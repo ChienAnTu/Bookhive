@@ -108,7 +108,43 @@ alembic revision --autogenerate -m "describe your change"
 alembic upgrade head
 ```
 
-### 4.3 Example
+### 4.3 Connect to AWS RDS
+
+#### 4.3.1 Edit SSH
+
+Host: 3.25.176.34
+
+Port: 22
+
+User Name: ec2-user
+
+Authentication Method: Public Key
+
+Private Key: `capstone15keypair.pem` share in our channel.
+
+<img src="introduction-images/image-20250817120713999.png" alt="image-20250817120713999" style="zoom:67%;" />
+
+
+
+#### 4.3.2 Edit General infomation: 
+
+Host: uwa-cits5206-capstone15.c7u8yy6k6lxl.ap-southeast-2.rds.amazonaws.com
+
+Port:3306
+
+User Name: admin
+
+Password: share in our channel.
+
+<img src="introduction-images/image-20250817121410270.png" alt="image-20250817121410270" style="zoom:67%;" />
+
+
+
+
+
+
+
+### 4.4 Example
 
 When I run `alembic revision --autogenerate -m "add published_year to book"` and  `alembic upgrade head`, Alembic generates a new migration script that adds the `published_year` field to the `book` table.
 
