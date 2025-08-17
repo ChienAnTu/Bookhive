@@ -34,7 +34,7 @@ DB_NAME=bookhive
 
 ## **3. Start the Project**
 
-Run with Uvicorn:
+### 3.1 Run with Uvicorn:
 
 ```
 uvicorn app.main:app --reload
@@ -44,6 +44,37 @@ Visit:
 
 - API: http://127.0.0.1:8000
 - Docs: http://127.0.0.1:8000/docs
+
+### 3.2 You may encounter the following error:
+
+```
+ERROR:    [Errno 48] Address already in use
+```
+
+#### 3.2.1. Check which process is using port 8000
+
+```
+lsof -i :8000
+```
+
+Example output:
+
+```
+COMMAND     PID            USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+python3.1 83984 zhangchangjiang    3u  IPv4 ...      0t0  TCP localhost:8000 (LISTEN)
+python3.1 84407 zhangchangjiang    3u  IPv4 ...      0t0  TCP localhost:8000 (LISTEN)
+```
+
+#### 3.2.2 Kill the processes occupying the port
+
+```
+kill -9 83984
+kill -9 84407
+```
+
+[Re-execute Step 3.1 Run with Uvicorn]()
+
+
 
 ## 4. Database Migration (Alembic)
 
@@ -61,9 +92,9 @@ alembic revision --autogenerate -m "describe your change"
 alembic upgrade head
 ```
 
-### 4.3 example
+### 4.3 Example
 
-When I run `alembic revision --autogenerate -m "add published_year to book"` and  `alembic upgrade head`, Alembic generates a new migration script that adds the `published_year` field to the `book` table.
+When I run `alembic revision --autogenerate -m "add published_year to book"` and  `alembic upgrade head`, Alembic generates a new migration script that adds the `published_year` field to the `book` table.
 
 <img src="introduction-images/image-20250817111019996.png" alt="image-20250817111019996" style="zoom:67%;" />
 
