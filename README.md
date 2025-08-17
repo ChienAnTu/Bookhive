@@ -117,3 +117,28 @@ When I run `alembic revision --autogenerate -m "add published_year to book"` and
 <img src="introduction-images/image-20250817111103993.png" alt="image-20250817111103993" style="zoom:67%;" />
 
 <img src="introduction-images/image-20250817111129400.png" alt="image-20250817111129400" style="zoom:67%;" />
+
+## 5. AWS Aurora  and RDS
+
+### TODO: Aurora / RDS - Starter Enhancements, some example
+
+- [ ] **Enable automated backups for RDS**  
+      Configure automatic daily backups for data recovery.
+
+- [ ] **Enable slow query logging for performance tuning**  
+      Track long-running SQL queries to identify performance issues.
+
+- [ ] **Monitor DB metrics via Amazon CloudWatch**  
+      Observe key database metrics like CPU, connections, and storage.
+
+- [ ] **Optimize connection pooling (SQLAlchemy)**  
+      Adjust database connection settings for better performance.
+
+- [ ] **Perform regular DB snapshot exports to S3**  
+      Archive database snapshots externally for backup and audit.
+
+<img src="introduction-images/image-20250817114918931.png" alt="image-20250817114918931" style="zoom:67%;" />
+
+
+
+![image-20250817115006778](introduction-images/image-20250817115006778.png)
