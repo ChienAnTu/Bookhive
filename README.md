@@ -45,6 +45,22 @@ Visit:
 - API: http://127.0.0.1:8000
 - Docs: http://127.0.0.1:8000/docs
 
+
+
+At http://127.0.0.1:8000/docs, once you expand an endpoint, click the `Try it out` button, and then click the `Execute` button.
+
+<img src="introduction-images/image-20250817113555850.png" alt="image-20250817113555850" style="zoom:67%;" />
+
+<img src="introduction-images/image-20250817113730869.png" alt="image-20250817113730869" style="zoom:67%;" />
+
+
+
+After execution, you’ll see  the Response:
+
+<img src="introduction-images/image-20250817113759361.png" alt="image-20250817113759361" style="zoom:67%;" />
+
+
+
 ### 3.2 You may encounter the following error:
 
 ```
