@@ -1,0 +1,7 @@
+paramiko
+fastapi
+sqlmodel
+uvicorn
+mysql-connector-python
+python-dotenv
+alembic
