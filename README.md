@@ -1,6 +1,37 @@
 # BookHive
 
+## Overview
+
+| **Layer**      | **Tech Used**                             | **Description**                                     |
+| -------------- | ----------------------------------------- | --------------------------------------------------- |
+| API Framework  | [FastAPI](https://fastapi.tiangolo.com)   | Lightweight, high-performance Python web framework  |
+| ORM + Models   | [SQLModel](https://sqlmodel.tiangolo.com) | Combines SQLAlchemy + Pydantic for defining models  |
+| Database       | AWS RDS (MySQL)                           | Managed cloud DB, connected via SSH                 |
+| Migration Tool | Alembic                                   | Tracks model changes and auto-generates SQL scripts |
+| Deployment     | Local + SSH tunnel                        | Local dev runs via uvicorn, tunnels to AWS RDS      |
+| API Docs       | Swagger (via FastAPI)                     | Available at /docs                                  |
+
+## Folder Structure
+
+```
+bookhive/
+├── app/
+│   ├── models/         # SQLModel-based database models
+│   ├── routes/         # FastAPI route definitions
+│   ├── services/       # Business logic (optional abstraction)
+│   ├── config.py       # Loads .env configuration
+│   ├── db.py           # DB engine init & SSH tunnel
+│   └── main.py         # FastAPI app entrypoint
+├── alembic/            # Alembic migration versions
+├── alembic.ini         # Alembic config
+├── .env / .env.example # Environment config (SSH, DB, etc.)
+├── requirements.txt    # Python dependencies
+└── README.md
+```
+
 ## 1. Install Dependencies
+
+You can install all dependencies by running the following command in the directory that contains `requirements.txt`:
 
 ```bash
 pip install --upgrade pip
@@ -15,7 +46,7 @@ Copy the example file and update your credentials:
 cp .env.example .env
 ```
 
-Edit .env:
+Edit .env: use files `3thingsNeedtoModify.txt` in our teams channel.
 
 ```
 SSH_HOST=3.25.176.34
