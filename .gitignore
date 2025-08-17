@@ -1,2 +1,15 @@
 # .gitignore
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
 .env
+
+# VSCode settings (optional)
+.vscode/
+
+# Mac system files
+.DS_Store
