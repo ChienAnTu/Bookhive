@@ -52,7 +52,7 @@ Edit .env: use files `3thingsNeedtoModify.txt` in our teams channel.
 SSH_HOST=3.25.176.34
 SSH_PORT=22
 SSH_USER=ec2-user
-SSH_KEY_PATH=/Users/yourname/.ssh/your-key.pem
+SSH_KEY_PATH=/xxx/your-key.pem
 
 REMOTE_DB_HOST=your-rds-endpoint.ap-southeast-2.rds.amazonaws.com
 REMOTE_DB_PORT=3306
@@ -123,25 +123,37 @@ kill -9 84407
 
 
 
-## 4. Database Migration (Alembic)
+## 4. Database
+
+### 4.1 Migration
 
 Whenever your SQLModel models change (e.g. add/edit/delete fields or tables), follow these steps to apply the changes to the database:
 
-### 4.1 Generate migration script:
+#### 4.1.1Migration (Alembic) script:
 
 ```
 alembic revision --autogenerate -m "describe your change"
 ```
 
-### 4.2 Apply changes to Database:
+#### 4.1.2 Apply changes to Database:
 
 ```
 alembic upgrade head
 ```
 
-### 4.3 Connect to AWS RDS
+#### 4.1.3 Migration Example
 
-#### 4.3.1 Edit SSH
+When I run `alembic revision --autogenerate -m "add published_year to book"` and  `alembic upgrade head`, Alembic generates a new migration script that adds the `published_year` field to the `book` table.
+
+<img src="introduction-images/image-20250817111019996.png" alt="image-20250817111019996" style="zoom:67%;" />
+
+<img src="introduction-images/image-20250817111103993.png" alt="image-20250817111103993" style="zoom:67%;" />
+
+<img src="introduction-images/image-20250817111129400.png" alt="image-20250817111129400" style="zoom:67%;" />
+
+### 4.2 Local development environment Connect to AWS RDS
+
+#### 4.2.1 Edit SSH
 
 Host: 3.25.176.34
 
@@ -157,7 +169,7 @@ Private Key: `capstone15keypair.pem` share in our channel.
 
 
 
-#### 4.3.2 Edit General infomation: 
+#### 4.2.2 Edit General infomation: 
 
 Host: uwa-cits5206-capstone15.c7u8yy6k6lxl.ap-southeast-2.rds.amazonaws.com
 
@@ -169,25 +181,9 @@ Password: share in our channel.
 
 <img src="introduction-images/image-20250817121410270.png" alt="image-20250817121410270" style="zoom:67%;" />
 
-
-
-
-
-
-
-### 4.4 Example
-
-When I run `alembic revision --autogenerate -m "add published_year to book"` and  `alembic upgrade head`, Alembic generates a new migration script that adds the `published_year` field to the `book` table.
-
-<img src="introduction-images/image-20250817111019996.png" alt="image-20250817111019996" style="zoom:67%;" />
-
-<img src="introduction-images/image-20250817111103993.png" alt="image-20250817111103993" style="zoom:67%;" />
-
-<img src="introduction-images/image-20250817111129400.png" alt="image-20250817111129400" style="zoom:67%;" />
-
 ## 5. AWS Aurora  and RDS
 
-### TODO: Aurora / RDS - Starter Enhancements, some example
+### TODO list : Aurora / RDS - Starter Enhancements, some example
 
 - [ ] **Enable automated backups for RDS**  
       Configure automatic daily backups for data recovery.
