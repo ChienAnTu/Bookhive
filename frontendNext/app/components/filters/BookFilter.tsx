@@ -216,9 +216,9 @@ const BookFilter: React.FC<BookFilterProps> = ({
 
   return (
     <>
-      {/* Desktop Filter - 桌面端固定侧边栏（调整为更窄的宽度） */}
-      <div className="hidden lg:block w-48 fixed top-16 bottom-0 left-0 overflow-y-auto z-30">
-        <div className={`bg-transparent p-4 border-0 ${className}`}>
+      {/* Desktop Filter - 使用完整宽度，由父容器控制比例 */}
+      <div className="hidden lg:block w-full h-full overflow-y-auto border-r border-gray-200">
+        <div className={`bg-transparent p-4 ${className}`}>
           <FilterContent />
         </div>
       </div>

@@ -72,7 +72,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
     <Card
       hover={true}
       padding={false}
-      className="w-full max-w-sm mx-auto overflow-hidden h-full flex flex-col transform-none"
+      className="w-full overflow-hidden h-full flex flex-col transform-none"
       onClick={() => onViewDetails?.(book.id)}
     >
       {/* 封面图片区域 */}
