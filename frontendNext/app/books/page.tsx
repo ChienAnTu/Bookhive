@@ -62,17 +62,19 @@ export default function BooksPage() {
 
   return (
     <div className="flex h-full">
-      {/* BookFilter组件 - 更窄的侧边栏 */}
-      <BookFilter
-        filters={filters}
-        books={availableBooks}
-        onFilterChange={handleFilterChange}
-        onClearFilters={handleClearFilters}
-      />
+      {/* Filter Sidebar - 使用flex比例布局 */}
+      <div className="hidden lg:flex lg:w-1/5 lg:min-w-48 lg:max-w-64">
+        <BookFilter
+          filters={filters}
+          books={availableBooks}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+        />
+      </div>
 
-      {/* Main content area - 调整为更窄的左边距，并平衡左右边距 */}
-      <div className="flex-1 lg:ml-48 lg:mr-6 overflow-y-auto">
-        <div className="p-6 lg:px-0">
+      {/* Main content area - 自动占用剩余空间 */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6">
           {/* Simple header showing results count */}
           <div className="mb-6">
             <h2 className="text-lg font-medium text-gray-900">
@@ -113,6 +115,16 @@ export default function BooksPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Mobile Filter - 移动端显示 */}
+      <div className="lg:hidden">
+        <BookFilter
+          filters={filters}
+          books={availableBooks}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+        />
       </div>
     </div>
   );
