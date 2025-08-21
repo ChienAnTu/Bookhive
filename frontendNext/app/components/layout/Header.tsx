@@ -21,7 +21,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <header className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 transform-none">
       <div className="w-full px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center h-16 gap-2">
           <div className="flex-shrink-0">
@@ -73,7 +73,7 @@ const Header: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 rounded-lg hover:bg-gray-100"
                 >
                   {/* profile photo */}
                   <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
