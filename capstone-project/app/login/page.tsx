@@ -6,6 +6,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { Mail, Lock } from "lucide-react";
+import axios from "axios";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -20,11 +21,40 @@ export default function LoginPage() {
     setIsLoading(true);
 
     // Login simulation
-    setTimeout(() => {
-      console.log("Log data:", formData);
-      alert("logged...");
-      setIsLoading(false);
-    }, 1500);
+      try {
+        const res = await axios.post(
+          "http://localhost:8000/api/v1/auth/login",
+          {
+            email: formData.email,
+            password: formData.password,
+          },
+          {
+            headers: { "Content-Type": "application/json" },
+            // Only set to true if cookies are relied upon for session management
+            withCredentials: false,
+          }
+        );
+
+        // Retrieve token and store/apply it
+        const token: string = res.data.access_token;
+        // For security: in production, prefer httpOnly cookies. For a demo, localStorage is acceptable.
+        localStorage.setItem("access_token", token);
+        axios.defaults.headers.common["Authorisation"] = `Bearer ${token}`;
+
+        console.log("Sign in:", res.data);
+        alert("Sign in successful!");
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.detail ||   // FastAPI returns `detail` on 401
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Sign in failed";
+        console.error("Sign in error:", err);
+        alert(msg);
+      } finally {
+        setIsLoading(false);
+      }
   };
 
   return (
