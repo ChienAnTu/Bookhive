@@ -8,4 +8,4 @@ sqlalchemy
 python-dotenv
 pydantic
 email-validator
-pymysql
+PyMySQL

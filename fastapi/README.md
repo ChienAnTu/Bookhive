@@ -46,9 +46,9 @@ This directory contains the FastAPI backend for the BookHive project, focusing o
    - Copy `../.env.example` to `../.env` (at project root) and fill in values:
      ```
      # Database (required)
-     DB_USER=myuser
-     DB_PASSWORD=123456
-     DB_HOST=localhost
+     DB_USER=admin
+     DB_PASSWORD=12345678
+     DB_HOST=capstone15db.c7u8yy6k6lxl.ap-southeast-2.rds.amazonaws.com
      DB_PORT=3306
      DB_NAME=BookHive
 
@@ -70,13 +70,75 @@ This directory contains the FastAPI backend for the BookHive project, focusing o
 - Production: Remove `--reload` and use a production server like Gunicorn.
 - Access: http://localhost:8000 (root), http://localhost:8000/docs (Swagger UI for testing).
 
-## API Endpoints
-Focus on authentication (/api/v1/auth prefix):
+## API REFERENCE
 
-- **POST /register**: Create a new user (JSON body: name, email, password, confirm_password, agree_terms). Returns user details.
-- **POST /login**: Authenticate and get JWT (JSON body: email, password). Returns {access_token}.
-- **POST /logout**: Logout (requires Bearer token). Returns success message (client-side clears token).
-- **GET /me**: Get current user info (requires Bearer token). Returns user details.
+authentication:
+
+- **POST /register**
+    Endpoint: http://localhost:8000/api/v1/auth/register
+    Description: This endpoint allows a new user to register. A JSON body must be provided with name, email, password, confirm_password, and agree_terms. The 
+                 server will validate the input and, if valid, create a new account.
+    Example Request:
+    {
+        "name": "Alice",
+        "email": "alice@example.com",
+        "password": "securePassword123",
+        "confirm_password": "securePassword123",
+        "agree_terms": true
+    }
+    Example Response:
+    {
+        "id": "uuid123",
+        "name": "Alice",
+        "email": "alice@example.com",
+        "location": null,
+        "avatar": null,
+        "createdAt": "2025-08-24T15:00:00Z"
+    }
+
+- **POST /login**: 
+    Endpoint: http://localhost:8000/api/v1/auth/login
+    Description: This endpoint authenticates a user with their e-mail and password. If the credentials are correct, the server issues a JWT access token that 
+                 must be used in the Authorisation: Bearer <token> header for protected routes.
+    Example Request:
+    {
+        "email": "alice@example.com",
+        "password": "securePassword123"
+    }
+    Example Response:
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer"
+    }
+
+- **POST /logout**: 
+    Endpoint: http://localhost:8000/api/v1/auth/logout
+    Description: This endpoint logs a user out. It requires a valid JWT in the Authorisation: Bearer <token> header. The server responds with a 
+    confirmation message; the client is responsible for discarding the token.
+    Example Request:
+       None
+    Example Response:
+    {
+        "message": "Successfully logged out"
+    }
+
+- **GET /me**: 
+    Endpoint: http://localhost:8000/api/v1/auth/me
+    Description: This endpoint retrieves information about the currently authenticated user. A valid JWT must be included in the Authorisation: Bearer 
+                 <token> header.
+    Example Request:
+       None
+    Example Response:
+    {
+        "id": "uuid123",
+        "name": "Alice",
+        "email": "alice@example.com",
+        "location": "London",
+        "avatar": "https://example.com/avatar.png",
+        "createdAt": "2025-08-24T15:00:00Z"
+    }          
+
+
 
 Test in Swagger (authorize with "Bearer <token>") or Postman.
 

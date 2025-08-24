@@ -6,6 +6,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { Mail, Lock, User } from "lucide-react";
+import axios from "axios";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -16,6 +17,11 @@ export default function RegisterPage() {
   });
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+    const onChange =
+    (key: keyof typeof formData) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setFormData((s) => ({ ...s, [key]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +38,36 @@ export default function RegisterPage() {
 
     setIsLoading(true);
 
-    // Simulation
-    setTimeout(() => {
-      console.log("Data:", formData);
-      alert("Developing...");
+    // Sign up request
+    try {
+      // Call POST request
+      const res = await axios.post("http://localhost:8000/api/v1/auth/register", {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+        agree_terms:agreeTerms,
+      }, {
+        // Header/Cookie option 
+        headers: { "Content-Type": "application/json" },
+        withCredentials: true, // in case Header and cookie are used 
+      });
+
+      // if Successful 
+      console.log("Registered:", res.data);
+      alert("Account created successfully!");
+     
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Registration failed";
+      console.error("Registration error:", err);
+      alert(msg);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
