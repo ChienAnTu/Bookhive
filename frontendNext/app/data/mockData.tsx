@@ -1,32 +1,5 @@
 // mockData.tsx
 
-// export interface Book {
-//   id: string;
-//   title: string;
-//   author: string;
-//   category: string;
-//   description: string;
-//   imageUrl: string;
-//   ownerId: string;
-//   borrowerId?: string;
-//   status: "available" | "borrowed" | "requested";
-//   condition: "new" | "like-new" | "good" | "fair";
-//   dateAdded: string;
-//   dueDate?: string;
-//   language: string;
-//   isbn?: string;
-//   publishYear?: number;
-//   tags: string[];
-//   genre: string[];
-//   availableFrom?: string;
-//   maxLendingDays: number;
-//   deliveryMethod: "post" | "self-help" | "both";
-//   fees: {
-//     deposit: number; // Security deposit amount (refundable)
-//     serviceFee: number; // Platform service fee (non-refundable)
-//     estimatedShipping?: number; // Estimated shipping cost (for post delivery)
-//   };
-// }
 import { Book } from "@/app/types/book";
 
 export interface User {
@@ -210,8 +183,6 @@ export const mockUsers: User[] = [
 ];
 
 
-import { Book } from "@/app/types/book";
-
 export const mockBooks: Book[] = [
   {
     id: "book1",
@@ -227,7 +198,6 @@ export const mockBooks: Book[] = [
     ownerId: "user2",
     status: "listed",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2024-01-15",
     updateDate: "2024-01-15",
     isbn: "",
@@ -251,7 +221,6 @@ export const mockBooks: Book[] = [
     ownerId: "user3",
     status: "listed",
     condition: "good",
-    conditionImgURL: "",
     dateAdded: "2024-01-20",
     updateDate: "2024-01-20",
     isbn: "",
@@ -275,7 +244,6 @@ export const mockBooks: Book[] = [
     ownerId: "user1",
     status: "lendOut",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2023-12-10",
     updateDate: "2023-12-10",
     isbn: "",
@@ -299,7 +267,6 @@ export const mockBooks: Book[] = [
     ownerId: "user1",
     status: "lendOut",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2023-12-10",
     updateDate: "2023-12-10",
     isbn: "",
@@ -323,7 +290,6 @@ export const mockBooks: Book[] = [
     ownerId: "user3",
     status: "listed",
     condition: "good",
-    conditionImgURL: "",
     dateAdded: "2024-01-10",
     updateDate: "2024-01-10",
     isbn: "",
@@ -347,7 +313,6 @@ export const mockBooks: Book[] = [
     ownerId: "user2",
     status: "listed",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2024-01-05",
     updateDate: "2024-01-05",
     isbn: "",
@@ -376,7 +341,6 @@ export const mockBooks: Book[] = [
     ownerId: "user1",
     status: "listed",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2024-01-25",
     updateDate: "2024-01-25",
     isbn: "",
@@ -400,7 +364,6 @@ export const mockBooks: Book[] = [
     ownerId: "user5",
     status: "listed",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2024-01-18",
     updateDate: "2024-01-18",
     isbn: "",
@@ -424,7 +387,6 @@ export const mockBooks: Book[] = [
     ownerId: "user1",
     status: "listed",
     condition: "good",
-    conditionImgURL: "",
     dateAdded: "2024-01-22",
     updateDate: "2024-01-22",
     isbn: "",
@@ -448,7 +410,6 @@ export const mockBooks: Book[] = [
     ownerId: "user4",
     status: "listed",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2024-01-12",
     updateDate: "2024-01-12",
     isbn: "",
@@ -472,7 +433,6 @@ export const mockBooks: Book[] = [
     ownerId: "user2",
     status: "listed",
     condition: "good",
-    conditionImgURL: "",
     dateAdded: "2024-01-08",
     updateDate: "2024-01-08",
     isbn: "",
@@ -496,7 +456,6 @@ export const mockBooks: Book[] = [
     ownerId: "user3",
     status: "listed",
     condition: "good",
-    conditionImgURL: "",
     dateAdded: "2024-01-14",
     updateDate: "2024-01-14",
     isbn: "",
@@ -520,7 +479,6 @@ export const mockBooks: Book[] = [
     ownerId: "user5",
     status: "listed",
     condition: "fair",
-    conditionImgURL: "",
     dateAdded: "2024-01-06",
     updateDate: "2024-01-06",
     isbn: "",
@@ -544,7 +502,6 @@ export const mockBooks: Book[] = [
     ownerId: "user4",
     status: "listed",
     condition: "like-new",
-    conditionImgURL: "",
     dateAdded: "2024-01-30",
     updateDate: "2024-01-30",
     isbn: "",

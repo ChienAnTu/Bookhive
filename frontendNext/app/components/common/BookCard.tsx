@@ -1,9 +1,10 @@
 import React from "react";
 import Card from "../ui/Card";
 import { MapPin, Star, Clock, Calendar } from "lucide-react";
+import { Book } from "@/app/types/book";
+
 // import Link from "next/link";
 import {
-  Book,
   User,
   calculateDistance,
   getCurrentUser,
@@ -60,6 +61,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
 
     if (diffDays === 0) return "today";
     if (diffDays === 1) return "yesterday";
@@ -85,10 +87,10 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
         </div>
 
         <div className="aspect-[4/5] w-full">
-          {book.imageUrl ? (
+          {book.coverImgUrl ? (
             <img
-              src={book.imageUrl}
-              alt={book.title}
+              src={book.coverImgUrl}
+              alt={book.titleOr}
               className="w-full h-full object-cover block"
             />
           ) : (
@@ -96,7 +98,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
               <div className="text-center">
                 <div className="text-6xl mb-2">📚</div>
                 <div className="text-sm text-gray-500 font-medium">
-                  {book.title.slice(0, 20)}...
+                  {book.titleOr.slice(0, 20)}...
                 </div>
               </div>
             </div>
@@ -110,14 +112,14 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
           {/* title and author */}
           <div className="mb-3">
             <h3 className="font-semibold text-lg text-gray-900 line-clamp-2 mb-1 leading-tight">
-              {book.title}
+              {book.titleOr}
             </h3>
             <p className="text-gray-600 text-sm">by {book.author}</p>
           </div>
 
           {/* tags */}
           <div className="flex flex-wrap gap-1 mb-4">
-            {book.tags.slice(0, 3).map((tag, index) => (
+            {book.tags?.slice(0, 3).map((tag, index) => (
               <span
                 key={index}
                 className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"

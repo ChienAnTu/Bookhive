@@ -19,6 +19,7 @@ export default function LendBookPage() {
     depositPrice: "",
     lendDuration: "",
     condition: "like-new",
+    conditionImages: [] as File[],
     isbn: "",
     publishYear: "",
     shippingPickup: false,
@@ -47,42 +48,52 @@ export default function LendBookPage() {
 
     // check Shipping Way
     if (!form.shippingPickup && !form.shippingDelivery) {
-      alert("Please select at least one shipping way");
+      setShowErrors(true);
       return;
     }
 
     // create a Book
     const newBook: Book = {
-      id: `book-${Date.now()}`,// need to check with backend what the id is 
-      title: form.titleEn || form.titleOrigin,
+      id: `book-${Date.now()}`,
+      titleOr: form.titleOrigin,
+      titleEn: form.titleEn || "",
+      originalLanguage: form.language,
       author: form.author,
       category: form.category,
       description: form.description,
-      imageUrl: form.coverImage
+      coverImgUrl: form.coverImage
         ? URL.createObjectURL(form.coverImage)
         : "https://via.placeholder.com/300x400?text=No+Cover",
       ownerId: "user1", // TODO: 替换为当前登录用户
-      status: "available",
+
+      status: "listed",
       condition: form.condition as Book["condition"],
+      conditionImgURLs: form.conditionImages.map((file) =>
+        URL.createObjectURL(file)
+      ),
+
       dateAdded: new Date().toISOString(),
-      language: form.language,
+      updateDate: new Date().toISOString(),
+
       isbn: form.isbn || undefined,
       publishYear: form.publishYear ? Number(form.publishYear) : undefined,
       tags: form.tags.split(",").map((k) => k.trim()).filter(Boolean),
-      availableFrom: new Date().toISOString(),
       maxLendingDays: Number(form.lendDuration) || 14,
+
       deliveryMethod:
         form.shippingPickup && form.shippingDelivery
           ? "both"
           : form.shippingPickup
             ? "self-help"
             : "post",
+
       fees: {
         deposit: Number(form.depositPrice),
         serviceFee: 3,
         estimatedShipping: form.shippingDelivery ? 8 : undefined,
       },
     };
+
 
     // save
     mockBooks.push(newBook);
@@ -91,6 +102,7 @@ export default function LendBookPage() {
     alert("Book has been listed successfully!");
   };
 
+  const [showErrors, setShowErrors] = useState(false);
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -277,7 +289,7 @@ export default function LendBookPage() {
               const files = Array.from(e.target.files || []);
               setForm((prev) => ({
                 ...prev,
-                conditionImages: files,
+                conditionImages: [...prev.conditionImages, ...files],
               }));
             }}
             className="hidden"
@@ -295,7 +307,7 @@ export default function LendBookPage() {
 
           {/* preview */}
           <div className="flex gap-2 mt-2 flex-wrap">
-            {form.conditionImages?.map((file, index) => (
+            {form.conditionImages.map((file, index) => (
               <img
                 key={index}
                 src={URL.createObjectURL(file)}
@@ -360,9 +372,12 @@ export default function LendBookPage() {
               Delivery
             </label>
           </div>
-          {!(form.shippingPickup || form.shippingDelivery) && (
-            <p className="text-sm text-red-600 mt-1">Please select at least one option</p>
+          {showErrors && !(form.shippingPickup || form.shippingDelivery) && (
+            <p className="text-sm text-red-600 mt-1">
+              Please select at least one option
+            </p>
           )}
+
         </div>
 
 

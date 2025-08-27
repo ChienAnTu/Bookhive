@@ -7,23 +7,23 @@ export interface Book {
   author: string;
   category: string;
   description: string;
-  coverImgUrl: string;
+  coverImgUrl?: string;
   ownerId: string;
   // borrowerId?: string;
 
   // 状态
   status: "listed" | "unlisted" | "lendOut";
   condition: "new" | "like-new" | "good" | "fair";
-  conditionImgURL: string;
-
+  conditionImgURLs?: string[];
+  
   // 时间相关
   dateAdded: string;
   updateDate: string;
 
   // 书籍属性
-  isbn: string;
-  tags: string[];
-  publishYear: number;
+  isbn?: string;
+  tags?: string[];
+  publishYear?: number;
   maxLendingDays: number;
 
   // 配送
