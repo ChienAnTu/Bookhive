@@ -48,7 +48,7 @@ export default function BorrowPage() {
     e.preventDefault();
     console.log("Borrow confirmed:", {
       bookId: id,
-      bookTitle: book.title,
+      bookTitle: book.titleOr,
       ...form,
       total,
     });
@@ -60,14 +60,14 @@ export default function BorrowPage() {
       <Breadcrumb
         items={[
           { label: "Books", href: "/books" },
-          { label: book.title, href: `/books/${book.id}` },
+          { label: book.titleOr, href: `/books/${book.id}` },
           { label: "Borrow" },
         ]}
       />
 
       <div className="max-w-2xl mx-auto p-6">
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">{book.title}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">{book.titleOr}</h1>
         <p className="text-gray-600 mb-6">Borrow it from {owner?.name || "Platform User"}</p>
 
         <form
