@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User, LogOut, Plus } from "lucide-react";
+import { User, LogOut, Plus, Package, MessageSquare, Book } from "lucide-react";
 import { getCurrentUser } from "@/app/data/mockData";
 
 const Header: React.FC = () => {
@@ -47,6 +47,31 @@ const Header: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Navigation Menu */}
+          <nav className="hidden lg:flex items-center space-x-6">
+            <Link 
+              href="/books" 
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <Book className="w-4 h-4" />
+              <span>Books</span>
+            </Link>
+            <Link 
+              href="/shipping" 
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <Package className="w-4 h-4" />
+              <span>Shipping</span>
+            </Link>
+            <Link 
+              href="/complain" 
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Support</span>
+            </Link>
+          </nav>
 
           {/* Operation area */}
           <div className="flex items-center space-x-2">
@@ -136,3 +161,4 @@ const Header: React.FC = () => {
 };
 
 export default Header;
+

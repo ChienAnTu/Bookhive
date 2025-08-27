@@ -1,12 +1,15 @@
 // app/books/page.tsx
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { useState, useMemo } from "react";
 import BookCard from "../components/common/BookCard";
 import { BookFilter, type BookFilters } from "../components/filters";
 import { mockBooks, getUserById } from "@/app/data/mockData";
 
 export default function BooksPage() {
+  const router = useRouter();
   const [filters, setFilters] = useState<BookFilters>({
     category: "",
     language: "",
@@ -56,8 +59,7 @@ export default function BooksPage() {
   }, [availableBooks, filters]);
 
   const handleViewDetails = (bookId: string) => {
-    // Handle view details logic
-    console.log("Viewing details for book:", bookId);
+    router.push(`/books/${bookId}`);
   };
 
   return (
@@ -117,7 +119,7 @@ export default function BooksPage() {
         </div>
       </div>
 
-      {/* Mobile Filter - 移动端显示 */}
+      {/* Mobile Filter - 移动端显�?*/}
       <div className="lg:hidden">
         <BookFilter
           filters={filters}
@@ -129,3 +131,4 @@ export default function BooksPage() {
     </div>
   );
 }
+
