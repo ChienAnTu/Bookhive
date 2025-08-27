@@ -1,7 +1,7 @@
 // app/components/filters/BookFilter.tsx
 import React, { useState } from "react";
 import { X, BookOpen, Globe, Package, Tag, Filter } from "lucide-react";
-import { Book } from "@/app/data/mockData";
+import { Book } from "@/app/types/book";
 
 export interface BookFilters {
   category: string;

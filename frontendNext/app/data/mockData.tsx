@@ -1,32 +1,33 @@
 // mockData.tsx
 
-export interface Book {
-  id: string;
-  title: string;
-  author: string;
-  category: string;
-  description: string;
-  imageUrl: string;
-  ownerId: string;
-  borrowerId?: string;
-  status: "available" | "borrowed" | "requested";
-  condition: "new" | "like-new" | "good" | "fair";
-  dateAdded: string;
-  dueDate?: string;
-  language: string;
-  isbn?: string;
-  publishYear?: number;
-  tags: string[];
-  genre: string[];
-  availableFrom?: string;
-  maxLendingDays: number;
-  deliveryMethod: "post" | "self-help" | "both";
-  fees: {
-    deposit: number; // Security deposit amount (refundable)
-    serviceFee: number; // Platform service fee (non-refundable)
-    estimatedShipping?: number; // Estimated shipping cost (for post delivery)
-  };
-}
+// export interface Book {
+//   id: string;
+//   title: string;
+//   author: string;
+//   category: string;
+//   description: string;
+//   imageUrl: string;
+//   ownerId: string;
+//   borrowerId?: string;
+//   status: "available" | "borrowed" | "requested";
+//   condition: "new" | "like-new" | "good" | "fair";
+//   dateAdded: string;
+//   dueDate?: string;
+//   language: string;
+//   isbn?: string;
+//   publishYear?: number;
+//   tags: string[];
+//   genre: string[];
+//   availableFrom?: string;
+//   maxLendingDays: number;
+//   deliveryMethod: "post" | "self-help" | "both";
+//   fees: {
+//     deposit: number; // Security deposit amount (refundable)
+//     serviceFee: number; // Platform service fee (non-refundable)
+//     estimatedShipping?: number; // Estimated shipping cost (for post delivery)
+//   };
+// }
+import { Book } from "@/app/types/book";
 
 export interface User {
   id: string;
