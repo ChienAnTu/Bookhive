@@ -117,7 +117,7 @@ export default function BookDetailPage() {
     if (navigator.share) {
       navigator.share({
         title: book.title,
-        text: Check out "${book.title}" by ${book.author} on BookHive,
+        text: `Check out "${book.title}" by ${book.author} on BookHive`,
         url: window.location.href,
       });
     } else {
@@ -177,7 +177,7 @@ export default function BookDetailPage() {
                       onClick={handleToggleFavorite}
                       className="flex-1 flex items-center justify-center gap-2"
                     >
-                      <Heart className={w-4 h-4 ${isFavorited ? "fill-current text-red-500" : ""}} />
+                      <Heart className={`w-4 h-4 ${isFavorited ? "fill-current text-red-500" : ""}`} />
                       {isFavorited ? "Favorited" : "Favorite"}
                     </Button>
                     <Button
@@ -202,7 +202,7 @@ export default function BookDetailPage() {
                     </h1>
                     <p className="text-xl text-gray-600 mb-4">by {book.author}</p>
                   </div>
-                  <div className={px-3 py-1 rounded-full text-sm font-medium border ${getConditionColor(book.condition)}}>
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getConditionColor(book.condition)}`}>
                     {book.condition}
                   </div>
                 </div>
@@ -290,11 +290,11 @@ export default function BookDetailPage() {
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
                             key={star}
-                            className={w-4 h-4 ${
+                            className={`w-4 h-4 ${
                               star <= Math.floor(owner.rating)
                                 ? "text-yellow-400 fill-current"
                                 : "text-gray-300"
-                            }}
+                            }`}
                           />
                         ))}
                       </div>
