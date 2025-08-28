@@ -59,8 +59,8 @@ export default function BorrowPage() {
     <div className="p-6">
       <div className="max-w-2xl mx-auto p-6">
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">{book.titleOr}</h1>
-        <p className="text-gray-600 mb-6">Borrow it from {owner?.name || "Platform User"}</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">《{book.titleOr}》</h1>
+        <p className="text-gray-600 mb-6">-- Borrow it from {owner?.name || "Platform User"}</p>
 
         <form
           onSubmit={handleSubmit}

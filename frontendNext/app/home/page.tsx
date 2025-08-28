@@ -30,7 +30,6 @@ export default function HomePage() {
       >
         {/* 半透明遮罩 */}
         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-6">
-          {/* 文本 */}
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             {greeting}! Welcome back
           </h1>
@@ -38,7 +37,6 @@ export default function HomePage() {
             BookHive — where every book finds a new friend.
           </p>
 
-          {/* 白底大搜索框 */}
           <div className="relative w-full max-w-2xl">
             <input
               type="text"

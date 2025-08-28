@@ -48,7 +48,7 @@ export default function ShippingPage() {
     if (searchTerm) {
       filtered = filtered.filter(order => {
         const book = mockBooks.find(b => b.id === order.bookId);
-        return book?.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        return book?.titleOr.toLowerCase().includes(searchTerm.toLowerCase()) ||
           book?.author.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
@@ -173,10 +173,10 @@ export default function ShippingPage() {
                   <Card key={order.id}>
                     <div className="flex items-start space-x-4">
                       <div className="w-16 h-20 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
-                        {book.imageUrl ? (
+                        {book.coverImgUrl ? (
                           <img
-                            src={book.imageUrl}
-                            alt={book.title}
+                            src={book.coverImgUrl}
+                            alt={book.titleOr}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -190,7 +190,7 @@ export default function ShippingPage() {
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900 truncate">
-                              {book.title}
+                              {book.titleOr}
                             </h3>
                             <p className="text-sm text-gray-600">by {book.author}</p>
                           </div>

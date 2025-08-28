@@ -22,7 +22,7 @@ export interface Book {
 
   // 书籍属性
   isbn?: string;
-  tags?: string[];
+  tags: string[];
   publishYear?: number;
   maxLendingDays: number;
 

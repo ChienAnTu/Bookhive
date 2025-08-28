@@ -1,5 +1,10 @@
 import React from "react";
-import { mockBooks, type Book } from "../../data/mockData";
+// 引入类型
+import type { Book } from "@/app/types/book";
+
+// 引入数据
+import { mockBooks } from "@/app/data/mockData";
+
 import Button from "../ui/Button";
 import Link from "next/link";
 import SimpleBookCard from "../ui/SimpleBookCard";
@@ -7,7 +12,7 @@ import SimpleBookCard from "../ui/SimpleBookCard";
 // sorted by dateAdd
 const getNewReleases = (): Book[] => {
   return mockBooks
-    .filter((book) => book.status === "available")
+    .filter((book) => book.status === "listed")
     .sort(
       (a, b) =>
         new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
