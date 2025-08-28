@@ -5,10 +5,12 @@ import Link from "next/link";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
+import { useRouter } from "next/navigation";
 import { Mail, Lock, User } from "lucide-react";
 import axios from "axios";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -59,6 +61,9 @@ export default function RegisterPage() {
       // if Successful
       console.log("Registered:", res.data);
       alert("Account created successfully!");
+
+      // to /login
+      router.push("/login");
     } catch (err) {
       let msg = "Registration failed";
 
@@ -74,7 +79,7 @@ export default function RegisterPage() {
       console.error("Registration error:", err);
       alert(msg);
     } finally {
-      setIsLoading(false); 
+      setIsLoading(false);
     }
   };
 
@@ -96,7 +101,7 @@ export default function RegisterPage() {
             placeholder="John Doe"
             leftIcon={<User className="w-4 h-4" />}
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={onChange("name")}
             required
           />
 
@@ -107,9 +112,7 @@ export default function RegisterPage() {
             placeholder="your@email.com"
             leftIcon={<Mail className="w-4 h-4" />}
             value={formData.email}
-            onChange={(e) =>
-              setFormData({ ...formData, email: e.target.value })
-            }
+            onChange={onChange("email")}
             required
           />
 
@@ -120,22 +123,18 @@ export default function RegisterPage() {
             placeholder="Create a password"
             leftIcon={<Lock className="w-4 h-4" />}
             value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
-            }
+            onChange={onChange("password")}
             required
           />
 
-          {/* comfirm password */}
+          {/* confirm password */}
           <Input
             label="Confirm Password"
             isPassword
             placeholder="Confirm your password"
             leftIcon={<Lock className="w-4 h-4" />}
             value={formData.confirmPassword}
-            onChange={(e) =>
-              setFormData({ ...formData, confirmPassword: e.target.value })
-            }
+            onChange={onChange("confirmPassword")}
             required
           />
 
