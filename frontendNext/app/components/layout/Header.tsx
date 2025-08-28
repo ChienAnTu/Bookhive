@@ -102,28 +102,24 @@ const Header: React.FC = () => {
           </div>
 
           {/* Search box */}
-          <div className="flex-1 flex justify-center px-2 sm:px-4">
-            <div className="w-full max-w-xl">
-              <div className="flex">
-                {/* input */}
-                <Input
-                  variant="search"
-                  placeholder="Search books, authors, tags..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-r-none"
-                />
+<div className="flex-1 flex justify-center px-2 sm:px-4">
+  <div className="w-full max-w-xl">
+    {/* input */}
+    <Input
+      variant="search"
+      placeholder="Search books, authors, tags..."
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          console.log("Searching:", searchQuery);
+        }
+      }}
+      className="w-full"
+    />
+  </div>
+</div>
 
-                {/* search button */}
-                <button
-                  className="px-4 bg-black text-white rounded-r-lg hover:bg-blue-800 transition"
-                  onClick={() => console.log("Searching:", searchQuery)}
-                >
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Action buttons area */}
           <div className="flex items-center space-x-2">

@@ -42,10 +42,10 @@ export default function HomePage() {
           <div className="relative w-full max-w-2xl">
             <input
               type="text"
-              placeholder="Find your next reading..."
+              placeholder="Find your next reading.."
               className="w-full px-6 py-4 text-lg rounded-xl bg-white text-gray-900 shadow focus:ring-2 focus:ring-black focus:outline-none"
             />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2 bg-white text-black px-6 py-2 rounded-lg  border-black hover:bg-black hover:text-white transition">
+            <button className="absolute right-3 top-1/2 -translate-y-1/2 bg-black text-white px-6 py-2 rounded-lg  border-black hover:bg-black hover:text-white transition">
               Search
             </button>
           </div>
