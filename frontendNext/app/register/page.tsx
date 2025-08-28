@@ -18,9 +18,8 @@ export default function RegisterPage() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-    const onChange =
-    (key: keyof typeof formData) =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
+  const onChange =
+    (key: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) =>
       setFormData((s) => ({ ...s, [key]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,32 +40,41 @@ export default function RegisterPage() {
     // Sign up request
     try {
       // Call POST request
-      const res = await axios.post("http://localhost:8000/api/v1/auth/register", {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        confirm_password: formData.confirmPassword,
-        agree_terms:agreeTerms,
-      }, {
-        // Header/Cookie option 
-        headers: { "Content-Type": "application/json" },
-        withCredentials: true, // in case Header and cookie are used 
-      });
+      const res = await axios.post(
+        "http://localhost:8000/api/v1/auth/register",
+        {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          confirm_password: formData.confirmPassword,
+          agree_terms: agreeTerms,
+        },
+        {
+          // Header/Cookie option
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true, // in case Header and cookie are used
+        }
+      );
 
-      // if Successful 
+      // if Successful
       console.log("Registered:", res.data);
       alert("Account created successfully!");
-     
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Registration failed";
+    } catch (err) {
+      let msg = "Registration failed";
+
+      if (axios.isAxiosError(err)) {
+        msg =
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+
       console.error("Registration error:", err);
       alert(msg);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); 
     }
   };
 
