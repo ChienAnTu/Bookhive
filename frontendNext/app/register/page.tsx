@@ -8,6 +8,7 @@ import Card from "../components/ui/Card";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, User } from "lucide-react";
 import axios from "axios";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -28,12 +29,12 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match!");
       return;
     }
 
     if (!agreeTerms) {
-      alert("Please agree to the Terms of Service");
+      toast.error("Please agree to the Terms of Service");
       return;
     }
 
@@ -60,10 +61,10 @@ export default function RegisterPage() {
 
       // if Successful
       console.log("Registered:", res.data);
-      alert("Account created successfully!");
-
-      // to /login
-      router.push("/login");
+      toast.success("Account created successfully!");
+      setTimeout(() => {
+        router.push("/login");
+      }, 1500);
     } catch (err) {
       let msg = "Registration failed";
 
@@ -77,7 +78,7 @@ export default function RegisterPage() {
       }
 
       console.error("Registration error:", err);
-      alert(msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
