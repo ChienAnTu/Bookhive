@@ -38,28 +38,42 @@ const Header: React.FC = () => {
           {/* Search box */}
           <div className="flex-1 flex justify-center px-2 sm:px-4">
             <div className="w-full max-w-xl">
-              <Input
-                variant="search"
-                placeholder="Search books, authors, tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full"
-              />
+              <div className="flex">
+                {/* input */}
+                <Input
+                  variant="search"
+                  placeholder="Search books, authors, tags..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 rounded-r-none"
+                />
+
+                {/* search button */}
+                <button
+                  className="px-4 bg-black text-white rounded-r-lg hover:bg-blue-800 transition"
+                  onClick={() => console.log("Searching:", searchQuery)}
+                >
+                  Search
+                </button>
+              </div>
             </div>
           </div>
+
 
           {/* Operation area */}
           <div className="flex items-center space-x-2">
             {/* Lend Books button, display when logged */}
             {isLoggedIn && (
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Plus className="w-4 h-4" />}
-                className="hidden sm:flex"
-              >
-                Lend Books
-              </Button>
+              <Link href="/lend/add">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Plus className="w-4 h-4" />}
+                  className="hidden sm:flex"
+                >
+                  Start Lending
+                </Button>
+              </Link>
             )}
             {/* mobile Lend button */}
             {isLoggedIn && (
@@ -67,6 +81,9 @@ const Header: React.FC = () => {
                 <Plus className="w-4 h-4" />
               </Button>
             )}
+
+
+           
 
             {/* Profile area */}
             {isLoggedIn ? (

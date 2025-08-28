@@ -4,7 +4,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { getBookById, getUserById } from "@/app/data/mockData";
-import Breadcrumb from "@/app/components/ui/Breadcrumb";
+//import Breadcrumb from "@/app/components/ui/Breadcrumb";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 
@@ -57,14 +57,6 @@ export default function BorrowPage() {
 
   return (
     <div className="p-6">
-      <Breadcrumb
-        items={[
-          { label: "Books", href: "/books" },
-          { label: book.titleOr, href: `/books/${book.id}` },
-          { label: "Borrow" },
-        ]}
-      />
-
       <div className="max-w-2xl mx-auto p-6">
         {/* Title */}
         <h1 className="text-2xl font-bold text-gray-900 mb-4">{book.titleOr}</h1>
