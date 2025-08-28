@@ -3,12 +3,12 @@
 
 import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { 
-  Star, 
-  MapPin, 
-  Clock, 
-  ArrowLeft, 
-  Heart, 
+import {
+  Star,
+  MapPin,
+  Clock,
+  ArrowLeft,
+  Heart,
   Share2,
   MessageCircle,
   Package,
@@ -17,18 +17,18 @@ import {
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
-import { 
-  mockBooks, 
-  getUserById, 
+import {
+  mockBooks,
+  getUserById,
   getCurrentUser,
-  calculateDistance 
+  calculateDistance
 } from "@/app/data/mockData";
 
 export default function BookDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bookId = params.id as string;
-  
+
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
   const [isFavorited, setIsFavorited] = useState(false);
@@ -116,8 +116,8 @@ export default function BookDetailPage() {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: book.title,
-        text: `Check out "${book.title}" by ${book.author} on BookHive`,
+        title: book.titleOr,
+        text: `Check out "${book.titleOr}" by ${book.author} on BookHive`,
         url: window.location.href,
       });
     } else {
@@ -144,10 +144,10 @@ export default function BookDetailPage() {
             <div className="lg:col-span-1">
               <Card padding={false} className="overflow-hidden">
                 <div className="aspect-[3/4] w-full">
-                  {book.imageUrl ? (
+                  {book.coverImgUrl ? (
                     <img
-                      src={book.imageUrl}
-                      alt={book.title}
+                      src={book.coverImgUrl}
+                      alt={book.titleOr}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -155,7 +155,7 @@ export default function BookDetailPage() {
                       <div className="text-center">
                         <div className="text-6xl mb-4"></div>
                         <div className="text-sm text-gray-500 font-medium px-4">
-                          {book.title}
+                          {book.titleOr}
                         </div>
                       </div>
                     </div>
@@ -164,13 +164,14 @@ export default function BookDetailPage() {
 
                 <div className="p-4 space-y-3">
                   <Button
-                    onClick={handleRequestBook}
+                    onClick={() => router.push(`/borrow/${book.id}`)}
                     className="w-full"
-                    disabled={book.status !== "available"}
+                    disabled={book.status !== "listed"}
                   >
-                    {book.status === "available" ? "Request to Borrow" : "Not Available"}
+                    {book.status === "listed" ? "Borrow This Book" : "Unlisted"}
                   </Button>
-                  
+
+
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -198,7 +199,7 @@ export default function BookDetailPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                      {book.title}
+                      {book.titleOr}
                     </h1>
                     <p className="text-xl text-gray-600 mb-4">by {book.author}</p>
                   </div>
@@ -235,7 +236,7 @@ export default function BookDetailPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Language:</span>
-                        <span className="font-medium">{book.language}</span>
+                        <span className="font-medium">{book.originalLanguage}</span>
                       </div>
                     </div>
                   </div>
@@ -290,11 +291,10 @@ export default function BookDetailPage() {
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
                             key={star}
-                            className={`w-4 h-4 ${
-                              star <= Math.floor(owner.rating)
+                            className={`w-4 h-4 ${star <= Math.floor(owner.rating)
                                 ? "text-yellow-400 fill-current"
                                 : "text-gray-300"
-                            }`}
+                              }`}
                           />
                         ))}
                       </div>
@@ -306,10 +306,12 @@ export default function BookDetailPage() {
                   <Button
                     variant="outline"
                     className="flex items-center gap-2"
+                    onClick={() => setIsRequestModalOpen(true)}
                   >
                     <MessageCircle className="w-4 h-4" />
                     Message
                   </Button>
+
                 </div>
               </Card>
             </div>
@@ -320,12 +322,12 @@ export default function BookDetailPage() {
       <Modal
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
-        title="Request to Borrow Book"
+        title="Send Message to Owner"
       >
         <div className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              Send a message to {owner.name} to request borrowing "{book.title}".
+              Send a message to {owner.name} to request borrowing "{book.titleOr}".
             </p>
             <textarea
               value={requestMessage}
@@ -345,7 +347,7 @@ export default function BookDetailPage() {
               onClick={handleSendRequest}
               disabled={!requestMessage.trim()}
             >
-              Send Request
+              Send
             </Button>
           </div>
         </div>
