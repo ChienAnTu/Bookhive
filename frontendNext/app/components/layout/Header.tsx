@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User, LogOut, Plus } from "lucide-react";
+import { User, LogOut, Plus, Truck, LifeBuoy } from "lucide-react";
 import { getCurrentUser } from "@/app/data/mockData";
 
 const Header: React.FC = () => {
@@ -83,7 +83,7 @@ const Header: React.FC = () => {
             )}
 
 
-           
+
 
             {/* Profile area */}
             {isLoggedIn ? (
@@ -117,7 +117,27 @@ const Header: React.FC = () => {
                       <User className="w-4 h-4 mr-3" />
                       View Profile
                     </Link>
+
+                    {/* New Shipping entry */}
+                    <Link
+                      href="/shipping"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileMenu(false)}
+                    >
+                      <Truck className="w-4 h-4 mr-3" />Shipping
+                    </Link>
+
+                    {/* New Support entry */}
+                    <Link
+                      href="/complain"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileMenu(false)}
+                    >
+                      <LifeBuoy className="w-4 h-4 mr-3" />Support
+                    </Link>
+
                     <hr className="my-1" />
+
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -127,6 +147,7 @@ const Header: React.FC = () => {
                     </button>
                   </div>
                 )}
+
               </div>
             ) : (
               /* Logout Status */

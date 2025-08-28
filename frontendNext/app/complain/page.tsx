@@ -177,7 +177,10 @@ export default function ComplainPage() {
                   key={option.value}
                   variant={selectedFilter === option.value ? "default" : "outline"}
                   onClick={() => setSelectedFilter(option.value as FilterStatus)}
-                  className="flex items-center gap-2"
+                                    className={`flex items-center gap-2 ${selectedFilter === option.value
+                      ? "bg-black text-white hover:bg-gray-800 border-black"
+                      : ""
+                    }`}
                 >
                   <Filter className="w-4 h-4" />
                   {option.label}
