@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User, LogOut, Plus } from "lucide-react";
+import { User, LogOut, Plus, Truck, LifeBuoy } from "lucide-react";
 import {
   logoutUser,
   isAuthenticated,
@@ -104,13 +104,24 @@ const Header: React.FC = () => {
           {/* Search box */}
           <div className="flex-1 flex justify-center px-2 sm:px-4">
             <div className="w-full max-w-xl">
-              <Input
-                variant="search"
-                placeholder="Search books, authors, tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full"
-              />
+              <div className="flex">
+                {/* input */}
+                <Input
+                  variant="search"
+                  placeholder="Search books, authors, tags..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 rounded-r-none"
+                />
+
+                {/* search button */}
+                <button
+                  className="px-4 bg-black text-white rounded-r-lg hover:bg-blue-800 transition"
+                  onClick={() => console.log("Searching:", searchQuery)}
+                >
+                  Search
+                </button>
+              </div>
             </div>
           </div>
 
@@ -118,14 +129,16 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-2">
             {/* Lend Books button - visible when user is logged in (desktop) */}
             {isLoggedIn && (
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Plus className="w-4 h-4" />}
-                className="hidden sm:flex"
-              >
-                Lend Books
-              </Button>
+              <Link href="/lend/add">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Plus className="w-4 h-4" />}
+                  className="hidden sm:flex"
+                >
+                  Start Lending
+                </Button>
+              </Link>
             )}
 
             {/* Lend Books button - mobile version (icon only) */}
@@ -167,7 +180,27 @@ const Header: React.FC = () => {
                       <User className="w-4 h-4 mr-3" />
                       View Profile
                     </Link>
+
+                    {/* New Shipping entry */}
+                    <Link
+                      href="/shipping"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileMenu(false)}
+                    >
+                      <Truck className="w-4 h-4 mr-3" />Shipping
+                    </Link>
+
+                    {/* New Support entry */}
+                    <Link
+                      href="/complain"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileMenu(false)}
+                    >
+                      <LifeBuoy className="w-4 h-4 mr-3" />Support
+                    </Link>
+
                     <hr className="my-1" />
+
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -177,6 +210,7 @@ const Header: React.FC = () => {
                     </button>
                   </div>
                 )}
+
               </div>
             ) : (
               /* Authentication buttons - shown when not logged in */
