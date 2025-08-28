@@ -1,4 +1,4 @@
-import { DeliveryMethod } from "./book";
+import { deliveryMethod } from "./book";
 
 export interface Order {
   id: string;
@@ -16,7 +16,7 @@ export interface Order {
 
   // 状态
   status: string; // "active" | "returned" | "overdue"
-  deliveryMethod: DeliveryMethod;
+  deliveryMethod: deliveryMethod;
 
   createdAt: Date;
 }

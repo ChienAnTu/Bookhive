@@ -9,6 +9,7 @@ import {
   getUserBorrowingOrders,
   mockOrders,
 } from "../data/mockData";
+import Link from "next/link";
 
 // User data interface
 interface UserData {
@@ -190,7 +191,10 @@ const ProfilePage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Lending */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+            <Link
+              href="/lend"
+              className="block bg-blue-50 border border-blue-200 rounded-lg p-4 text-center hover:bg-blue-100 transition"
+            >
               <div className="text-2xl font-bold text-blue-600 mb-1">
                 {ongoingLending}
               </div>
@@ -198,10 +202,13 @@ const ProfilePage: React.FC = () => {
               <div className="text-xs text-blue-600 mt-1">
                 Books you're lending
               </div>
-            </div>
+            </Link>
 
             {/* Borrowing */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+            <Link
+              href="/borrow"
+              className="block bg-green-50 border border-green-200 rounded-lg p-4 text-center hover:bg-green-100 transition"
+            >
               <div className="text-2xl font-bold text-green-600 mb-1">
                 {ongoingBorrowing}
               </div>
@@ -211,10 +218,13 @@ const ProfilePage: React.FC = () => {
               <div className="text-xs text-green-600 mt-1">
                 Books you're borrowing
               </div>
-            </div>
+            </Link>
 
             {/* Shipping */}
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+            <Link
+              href="/shipping"
+              className="block bg-orange-50 border border-orange-200 rounded-lg p-4 text-center hover:bg-orange-100 transition"
+            >
               <div className="text-2xl font-bold text-orange-600 mb-1">
                 {shippingOrders}
               </div>
@@ -224,7 +234,7 @@ const ProfilePage: React.FC = () => {
               <div className="text-xs text-orange-600 mt-1">
                 Books in transit
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </div>

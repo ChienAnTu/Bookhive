@@ -5,11 +5,13 @@ import { useState, useMemo } from "react";
 import BookCard from "../components/common/BookCard";
 import { BookFilter, type BookFilters } from "../components/filters";
 import { mockBooks, getUserById } from "@/app/data/mockData";
+import { useRouter } from "next/navigation";
+
 
 export default function BooksPage() {
   const [filters, setFilters] = useState<BookFilters>({
     category: "",
-    language: "",
+    originalLanguage: "",
     deliveryMethod: "",
   });
 
@@ -20,14 +22,14 @@ export default function BooksPage() {
   const handleClearFilters = () => {
     setFilters({
       category: "",
-      language: "",
+      originalLanguage: "",
       deliveryMethod: "",
     });
   };
 
   // Only get available books for filtering and display
   const availableBooks = useMemo(() => {
-    return mockBooks.filter((book) => book.status === "available");
+    return mockBooks.filter((book) => book.status === "listed");
   }, []);
 
   // Filter logic
@@ -39,7 +41,7 @@ export default function BooksPage() {
       }
 
       // Language filter
-      if (filters.language && book.language !== filters.language) {
+      if (filters.originalLanguage && book.originalLanguage !== filters.originalLanguage) {
         return false;
       }
 
@@ -55,9 +57,11 @@ export default function BooksPage() {
     });
   }, [availableBooks, filters]);
 
+  const router = useRouter();
+
+  // 点击跳转详情
   const handleViewDetails = (bookId: string) => {
-    // Handle view details logic
-    console.log("Viewing details for book:", bookId);
+    router.push(`/books/${bookId}`);
   };
 
   return (
