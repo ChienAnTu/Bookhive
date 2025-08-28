@@ -70,7 +70,7 @@ export interface Order {
   borrowerId: string;
   borrowerName: string;
   borrowerAvatar: string;
-  status: "completed" | "ongoing" | "overdue";
+  status: "completed" | "ongoing" | "overdue" | "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
   startDate: string;
   dueDate: string;
   returnedDate?: string;
@@ -79,6 +79,13 @@ export interface Order {
   deliveryMethod: "post" | "self-help" | "both";
   location: string; // Location where the transaction took place
   conversationId: string; // Link to the conversation for this order
+  createdAt: string; // When the order was created
+  shippingInfo?: {
+    trackingNumber: string;
+    carrier: string;
+    estimatedDelivery: string;
+    address: string;
+  };
 }
 
 export interface Conversation {
@@ -583,7 +590,7 @@ export const mockOrders: Order[] = [
     borrowerName: "Zhenyi Su",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "completed",
+    status: "delivered",
     startDate: "2023-12-01",
     dueDate: "2023-12-21",
     returnedDate: "2023-12-20",
@@ -593,6 +600,13 @@ export const mockOrders: Order[] = [
     deliveryMethod: "post",
     location: "Fremantle, WA",
     conversationId: "conv_completed1",
+    createdAt: "2023-11-28T10:30:00Z",
+    shippingInfo: {
+      trackingNumber: "AU123456789",
+      carrier: "Australia Post",
+      estimatedDelivery: "2023-12-03",
+      address: "123 Main St, Fremantle WA 6160"
+    },
   },
   {
     id: "order2",
@@ -609,12 +623,13 @@ export const mockOrders: Order[] = [
     borrowerName: "Marcus Davis",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    status: "ongoing",
+    status: "shipped",
     startDate: "2024-01-15",
     dueDate: "2024-02-15",
     deliveryMethod: "self-help",
     location: "Perth, WA",
     conversationId: "conv_ongoing1",
+    createdAt: "2024-01-10T14:20:00Z",
   },
   {
     id: "order3",
@@ -631,12 +646,19 @@ export const mockOrders: Order[] = [
     borrowerName: "Sarah Johnson",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    status: "ongoing",
+    status: "in-transit",
     startDate: "2024-01-15",
     dueDate: "2024-02-15",
-    deliveryMethod: "self-help",
+    deliveryMethod: "post",
     location: "Perth, WA",
     conversationId: "conv_ongoing2",
+    createdAt: "2024-01-12T09:15:00Z",
+    shippingInfo: {
+      trackingNumber: "AU987654321",
+      carrier: "FedEx",
+      estimatedDelivery: "2024-01-18",
+      address: "456 Ocean Dr, Perth WA 6000"
+    },
   },
   {
     id: "order4",
@@ -653,12 +675,13 @@ export const mockOrders: Order[] = [
     borrowerName: "Zhenyi Su",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "ongoing",
+    status: "pending",
     startDate: "2024-01-20",
     dueDate: "2024-02-10",
     deliveryMethod: "post",
     location: "Subiaco, WA",
     conversationId: "conv_ongoing3",
+    createdAt: "2024-01-18T16:45:00Z",
   },
 ];
 
@@ -720,3 +743,52 @@ export function calculateDistance(
   const distance = R * c; // Distance in kilometers
   return Math.round(distance * 10) / 10; // Round to 1 decimal place
 }
+
+export interface Complaint {
+  id: string;
+  complainantId: string;
+  subject: string;
+  description: string;
+  type: "book-condition" | "delivery" | "user-behavior" | "other";
+  status: "pending" | "investigating" | "resolved" | "closed";
+  orderId?: string;
+  adminResponse?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export const mockComplaints: Complaint[] = [
+  {
+    id: "complaint1",
+    complainantId: "user1",
+    subject: "Book condition not as described",
+    description: "The book I received was damaged and had several missing pages. This was not mentioned in the listing.",
+    type: "book-condition",
+    status: "investigating",
+    orderId: "order1",
+    adminResponse: "We are investigating this issue with the book owner. Thank you for your patience.",
+    createdAt: "2024-01-15T10:30:00Z",
+    updatedAt: "2024-01-16T14:20:00Z"
+  },
+  {
+    id: "complaint2",
+    complainantId: "user1",
+    subject: "Delayed delivery",
+    description: "My book order was supposed to arrive 3 days ago but still hasn't been delivered.",
+    type: "delivery",
+    status: "resolved",
+    orderId: "order2",
+    adminResponse: "The delivery issue has been resolved with the shipping provider. You should receive your order within 24 hours.",
+    createdAt: "2024-01-10T09:15:00Z",
+    updatedAt: "2024-01-12T16:45:00Z"
+  },
+  {
+    id: "complaint3",
+    complainantId: "user2",
+    subject: "Inappropriate communication",
+    description: "The book owner was rude and unprofessional in our communications.",
+    type: "user-behavior",
+    status: "pending",
+    createdAt: "2024-01-20T11:00:00Z"
+  }
+];
