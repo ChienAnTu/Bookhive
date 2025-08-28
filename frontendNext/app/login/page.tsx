@@ -7,6 +7,7 @@ import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { Mail, Lock } from "lucide-react";
 import axios from "axios";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -42,7 +43,7 @@ export default function LoginPage() {
       axios.defaults.headers.common["Authorisation"] = `Bearer ${token}`;
 
       console.log("Sign in:", res.data);
-      window.location.href = "/home";
+      window.location.href = "/books";
     } catch (err) {
       let msg = "Sign in failed";
 
@@ -56,7 +57,7 @@ export default function LoginPage() {
       }
 
       console.error("Sign in error:", err);
-      alert(msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
