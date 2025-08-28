@@ -7,8 +7,8 @@ import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, User } from "lucide-react";
-import axios from "axios";
 import { toast } from "sonner";
+import { registerUser } from "../../utils/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -40,45 +40,30 @@ export default function RegisterPage() {
 
     setIsLoading(true);
 
-    // Sign up request
     try {
-      // Call POST request
-      const res = await axios.post(
-        "http://localhost:8000/api/v1/auth/register",
-        {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          confirm_password: formData.confirmPassword,
-          agree_terms: agreeTerms,
-        },
-        {
-          // Header/Cookie option
-          headers: { "Content-Type": "application/json" },
-          withCredentials: true, // in case Header and cookie are used
-        }
-      );
+      const result = await registerUser({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+        agree_terms: agreeTerms,
+      });
 
-      // if Successful
-      console.log("Registered:", res.data);
-      toast.success("Account created successfully!");
-      setTimeout(() => {
-        router.push("/login");
-      }, 1500);
-    } catch (err) {
-      let msg = "Registration failed";
+      if (result.success) {
+        console.log("Registered:", result.data);
+        toast.success("Account created successfully!");
 
-      if (axios.isAxiosError(err)) {
-        msg =
-          err.response?.data?.detail ||
-          err.response?.data?.message ||
-          err.message;
-      } else if (err instanceof Error) {
-        msg = err.message;
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
+      } else if (result.fieldErrors) {
+        toast.error(result.message);
+        console.error("Field errors:", result.fieldErrors);
       }
-
-      console.error("Registration error:", err);
-      toast.error(msg);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Registration failed"
+      );
     } finally {
       setIsLoading(false);
     }
