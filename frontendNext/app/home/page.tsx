@@ -1,6 +1,5 @@
 import React from "react";
 import NewReleases from "../components/common/NewReleases";
-// import { getCurrentUser } from "@/app/data/mockData";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -16,22 +15,55 @@ function getGreeting(): string {
 }
 
 export default function HomePage() {
-  //   const currentUser = getCurrentUser();
   const greeting = getGreeting();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {greeting}！
+      {/* Hero Section */}
+      <div
+        className="relative w-full h-[80vh] overflow-hidden mb-10 rounded-b-[7rem]" // 顶部直角，底部大弧度
+        style={{
+          backgroundImage: "url('/images/home.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        {/* 半透明遮罩 */}
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-6">
+          {/* 文本 */}
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            {greeting}! Welcome back
           </h1>
-          <p className="text-lg text-gray-600">Welcome back</p>
-        </div>
+          <p className="text-lg text-gray-200 mb-8">
+            BookHive — where every book finds a new friend.
+          </p>
 
-        {/* New Releases */}
+          {/* 白底大搜索框 */}
+          <div className="relative w-full max-w-2xl">
+            <input
+              type="text"
+              placeholder="Find your next reading..."
+              className="w-full px-6 py-4 text-lg rounded-xl bg-white text-gray-900 shadow focus:ring-2 focus:ring-black focus:outline-none"
+            />
+            <button className="absolute right-3 top-1/2 -translate-y-1/2 bg-white text-black px-6 py-2 rounded-lg  border-black hover:bg-black hover:text-white transition">
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-6 text-center mb-12">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+          Your Book Community
+        </h2>
+        <p className="text-gray-600 text-lg">
+          Connect with readers around you, share your favorite books, and explore new stories every day.
+        </p>
+      </div>
+
+      {/* New Releases */}
+      <div className="max-w-7xl mx-auto px-6">
         <NewReleases />
-        {/* <CloseToYou /> */}
       </div>
     </div>
   );
