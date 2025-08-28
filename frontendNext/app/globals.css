@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
-button {
+a,
+button,
+label,
+[data-clickable="true"] {
   cursor: pointer;
 }
