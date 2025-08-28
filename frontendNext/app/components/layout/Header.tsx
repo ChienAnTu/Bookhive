@@ -1,29 +1,95 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
 import { User, LogOut, Plus } from "lucide-react";
-import { getCurrentUser } from "@/app/data/mockData";
+import {
+  logoutUser,
+  isAuthenticated,
+  getCurrentUser,
+} from "../../../utils/auth";
 
 const Header: React.FC = () => {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    location: string;
+    avatar: string;
+    createdAt: string;
+  } | null>(null);
 
-  // Get current user data
-  const currentUser = getCurrentUser();
+  // Check authentication status on component mount and when auth changes
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      const authenticated = isAuthenticated();
+      setIsLoggedIn(authenticated);
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setShowProfileMenu(false);
+      if (authenticated) {
+        // Fetch user data from API if logged in
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+      } else {
+        setCurrentUser(null);
+      }
+    };
+
+    checkAuthStatus();
+
+    // Handle authentication state changes
+    const handleAuthChange = () => {
+      checkAuthStatus();
+    };
+
+    // Listen for custom auth-changed events and storage changes
+    window.addEventListener("auth-changed", handleAuthChange);
+    window.addEventListener("storage", checkAuthStatus);
+
+    return () => {
+      window.removeEventListener("auth-changed", handleAuthChange);
+      window.removeEventListener("storage", checkAuthStatus);
+    };
+  }, []);
+
+  // Handle user logout
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setShowProfileMenu(false);
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Clear frontend state even if logout API fails
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      router.push("/login");
+    }
+  };
+
+  // Navigate to login page
+  const handleLogin = () => {
+    router.push("/login");
+  };
+
+  // Navigate to signup page
+  const handleSignUp = () => {
+    router.push("/register");
   };
 
   return (
     <header className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 transform-none">
       <div className="w-full px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center h-16 gap-2">
+          {/* Logo section */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center">
               <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-2">
@@ -48,9 +114,9 @@ const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Operation area */}
+          {/* Action buttons area */}
           <div className="flex items-center space-x-2">
-            {/* Lend Books button, display when logged */}
+            {/* Lend Books button - visible when user is logged in (desktop) */}
             {isLoggedIn && (
               <Button
                 variant="outline"
@@ -61,21 +127,22 @@ const Header: React.FC = () => {
                 Lend Books
               </Button>
             )}
-            {/* mobile Lend button */}
+
+            {/* Lend Books button - mobile version (icon only) */}
             {isLoggedIn && (
               <Button variant="outline" size="sm" className="sm:hidden p-2">
                 <Plus className="w-4 h-4" />
               </Button>
             )}
 
-            {/* Profile area */}
-            {isLoggedIn ? (
+            {/* User profile section - shown when logged in */}
+            {isLoggedIn && currentUser ? (
               <div className="relative">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 rounded-lg hover:bg-gray-100"
                 >
-                  {/* profile photo */}
+                  {/* User avatar */}
                   <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
                     <img
                       src={currentUser.avatar}
@@ -83,13 +150,13 @@ const Header: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  {/* User name - only display for large screen */}
+                  {/* User name - only visible on large screens */}
                   <span className="hidden lg:block text-sm font-medium text-gray-700 max-w-20 truncate">
                     {currentUser.name}
                   </span>
                 </button>
 
-                {/* Profile file menu */}
+                {/* Profile dropdown menu */}
                 {showProfileMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                     <Link
@@ -112,19 +179,21 @@ const Header: React.FC = () => {
                 )}
               </div>
             ) : (
-              /* Logout Status */
+              /* Authentication buttons - shown when not logged in */
               <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleLogin}>
                   Login
                 </Button>
-                <Button size="sm">Sign Up</Button>
+                <Button size="sm" onClick={handleSignUp}>
+                  Sign Up
+                </Button>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Click other area to close the profile menu */}
+      {/* Overlay to close profile menu when clicking outside */}
       {showProfileMenu && (
         <div
           className="fixed inset-0 z-30"
