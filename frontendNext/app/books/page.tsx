@@ -5,6 +5,8 @@ import { useState, useMemo } from "react";
 import BookCard from "../components/common/BookCard";
 import { BookFilter, type BookFilters } from "../components/filters";
 import { mockBooks, getUserById } from "@/app/data/mockData";
+import { useRouter } from "next/navigation";
+
 
 export default function BooksPage() {
   const [filters, setFilters] = useState<BookFilters>({
@@ -55,9 +57,11 @@ export default function BooksPage() {
     });
   }, [availableBooks, filters]);
 
+  const router = useRouter();
+
+  // 点击跳转详情
   const handleViewDetails = (bookId: string) => {
-    // Handle view details logic
-    console.log("Viewing details for book:", bookId);
+    router.push(`/books/${bookId}`);
   };
 
   return (

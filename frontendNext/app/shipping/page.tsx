@@ -2,11 +2,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { 
-  Package, 
-  Truck, 
-  Clock, 
-  CheckCircle, 
+import {
+  Package,
+  Truck,
+  Clock,
+  CheckCircle,
   AlertCircle,
   MapPin,
   Calendar,
@@ -15,11 +15,11 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { 
+import {
   getCurrentUser,
   mockOrders,
   mockBooks,
-  getUserById 
+  getUserById
 } from "@/app/data/mockData";
 
 type OrderStatus = "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
@@ -28,31 +28,31 @@ type FilterStatus = "all" | OrderStatus;
 export default function ShippingPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   const currentUser = getCurrentUser();
-  
+
   // Get user's shipping orders (both as borrower and lender)
   const userOrders = useMemo(() => {
-    return mockOrders.filter(order => 
+    return mockOrders.filter(order =>
       order.borrowerId === currentUser.id || order.lenderId === currentUser.id
     );
   }, [currentUser.id]);
 
   const filteredOrders = useMemo(() => {
     let filtered = userOrders;
-    
+
     if (selectedFilter !== "all") {
       filtered = filtered.filter(order => order.status === selectedFilter);
     }
-    
+
     if (searchTerm) {
       filtered = filtered.filter(order => {
         const book = mockBooks.find(b => b.id === order.bookId);
         return book?.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               book?.author.toLowerCase().includes(searchTerm.toLowerCase());
+          book?.author.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
-    
+
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [userOrders, selectedFilter, searchTerm]);
 
@@ -134,7 +134,10 @@ export default function ShippingPage() {
                   key={option.value}
                   variant={selectedFilter === option.value ? "default" : "outline"}
                   onClick={() => setSelectedFilter(option.value as FilterStatus)}
-                  className="flex items-center gap-2"
+                  className={`flex items-center gap-2 ${selectedFilter === option.value
+                    ? "bg-black text-white hover:bg-gray-800 border-black"
+                    : ""
+                    }`}
                 >
                   <Filter className="w-4 h-4" />
                   {option.label}
@@ -163,7 +166,7 @@ export default function ShippingPage() {
                 const book = mockBooks.find(b => b.id === order.bookId);
                 const otherUser = getOtherUser(order);
                 const role = getOrderRole(order);
-                
+
                 if (!book || !otherUser) return null;
 
                 return (
