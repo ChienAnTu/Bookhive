@@ -7,7 +7,7 @@ Users can register, list books for lending, borrow books from others, and comple
 
 ## Features
 Product Requirement Document can be found here:
-https://tkzp1b.axshare.com/?g=4
+https://skfusc.axshare.com/?g=4
 
 ### 👤 User Management
 

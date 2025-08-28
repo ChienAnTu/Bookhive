@@ -1,32 +1,6 @@
 // mockData.tsx
 
-export interface Book {
-  id: string;
-  title: string;
-  author: string;
-  category: string;
-  description: string;
-  imageUrl: string;
-  ownerId: string;
-  borrowerId?: string;
-  status: "available" | "borrowed" | "requested";
-  condition: "new" | "like-new" | "good" | "fair";
-  dateAdded: string;
-  dueDate?: string;
-  language: string;
-  isbn?: string;
-  publishYear?: number;
-  tags: string[];
-  genre: string[];
-  availableFrom?: string;
-  maxLendingDays: number;
-  deliveryMethod: "post" | "self-help" | "both";
-  fees: {
-    deposit: number; // Security deposit amount (refundable)
-    serviceFee: number; // Platform service fee (non-refundable)
-    estimatedShipping?: number; // Estimated shipping cost (for post delivery)
-  };
-}
+import { Book } from "@/app/types/book";
 
 export interface User {
   id: string;
@@ -70,7 +44,7 @@ export interface Order {
   borrowerId: string;
   borrowerName: string;
   borrowerAvatar: string;
-  status: "completed" | "ongoing" | "overdue";
+  status: "completed" | "ongoing" | "overdue" | "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
   startDate: string;
   dueDate: string;
   returnedDate?: string;
@@ -79,6 +53,13 @@ export interface Order {
   deliveryMethod: "post" | "self-help" | "both";
   location: string; // Location where the transaction took place
   conversationId: string; // Link to the conversation for this order
+  createdAt: string; // When the order was created
+  shippingInfo?: {
+    trackingNumber: string;
+    carrier: string;
+    estimatedDelivery: string;
+    address: string;
+  };
 }
 
 export interface Conversation {
@@ -208,364 +189,339 @@ export const mockUsers: User[] = [
   },
 ];
 
+
 export const mockBooks: Book[] = [
   {
     id: "book1",
-    title: "The Midnight Library",
+    titleOr: "The Midnight Library",
+    titleEn: "The Midnight Library",
+    originalLanguage: "English",
     author: "Matt Haig",
     category: "Fiction",
     description:
       "Between life and death there is a library, and within that library, the shelves go on forever. Every book provides a chance to try another life you could have lived.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300&h=400&fit=crop",
     ownerId: "user2",
-    status: "available",
+    status: "listed",
     condition: "like-new",
     dateAdded: "2024-01-15",
-    language: "English",
-    publishYear: 2020,
-    genre: ["Contemporary Fiction", "Philosophy"],
+    updateDate: "2024-01-15",
+    isbn: "",
     tags: ["life choices", "parallel lives", "self-reflection", "existential"],
+    publishYear: 2020,
     maxLendingDays: 21,
-    availableFrom: "2024-02-01",
     deliveryMethod: "both",
-    fees: {
-      deposit: 15,
-      serviceFee: 3,
-      estimatedShipping: 8,
-    },
+    fees: { deposit: 15, serviceFee: 3, estimatedShipping: 8 },
   },
   {
     id: "book2",
-    title: "Atomic Habits",
+    titleOr: "Atomic Habits",
+    titleEn: "Atomic Habits",
+    originalLanguage: "English",
     author: "James Clear",
     category: "Self-Help",
     description:
       "An Easy & Proven Way to Build Good Habits & Break Bad Ones. Transform your life with tiny changes in behavior that deliver remarkable results.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=300&h=400&fit=crop",
     ownerId: "user3",
-    status: "available",
+    status: "listed",
     condition: "good",
     dateAdded: "2024-01-20",
-    language: "English",
-    publishYear: 2018,
-    genre: ["Personal Development", "Psychology"],
+    updateDate: "2024-01-20",
+    isbn: "",
     tags: ["habits", "productivity", "self-improvement", "psychology"],
+    publishYear: 2018,
     maxLendingDays: 14,
     deliveryMethod: "post",
-    fees: {
-      deposit: 12,
-      serviceFee: 2,
-      estimatedShipping: 6,
-    },
+    fees: { deposit: 12, serviceFee: 2, estimatedShipping: 6 },
   },
   {
     id: "book3",
-    title: "Dune",
+    titleOr: "Dune",
+    titleEn: "Dune",
+    originalLanguage: "English",
     author: "Frank Herbert",
     category: "Sci-Fi",
     description:
       "Set on the desert planet Arrakis, this epic tale follows young Paul Atreides as he navigates a complex web of politics, religion, and mysticism.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop",
     ownerId: "user1",
-    borrowerId: "user2",
-    status: "borrowed",
+    status: "lendOut",
     condition: "like-new",
     dateAdded: "2023-12-10",
-    dueDate: "2024-02-15",
-    language: "English",
-    publishYear: 1965,
-    genre: ["Science Fiction", "Space Opera", "Politics"],
+    updateDate: "2023-12-10",
+    isbn: "",
     tags: ["desert planet", "politics", "mysticism", "classic sci-fi"],
+    publishYear: 1965,
     maxLendingDays: 30,
     deliveryMethod: "self-help",
-    fees: {
-      deposit: 18,
-      serviceFee: 4,
-    },
+    fees: { deposit: 18, serviceFee: 4 },
   },
   {
     id: "book4",
-    title: "Dune",
+    titleOr: "Dune",
+    titleEn: "Dune",
+    originalLanguage: "English",
     author: "Frank Herbert",
     category: "Sci-Fi",
     description:
       "Set on the desert planet Arrakis, this epic tale follows young Paul Atreides as he navigates a complex web of politics, religion, and mysticism.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop",
     ownerId: "user1",
-    borrowerId: "user2",
-    status: "borrowed",
+    status: "lendOut",
     condition: "like-new",
     dateAdded: "2023-12-10",
-    dueDate: "2024-02-15",
-    language: "English",
-    publishYear: 1965,
-    genre: ["Science Fiction", "Space Opera", "Politics"],
+    updateDate: "2023-12-10",
+    isbn: "",
     tags: ["desert planet", "politics", "mysticism", "classic sci-fi"],
+    publishYear: 1965,
     maxLendingDays: 30,
     deliveryMethod: "self-help",
-    fees: {
-      deposit: 18,
-      serviceFee: 4,
-    },
+    fees: { deposit: 18, serviceFee: 4 },
   },
   {
     id: "book5",
-    title: "The Seven Husbands of Evelyn Hugo",
+    titleOr: "The Seven Husbands of Evelyn Hugo",
+    titleEn: "The Seven Husbands of Evelyn Hugo",
+    originalLanguage: "English",
     author: "Taylor Jenkins Reid",
     category: "Fiction",
     description:
       "Reclusive Hollywood icon Evelyn Hugo finally decides to tell her life story—but only to unknown journalist Monique Grant.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
     ownerId: "user3",
-    status: "available",
+    status: "listed",
     condition: "good",
     dateAdded: "2024-01-10",
-    language: "English",
-    publishYear: 2017,
-    genre: ["Historical Fiction", "LGBTQ+", "Romance"],
+    updateDate: "2024-01-10",
+    isbn: "",
     tags: ["Hollywood", "biography", "love story", "secrets"],
+    publishYear: 2017,
     maxLendingDays: 21,
     deliveryMethod: "both",
-    fees: {
-      deposit: 14,
-      serviceFee: 3,
-      estimatedShipping: 7,
-    },
+    fees: { deposit: 14, serviceFee: 3, estimatedShipping: 7 },
   },
   {
     id: "book6",
-    title: "Sapiens",
+    titleOr: "Sapiens",
+    titleEn: "Sapiens",
+    originalLanguage: "English",
     author: "Yuval Noah Harari",
     category: "History",
     description:
       "A brief history of humankind, exploring how Homo sapiens came to dominate the world through cognitive, agricultural, and scientific revolutions.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
     ownerId: "user2",
-    status: "available",
+    status: "listed",
     condition: "like-new",
     dateAdded: "2024-01-05",
-    language: "English",
-    publishYear: 2011,
-    genre: ["History", "Anthropology", "Philosophy"],
+    updateDate: "2024-01-05",
+    isbn: "",
     tags: [
       "human evolution",
       "civilization",
       "anthropology",
       "thought-provoking",
     ],
+    publishYear: 2011,
     maxLendingDays: 28,
     deliveryMethod: "post",
-    fees: {
-      deposit: 16,
-      serviceFee: 3,
-      estimatedShipping: 9,
-    },
+    fees: { deposit: 16, serviceFee: 3, estimatedShipping: 9 },
   },
   {
     id: "book7",
-    title: "Project Hail Mary",
+    titleOr: "Project Hail Mary",
+    titleEn: "Project Hail Mary",
+    originalLanguage: "English",
     author: "Andy Weir",
     category: "Sci-Fi",
     description:
       "Ryland Grace wakes up on a spaceship with no memory of why he's there. His crewmates are dead and he's apparently humanity's last hope.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300&h=400&fit=crop",
     ownerId: "user1",
-    status: "available",
+    status: "listed",
     condition: "like-new",
     dateAdded: "2024-01-25",
-    language: "English",
-    publishYear: 2021,
-    genre: ["Science Fiction", "Space Opera", "Adventure"],
+    updateDate: "2024-01-25",
+    isbn: "",
     tags: ["space", "mystery", "survival", "humor"],
+    publishYear: 2021,
     maxLendingDays: 21,
     deliveryMethod: "both",
-    fees: {
-      deposit: 17,
-      serviceFee: 4,
-      estimatedShipping: 8,
-    },
+    fees: { deposit: 17, serviceFee: 4, estimatedShipping: 8 },
   },
   {
     id: "book8",
-    title: "Norwegian Wood",
+    titleOr: "Norwegian Wood",
+    titleEn: "Norwegian Wood",
+    originalLanguage: "English",
     author: "Haruki Murakami",
     category: "Fiction",
     description:
       "A nostalgic story of loss and burgeoning sexuality set in late 1960s Tokyo, following student Toru Watanabe as he remembers his past.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=300&h=400&fit=crop",
     ownerId: "user5",
-    status: "available",
+    status: "listed",
     condition: "like-new",
     dateAdded: "2024-01-18",
-    language: "English",
-    publishYear: 1987,
-    genre: ["Literary Fiction", "Romance", "Coming of Age"],
+    updateDate: "2024-01-18",
+    isbn: "",
     tags: ["Tokyo", "1960s", "love", "memory", "Japanese literature"],
+    publishYear: 1987,
     maxLendingDays: 21,
     deliveryMethod: "both",
-    fees: {
-      deposit: 16,
-      serviceFee: 3,
-      estimatedShipping: 9,
-    },
+    fees: { deposit: 16, serviceFee: 3, estimatedShipping: 9 },
   },
   {
     id: "book9",
-    title: "The Design of Everyday Things",
+    titleOr: "The Design of Everyday Things",
+    titleEn: "The Design of Everyday Things",
+    originalLanguage: "English",
     author: "Don Norman",
     category: "Design",
     description:
       "A powerful primer on how design serves as the communication between object and user, and how to optimize that conduit of communication.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=300&h=400&fit=crop",
     ownerId: "user1",
-    status: "available",
+    status: "listed",
     condition: "good",
     dateAdded: "2024-01-22",
-    language: "English",
-    publishYear: 1988,
-    genre: ["Design", "Psychology", "Technology"],
+    updateDate: "2024-01-22",
+    isbn: "",
     tags: ["UX design", "usability", "human-centered design", "technology"],
+    publishYear: 1988,
     maxLendingDays: 21,
     deliveryMethod: "self-help",
-    fees: {
-      deposit: 13,
-      serviceFee: 3,
-    },
+    fees: { deposit: 13, serviceFee: 3 },
   },
   {
     id: "book10",
-    title: "Educated",
+    titleOr: "Educated",
+    titleEn: "Educated",
+    originalLanguage: "English",
     author: "Tara Westover",
     category: "Biography",
     description:
       "A memoir about a woman who grows up in a survivalist family in rural Idaho and eventually earns a PhD from Cambridge University.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300&h=400&fit=crop",
     ownerId: "user4",
-    status: "available",
+    status: "listed",
     condition: "like-new",
     dateAdded: "2024-01-12",
-    language: "English",
-    publishYear: 2018,
-    genre: ["Memoir", "Biography", "Education"],
+    updateDate: "2024-01-12",
+    isbn: "",
     tags: ["education", "family", "resilience", "transformation"],
+    publishYear: 2018,
     maxLendingDays: 25,
     deliveryMethod: "both",
-    fees: {
-      deposit: 18,
-      serviceFee: 4,
-      estimatedShipping: 8,
-    },
+    fees: { deposit: 18, serviceFee: 4, estimatedShipping: 8 },
   },
   {
     id: "book11",
-    title: "Where the Crawdads Sing",
+    titleOr: "Where the Crawdads Sing",
+    titleEn: "Where the Crawdads Sing",
+    originalLanguage: "English",
     author: "Delia Owens",
     category: "Fiction",
     description:
       "A coming-of-age story about a girl who raised herself in the marshes of North Carolina, becoming a naturalist and prime suspect in a murder case.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=300&h=400&fit=crop",
     ownerId: "user2",
-    status: "available",
+    status: "listed",
     condition: "good",
     dateAdded: "2024-01-08",
-    language: "English",
-    publishYear: 2018,
-    genre: ["Literary Fiction", "Mystery", "Coming of Age"],
+    updateDate: "2024-01-08",
+    isbn: "",
     tags: ["nature", "mystery", "isolation", "coming of age"],
+    publishYear: 2018,
     maxLendingDays: 21,
     deliveryMethod: "post",
-    fees: {
-      deposit: 15,
-      serviceFee: 3,
-      estimatedShipping: 7,
-    },
+    fees: { deposit: 15, serviceFee: 3, estimatedShipping: 7 },
   },
   {
     id: "book12",
-    title: "The Alchemist",
+    titleOr: "The Alchemist",
+    titleEn: "The Alchemist",
+    originalLanguage: "English",
     author: "Paulo Coelho",
     category: "Fiction",
     description:
       "A philosophical novel about a young shepherd's journey to find treasure, discovering the importance of following one's dreams.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300&h=400&fit=crop",
     ownerId: "user3",
-    status: "available",
+    status: "listed",
     condition: "good",
     dateAdded: "2024-01-14",
-    language: "English",
-    publishYear: 1988,
-    genre: ["Philosophical Fiction", "Adventure", "Spiritual"],
+    updateDate: "2024-01-14",
+    isbn: "",
     tags: ["dreams", "journey", "philosophy", "self-discovery"],
+    publishYear: 1988,
     maxLendingDays: 18,
     deliveryMethod: "both",
-    fees: {
-      deposit: 12,
-      serviceFee: 2,
-      estimatedShipping: 6,
-    },
+    fees: { deposit: 12, serviceFee: 2, estimatedShipping: 6 },
   },
   {
     id: "book13",
-    title: "1984",
+    titleOr: "1984",
+    titleEn: "1984",
+    originalLanguage: "English",
     author: "George Orwell",
     category: "Fiction",
     description:
       "A dystopian social science fiction novel about totalitarian rule and the struggle for truth and freedom in a surveillance state.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop",
     ownerId: "user5",
-    status: "available",
+    status: "listed",
     condition: "fair",
     dateAdded: "2024-01-06",
-    language: "English",
-    publishYear: 1949,
-    genre: ["Dystopian Fiction", "Political Fiction", "Classic"],
+    updateDate: "2024-01-06",
+    isbn: "",
     tags: ["dystopia", "surveillance", "freedom", "classic literature"],
+    publishYear: 1949,
     maxLendingDays: 28,
     deliveryMethod: "self-help",
-    fees: {
-      deposit: 10,
-      serviceFee: 2,
-    },
+    fees: { deposit: 10, serviceFee: 2 },
   },
   {
     id: "book14",
-    title: "Becoming",
+    titleOr: "Becoming",
+    titleEn: "Becoming",
+    originalLanguage: "English",
     author: "Michelle Obama",
     category: "Biography",
     description:
       "The intimate, powerful memoir of the former First Lady of the United States, chronicling her journey from Chicago's South Side to the White House.",
-    imageUrl:
+    coverImgUrl:
       "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
     ownerId: "user4",
-    status: "available",
+    status: "listed",
     condition: "like-new",
     dateAdded: "2024-01-30",
-    language: "English",
-    publishYear: 2018,
-    genre: ["Memoir", "Biography", "Politics"],
+    updateDate: "2024-01-30",
+    isbn: "",
     tags: ["inspiration", "leadership", "family", "politics"],
+    publishYear: 2018,
     maxLendingDays: 21,
     deliveryMethod: "both",
-    fees: {
-      deposit: 20,
-      serviceFee: 4,
-      estimatedShipping: 9,
-    },
+    fees: { deposit: 20, serviceFee: 4, estimatedShipping: 9 },
   },
 ];
+
+
+
 
 export const mockOrders: Order[] = [
   {
@@ -583,7 +539,7 @@ export const mockOrders: Order[] = [
     borrowerName: "Zhenyi Su",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "completed",
+    status: "delivered",
     startDate: "2023-12-01",
     dueDate: "2023-12-21",
     returnedDate: "2023-12-20",
@@ -593,6 +549,13 @@ export const mockOrders: Order[] = [
     deliveryMethod: "post",
     location: "Fremantle, WA",
     conversationId: "conv_completed1",
+    createdAt: "2023-11-28T10:30:00Z",
+    shippingInfo: {
+      trackingNumber: "AU123456789",
+      carrier: "Australia Post",
+      estimatedDelivery: "2023-12-03",
+      address: "123 Main St, Fremantle WA 6160"
+    },
   },
   {
     id: "order2",
@@ -609,12 +572,13 @@ export const mockOrders: Order[] = [
     borrowerName: "Marcus Davis",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    status: "ongoing",
+    status: "shipped",
     startDate: "2024-01-15",
     dueDate: "2024-02-15",
     deliveryMethod: "self-help",
     location: "Perth, WA",
     conversationId: "conv_ongoing1",
+    createdAt: "2024-01-10T14:20:00Z",
   },
   {
     id: "order3",
@@ -631,12 +595,19 @@ export const mockOrders: Order[] = [
     borrowerName: "Sarah Johnson",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    status: "ongoing",
+    status: "in-transit",
     startDate: "2024-01-15",
     dueDate: "2024-02-15",
-    deliveryMethod: "self-help",
+    deliveryMethod: "post",
     location: "Perth, WA",
     conversationId: "conv_ongoing2",
+    createdAt: "2024-01-12T09:15:00Z",
+    shippingInfo: {
+      trackingNumber: "AU987654321",
+      carrier: "FedEx",
+      estimatedDelivery: "2024-01-18",
+      address: "456 Ocean Dr, Perth WA 6000"
+    },
   },
   {
     id: "order4",
@@ -653,12 +624,13 @@ export const mockOrders: Order[] = [
     borrowerName: "Zhenyi Su",
     borrowerAvatar:
       "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "ongoing",
+    status: "pending",
     startDate: "2024-01-20",
     dueDate: "2024-02-10",
     deliveryMethod: "post",
     location: "Subiaco, WA",
     conversationId: "conv_ongoing3",
+    createdAt: "2024-01-18T16:45:00Z",
   },
 ];
 
@@ -671,6 +643,11 @@ export const getUserById = (userId: string): User | undefined => {
 export const getCurrentUser = (): User => {
   return mockUsers[0]; // user1 is Zhenyi Su
 };
+
+// Helper function to get book data by ID
+export function getBookById(id: string) {
+  return mockBooks.find((book) => book.id === id);
+}
 
 // Helper function to get user's lending orders
 export const getUserLendingOrders = (userId: string): Order[] => {
@@ -720,3 +697,52 @@ export function calculateDistance(
   const distance = R * c; // Distance in kilometers
   return Math.round(distance * 10) / 10; // Round to 1 decimal place
 }
+
+export interface Complaint {
+  id: string;
+  complainantId: string;
+  subject: string;
+  description: string;
+  type: "book-condition" | "delivery" | "user-behavior" | "other";
+  status: "pending" | "investigating" | "resolved" | "closed";
+  orderId?: string;
+  adminResponse?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export const mockComplaints: Complaint[] = [
+  {
+    id: "complaint1",
+    complainantId: "user1",
+    subject: "Book condition not as described",
+    description: "The book I received was damaged and had several missing pages. This was not mentioned in the listing.",
+    type: "book-condition",
+    status: "investigating",
+    orderId: "order1",
+    adminResponse: "We are investigating this issue with the book owner. Thank you for your patience.",
+    createdAt: "2024-01-15T10:30:00Z",
+    updatedAt: "2024-01-16T14:20:00Z"
+  },
+  {
+    id: "complaint2",
+    complainantId: "user1",
+    subject: "Delayed delivery",
+    description: "My book order was supposed to arrive 3 days ago but still hasn't been delivered.",
+    type: "delivery",
+    status: "resolved",
+    orderId: "order2",
+    adminResponse: "The delivery issue has been resolved with the shipping provider. You should receive your order within 24 hours.",
+    createdAt: "2024-01-10T09:15:00Z",
+    updatedAt: "2024-01-12T16:45:00Z"
+  },
+  {
+    id: "complaint3",
+    complainantId: "user2",
+    subject: "Inappropriate communication",
+    description: "The book owner was rude and unprofessional in our communications.",
+    type: "user-behavior",
+    status: "pending",
+    createdAt: "2024-01-20T11:00:00Z"
+  }
+];

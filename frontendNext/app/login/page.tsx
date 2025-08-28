@@ -2,12 +2,16 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { Mail, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { loginUser } from "../../utils/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -19,12 +23,22 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Login simulation
-    setTimeout(() => {
-      console.log("Log data:", formData);
-      alert("logged...");
+    try {
+      const result = await loginUser({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      console.log("Sign in:", result.data);
+      toast.success("Successfully signed in!");
+
+      window.dispatchEvent(new Event("auth-changed"));
+      router.push("/books");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Sign in failed");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -65,7 +79,7 @@ export default function LoginPage() {
             required
           />
 
-          {/* click & forget password */}
+          {/* remember me & forget password */}
           <div className="flex items-center justify-between">
             <label className="flex items-center text-sm">
               <input
@@ -95,14 +109,14 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* cut off line */}
+        {/* divider */}
         <div className="my-6 flex items-center">
           <div className="flex-1 border-t border-gray-300"></div>
           <span className="px-4 text-sm text-gray-500">or</span>
           <div className="flex-1 border-t border-gray-300"></div>
         </div>
 
-        {/* social media login way */}
+        {/* social media login */}
         <div className="space-y-3">
           <Button variant="outline" fullWidth className="border-gray-300">
             Continue with Google
@@ -114,7 +128,7 @@ export default function LoginPage() {
 
         {/* register link */}
         <div className="text-center mt-6 text-sm text-gray-600">
-          Don't have an account?{" "}
+          {`Don't have an account? `}
           <Link
             href="/register"
             className="text-blue-600 hover:text-blue-700 font-medium"

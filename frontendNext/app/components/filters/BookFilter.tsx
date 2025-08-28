@@ -1,11 +1,11 @@
 // app/components/filters/BookFilter.tsx
 import React, { useState } from "react";
 import { X, BookOpen, Globe, Package, Tag, Filter } from "lucide-react";
-import { Book } from "@/app/data/mockData";
+import { Book } from "@/app/types/book";
 
 export interface BookFilters {
   category: string;
-  language: string;
+  originalLanguage: string;
   deliveryMethod: string;
 }
 
@@ -28,10 +28,10 @@ const BookFilter: React.FC<BookFilterProps> = ({
 
   // Extract unique categories and languages from books data
   const allCategories = [...new Set(books.map((book) => book.category))];
-  const allLanguages = [...new Set(books.map((book) => book.language))];
-  const allGenres = [...new Set(books.flatMap((book) => book.genre))];
+  const allLanguages = [...new Set(books.map((book) => book.originalLanguage))];
+  const allTags = [...new Set(books.flatMap((book) => book.tags ?? []))];
 
-  // Count frequency of each category, language, and genre
+  // Count frequency of each category, language, and tags
   const categoryCount = allCategories.map((category) => ({
     name: category,
     count: books.filter((book) => book.category === category).length,
@@ -39,12 +39,12 @@ const BookFilter: React.FC<BookFilterProps> = ({
 
   const languageCount = allLanguages.map((language) => ({
     name: language,
-    count: books.filter((book) => book.language === language).length,
+    count: books.filter((book) => book.originalLanguage === language).length,
   }));
 
-  const genreCount = allGenres.map((genre) => ({
-    name: genre,
-    count: books.filter((book) => book.genre.includes(genre)).length,
+  const tagsCount = allTags.map((tags) => ({
+    name: tags,
+    count: books.filter((book) => book.tags?.includes(tags)).length, // Prevent undefined
   }));
 
   // Sort by frequency (most common first) and take top 5
@@ -58,7 +58,7 @@ const BookFilter: React.FC<BookFilterProps> = ({
     .slice(0, 5)
     .map((item) => item.name);
 
-  const topGenres = genreCount
+  const topTags = tagsCount
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
     .map((item) => item.name);
@@ -102,11 +102,10 @@ const BookFilter: React.FC<BookFilterProps> = ({
               onFilterChange("category", "");
               setIsMobileFilterOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-              filters.category === ""
-                ? "bg-black text-white"
-                : "text-gray-700 hover:bg-gray-100"
-            }`}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.category === ""
+              ? "bg-black text-white"
+              : "text-gray-700 hover:bg-gray-100"
+              }`}
           >
             All Categories
           </button>
@@ -117,11 +116,10 @@ const BookFilter: React.FC<BookFilterProps> = ({
                 onFilterChange("category", category);
                 setIsMobileFilterOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                filters.category === category
-                  ? "bg-black text-white"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.category === category
+                ? "bg-black text-white"
+                : "text-gray-700 hover:bg-gray-100"
+                }`}
             >
               {category}
             </button>
@@ -138,33 +136,33 @@ const BookFilter: React.FC<BookFilterProps> = ({
         <div className="space-y-2">
           <button
             onClick={() => {
-              onFilterChange("language", "");
+              onFilterChange("originalLanguage", "");
               setIsMobileFilterOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-              filters.language === ""
-                ? "bg-black text-white"
-                : "text-gray-700 hover:bg-gray-100"
-            }`}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.originalLanguage === ""
+              ? "bg-black text-white"
+              : "text-gray-700 hover:bg-gray-100"
+              }`}
           >
             All Languages
           </button>
-          {topLanguages.map((language) => (
+          {topLanguages.map((lang) => (
             <button
-              key={language}
+              key={lang}
               onClick={() => {
-                onFilterChange("language", language);
+                onFilterChange("originalLanguage", lang);
                 setIsMobileFilterOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                filters.language === language
-                  ? "bg-black text-white"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.originalLanguage === lang
+                ? "bg-black text-white"
+                : "text-gray-700 hover:bg-gray-100"
+                }`}
             >
-              {language}
+              {lang}
             </button>
           ))}
+
+
         </div>
       </div>
 
@@ -182,11 +180,10 @@ const BookFilter: React.FC<BookFilterProps> = ({
                 onFilterChange("deliveryMethod", option.value);
                 setIsMobileFilterOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm ${
-                filters.deliveryMethod === option.value
-                  ? "bg-black text-white"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm ${filters.deliveryMethod === option.value
+                ? "bg-black text-white"
+                : "text-gray-700 hover:bg-gray-100"
+                }`}
             >
               {option.label}
             </button>
@@ -194,19 +191,19 @@ const BookFilter: React.FC<BookFilterProps> = ({
         </div>
       </div>
 
-      {/* Genres Section */}
+      {/* Tags Section */}
       <div>
         <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
           <Tag className="w-4 h-4 mr-2" />
-          Genres ({topGenres.length})
+          Tags ({topTags.length})
         </h4>
         <div className="flex flex-wrap gap-2">
-          {topGenres.map((genre) => (
+          {topTags.map((tags) => (
             <button
-              key={genre}
+              key={tags}
               className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"
             >
-              {genre}
+              {tags}
             </button>
           ))}
         </div>

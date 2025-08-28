@@ -4,6 +4,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
+import AuthProvider from "./components/layout/AuthProvider";
+import { Toaster } from "./components/ui/sonner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
@@ -26,9 +28,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen flex flex-col bg-gray-100`}
       >
-        <Header />
-        <main className="flex-1 pt-16 pb-24 bg-gray-100">{children}</main>
-        <Footer />
+        <AuthProvider>
+          <Header />
+          <main className="flex-1 pt-16 pb-24 bg-gray-100">{children}</main>
+          <Footer />
+          <Toaster richColors />
+        </AuthProvider>
       </body>
     </html>
   );
