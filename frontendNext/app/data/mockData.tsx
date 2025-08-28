@@ -17,7 +17,6 @@ export interface Book {
   isbn?: string;
   publishYear?: number;
   tags: string[];
-  genre: string[];
   availableFrom?: string;
   maxLendingDays: number;
   deliveryMethod: "post" | "self-help" | "both";
@@ -224,7 +223,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-15",
     language: "English",
     publishYear: 2020,
-    genre: ["Contemporary Fiction", "Philosophy"],
     tags: ["life choices", "parallel lives", "self-reflection", "existential"],
     maxLendingDays: 21,
     availableFrom: "2024-02-01",
@@ -250,7 +248,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-20",
     language: "English",
     publishYear: 2018,
-    genre: ["Personal Development", "Psychology"],
     tags: ["habits", "productivity", "self-improvement", "psychology"],
     maxLendingDays: 14,
     deliveryMethod: "post",
@@ -277,7 +274,6 @@ export const mockBooks: Book[] = [
     dueDate: "2024-02-15",
     language: "English",
     publishYear: 1965,
-    genre: ["Science Fiction", "Space Opera", "Politics"],
     tags: ["desert planet", "politics", "mysticism", "classic sci-fi"],
     maxLendingDays: 30,
     deliveryMethod: "self-help",
@@ -303,7 +299,6 @@ export const mockBooks: Book[] = [
     dueDate: "2024-02-15",
     language: "English",
     publishYear: 1965,
-    genre: ["Science Fiction", "Space Opera", "Politics"],
     tags: ["desert planet", "politics", "mysticism", "classic sci-fi"],
     maxLendingDays: 30,
     deliveryMethod: "self-help",
@@ -327,7 +322,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-10",
     language: "English",
     publishYear: 2017,
-    genre: ["Historical Fiction", "LGBTQ+", "Romance"],
     tags: ["Hollywood", "biography", "love story", "secrets"],
     maxLendingDays: 21,
     deliveryMethod: "both",
@@ -352,7 +346,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-05",
     language: "English",
     publishYear: 2011,
-    genre: ["History", "Anthropology", "Philosophy"],
     tags: [
       "human evolution",
       "civilization",
@@ -382,7 +375,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-25",
     language: "English",
     publishYear: 2021,
-    genre: ["Science Fiction", "Space Opera", "Adventure"],
     tags: ["space", "mystery", "survival", "humor"],
     maxLendingDays: 21,
     deliveryMethod: "both",
@@ -407,7 +399,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-18",
     language: "English",
     publishYear: 1987,
-    genre: ["Literary Fiction", "Romance", "Coming of Age"],
     tags: ["Tokyo", "1960s", "love", "memory", "Japanese literature"],
     maxLendingDays: 21,
     deliveryMethod: "both",
@@ -432,7 +423,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-22",
     language: "English",
     publishYear: 1988,
-    genre: ["Design", "Psychology", "Technology"],
     tags: ["UX design", "usability", "human-centered design", "technology"],
     maxLendingDays: 21,
     deliveryMethod: "self-help",
@@ -456,7 +446,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-12",
     language: "English",
     publishYear: 2018,
-    genre: ["Memoir", "Biography", "Education"],
     tags: ["education", "family", "resilience", "transformation"],
     maxLendingDays: 25,
     deliveryMethod: "both",
@@ -481,7 +470,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-08",
     language: "English",
     publishYear: 2018,
-    genre: ["Literary Fiction", "Mystery", "Coming of Age"],
     tags: ["nature", "mystery", "isolation", "coming of age"],
     maxLendingDays: 21,
     deliveryMethod: "post",
@@ -506,7 +494,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-14",
     language: "English",
     publishYear: 1988,
-    genre: ["Philosophical Fiction", "Adventure", "Spiritual"],
     tags: ["dreams", "journey", "philosophy", "self-discovery"],
     maxLendingDays: 18,
     deliveryMethod: "both",
@@ -531,7 +518,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-06",
     language: "English",
     publishYear: 1949,
-    genre: ["Dystopian Fiction", "Political Fiction", "Classic"],
     tags: ["dystopia", "surveillance", "freedom", "classic literature"],
     maxLendingDays: 28,
     deliveryMethod: "self-help",
@@ -555,7 +541,6 @@ export const mockBooks: Book[] = [
     dateAdded: "2024-01-30",
     language: "English",
     publishYear: 2018,
-    genre: ["Memoir", "Biography", "Politics"],
     tags: ["inspiration", "leadership", "family", "politics"],
     maxLendingDays: 21,
     deliveryMethod: "both",
@@ -671,6 +656,11 @@ export const getUserById = (userId: string): User | undefined => {
 export const getCurrentUser = (): User => {
   return mockUsers[0]; // user1 is Zhenyi Su
 };
+
+// Helper function to get book data by ID
+export function getBookById(id: string) {
+  return mockBooks.find((book) => book.id === id);
+}
 
 // Helper function to get user's lending orders
 export const getUserLendingOrders = (userId: string): Order[] => {
