@@ -2,14 +2,16 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { Mail, Lock } from "lucide-react";
-import axios from "axios";
 import { toast } from "sonner";
+import { loginUser } from "../../utils/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -21,43 +23,19 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Login simulation
     try {
-      const res = await axios.post(
-        "http://localhost:8000/api/v1/auth/login",
-        {
-          email: formData.email,
-          password: formData.password,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          // Only set to true if cookies are relied upon for session management
-          withCredentials: false,
-        }
-      );
+      const result = await loginUser({
+        email: formData.email,
+        password: formData.password,
+      });
 
-      // Retrieve token and store/apply it
-      const token: string = res.data.access_token;
-      // For security: in production, prefer httpOnly cookies. For a demo, localStorage is acceptable.
-      localStorage.setItem("access_token", token);
-      axios.defaults.headers.common["Authorisation"] = `Bearer ${token}`;
+      console.log("Sign in:", result.data);
+      toast.success("Successfully signed in!");
 
-      console.log("Sign in:", res.data);
-      window.location.href = "/books";
-    } catch (err) {
-      let msg = "Sign in failed";
-
-      if (axios.isAxiosError(err)) {
-        msg =
-          err.response?.data?.detail ||
-          err.response?.data?.message ||
-          err.message;
-      } else if (err instanceof Error) {
-        msg = err.message;
-      }
-
-      console.error("Sign in error:", err);
-      toast.error(msg);
+      window.dispatchEvent(new Event("auth-changed"));
+      router.push("/books");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Sign in failed");
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +79,7 @@ export default function LoginPage() {
             required
           />
 
-          {/* click & forget password */}
+          {/* remember me & forget password */}
           <div className="flex items-center justify-between">
             <label className="flex items-center text-sm">
               <input
@@ -131,14 +109,14 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* cut off line */}
+        {/* divider */}
         <div className="my-6 flex items-center">
           <div className="flex-1 border-t border-gray-300"></div>
           <span className="px-4 text-sm text-gray-500">or</span>
           <div className="flex-1 border-t border-gray-300"></div>
         </div>
 
-        {/* social media login way */}
+        {/* social media login */}
         <div className="space-y-3">
           <Button variant="outline" fullWidth className="border-gray-300">
             Continue with Google
