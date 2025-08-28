@@ -7,6 +7,7 @@ import Input from "../components/ui/Input";
 import Card from "../components/ui/Card";
 import { Mail, Lock } from "lucide-react";
 import axios from "axios";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -21,40 +22,45 @@ export default function LoginPage() {
     setIsLoading(true);
 
     // Login simulation
-      try {
-        const res = await axios.post(
-          "http://localhost:8000/api/v1/auth/login",
-          {
-            email: formData.email,
-            password: formData.password,
-          },
-          {
-            headers: { "Content-Type": "application/json" },
-            // Only set to true if cookies are relied upon for session management
-            withCredentials: false,
-          }
-        );
+    try {
+      const res = await axios.post(
+        "http://localhost:8000/api/v1/auth/login",
+        {
+          email: formData.email,
+          password: formData.password,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          // Only set to true if cookies are relied upon for session management
+          withCredentials: false,
+        }
+      );
 
-        // Retrieve token and store/apply it
-        const token: string = res.data.access_token;
-        // For security: in production, prefer httpOnly cookies. For a demo, localStorage is acceptable.
-        localStorage.setItem("access_token", token);
-        axios.defaults.headers.common["Authorisation"] = `Bearer ${token}`;
+      // Retrieve token and store/apply it
+      const token: string = res.data.access_token;
+      // For security: in production, prefer httpOnly cookies. For a demo, localStorage is acceptable.
+      localStorage.setItem("access_token", token);
+      axios.defaults.headers.common["Authorisation"] = `Bearer ${token}`;
 
-        console.log("Sign in:", res.data);
-        alert("Sign in successful!");
-      } catch (err: any) {
-        const msg =
-          err?.response?.data?.detail ||   // FastAPI returns `detail` on 401
-          err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          err?.message ||
-          "Sign in failed";
-        console.error("Sign in error:", err);
-        alert(msg);
-      } finally {
-        setIsLoading(false);
+      console.log("Sign in:", res.data);
+      window.location.href = "/books";
+    } catch (err) {
+      let msg = "Sign in failed";
+
+      if (axios.isAxiosError(err)) {
+        msg =
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
       }
+
+      console.error("Sign in error:", err);
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -144,7 +150,7 @@ export default function LoginPage() {
 
         {/* register link */}
         <div className="text-center mt-6 text-sm text-gray-600">
-          Don't have an account?{" "}
+          {`Don't have an account? `}
           <Link
             href="/register"
             className="text-blue-600 hover:text-blue-700 font-medium"
