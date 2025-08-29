@@ -11,6 +11,7 @@ import {
 } from "../data/mockData";
 import Link from "next/link";
 
+
 // User data interface
 interface UserData {
   id: string;
@@ -117,6 +118,14 @@ const ProfilePage: React.FC = () => {
         {/* Basic Info Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+            <div className="flex justify-end mb-4">
+              <Link
+                href="/profile/edit"
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
+              >
+                Edit Profile
+              </Link>
+            </div>
             {/* Profile Photo */}
             <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
               <img

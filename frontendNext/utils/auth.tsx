@@ -29,6 +29,11 @@ interface UserData {
   location: string;
   avatar: string;
   createdAt: string;
+  phoneNumber?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
 }
 
 // User login function
@@ -181,6 +186,11 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
       name: userData.name,
       email: userData.email,
       location: userData.location,
+      phoneNumber: userData.phoneNumber || '',
+      address: userData.address || '',
+      city: userData.city || '',
+      state: userData.state || '',
+      zipCode: userData.zipCode || '',
       avatar:
         userData.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(
