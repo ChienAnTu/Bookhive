@@ -20,14 +20,14 @@ const getNewReleases = (): Book[] => {
     .slice(0, 10);
 };
 
-// New Releases
+// Recent Added
 export default function NewReleases() {
   const newBooks = getNewReleases();
 
   return (
     <div className="py-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">New Releases</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Recent Added</h2>
         <Link href="/books">
           <Button className="text-sm">See All</Button>
         </Link>
