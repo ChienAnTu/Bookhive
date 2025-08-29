@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUser, isAuthenticated } from "../../../utils/auth";
+import { getCurrentUser, isAuthenticated } from "../../utils/auth";
 import { Camera } from "lucide-react";
 
 interface UserProfile {
