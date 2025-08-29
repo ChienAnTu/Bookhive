@@ -11,7 +11,7 @@ export default function Home() {
         Find Your Next Books
       </h1>
       <p className="text-xl md:text-2xl text-gray-600 mb-8 text-center">
-        At Your Nearest Suburbs
+        All Over The World
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
         <Link href="/login">

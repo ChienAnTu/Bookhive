@@ -160,10 +160,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
             <span>Added {formatDateAdded(book.dateAdded)}</span>
           </div>
 
-          <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-100">
-            <span className="text-gray-600">Deposit: ${book.fees.deposit}</span>
-            <span className="text-gray-600">Fee: ${book.fees.serviceFee}</span>
-          </div>
+         
         </div>
       </div>
     </Card>

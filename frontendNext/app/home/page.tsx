@@ -1,5 +1,5 @@
 import React from "react";
-import NewReleases from "../components/common/NewReleases";
+import RecentAdded from "../components/common/RecentAdded";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -59,9 +59,9 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* New Releases */}
+      {/* Recent Added*/}
       <div className="max-w-7xl mx-auto px-6">
-        <NewReleases />
+        <RecentAdded />
       </div>
     </div>
   );
