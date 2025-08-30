@@ -10,6 +10,8 @@ import Input from "@/app/components/ui/Input";
 import Select from "@/app/components/ui/Select";
 import type { User } from "@/app/types/user";
 import Avatar from "@/app/components/ui/Avatar";
+import { toast } from "sonner";
+import { updateUser } from "../../../utils/auth";
 
 
 const emptyUser: User = {
@@ -60,17 +62,32 @@ const UpdateProfilePage: React.FC = () => {
     loadUserData();
   }, [router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // Implement API call to update profile
-      console.log("Updating profile:", profileData);
-      // After successful update
-      router.push("/profile");
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-    }
-  };
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
+
+  try {
+    // 拼接全名
+    const payload = {
+      ...profileData,
+      name: `${profileData.firstName} ${profileData.lastName}`.trim(),
+    };
+
+    const result = await updateUser(payload);
+
+    console.log("✅ Profile updated:", result);
+    toast.success("Profile updated successfully!");
+
+    window.dispatchEvent(new Event("auth-changed"));
+    router.push("/profile");
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Update failed");
+    console.error("❌ Failed to update profile:", error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,7 +162,7 @@ const UpdateProfilePage: React.FC = () => {
                 <Input
                   type="text"
                   required
-                  value={profileData.firstName}
+                  value={profileData.firstName || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, firstName: e.target.value })
                   }
@@ -159,7 +176,7 @@ const UpdateProfilePage: React.FC = () => {
                 <Input
                   type="text"
                   required
-                  value={profileData.lastName}
+                  value={profileData.lastName || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, lastName: e.target.value })
                   }
@@ -173,7 +190,7 @@ const UpdateProfilePage: React.FC = () => {
                 <Input
                   type="email"
                   required
-                  value={profileData.email}
+                  value={profileData.email || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, email: e.target.value })
                   }
@@ -186,7 +203,7 @@ const UpdateProfilePage: React.FC = () => {
                 </label>
                 <Input
                   type="tel"
-                  value={profileData.phoneNumber}
+                  value={profileData.phoneNumber || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, phoneNumber: e.target.value })
                   }
@@ -238,7 +255,7 @@ const UpdateProfilePage: React.FC = () => {
                   Country / Region*
                 </label>
                 <Select
-                  value={profileData.country}
+                  value={profileData.country || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, country: e.target.value })
                   }
@@ -255,7 +272,7 @@ const UpdateProfilePage: React.FC = () => {
                 </label>
                 <Input
                   type="text"
-                  value={profileData.streetAddress}
+                  value={profileData.streetAddress || ""}
                   onChange={(e) =>
                     setProfileData({
                       ...profileData,
@@ -271,7 +288,7 @@ const UpdateProfilePage: React.FC = () => {
                 </label>
                 <Input
                   type="text"
-                  value={profileData.city}
+                  value={profileData.city || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, city: e.target.value })
                   }
@@ -283,7 +300,7 @@ const UpdateProfilePage: React.FC = () => {
                   State / Province*
                 </label>
                 <Select
-                  value={profileData.state}
+                  value={profileData.state || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, state: e.target.value })
                   }
@@ -307,7 +324,7 @@ const UpdateProfilePage: React.FC = () => {
                 </label>
                 <Input
                   type="text"
-                  value={profileData.zipCode}
+                  value={profileData.zipCode || ""}
                   onChange={(e) =>
                     setProfileData({ ...profileData, zipCode: e.target.value })
                   }
