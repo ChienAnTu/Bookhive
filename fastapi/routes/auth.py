@@ -99,6 +99,7 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
+    print("access_token",access_token);
     return {"access_token": access_token}
 
 @router.post("/logout")
@@ -107,13 +108,3 @@ def logout(current_user: User = Depends(get_current_user)):
     # Optional: Implement token blacklist here if needed
     return {"message": "Logged out successfully"}
 
-@router.get("/me", response_model=UserResponse)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return UserResponse(
-        id=current_user.user_id,
-        name=current_user.name,
-        email=current_user.email,
-        location=current_user.location,
-        avatar=current_user.avatar,
-        createdAt=current_user.created_at.isoformat()
-    )
