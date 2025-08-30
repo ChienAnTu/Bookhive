@@ -11,7 +11,9 @@ import {
   isAuthenticated,
   getCurrentUser,
 } from "../../../utils/auth";
-import { useCartStore } from "@/app/store/cartStore";
+
+import Avatar from "@/app/components/ui/Avatar";
+
 
 
 const Header: React.FC = () => {
@@ -177,13 +179,8 @@ const Header: React.FC = () => {
                   className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 rounded-lg hover:bg-gray-100"
                 >
                   {/* User avatar */}
-                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
-                    <img
-                      src={currentUser.avatar}
-                      alt="User"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <Avatar user={currentUser} size={32} />
+
                   {/* User name - only visible on large screens */}
                   <span className="hidden lg:block text-sm font-medium text-gray-700 max-w-20 truncate">
                     {currentUser.name}

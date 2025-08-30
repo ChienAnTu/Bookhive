@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Star, MapPin, Calendar, Book } from "lucide-react";
+import { Star, MapPin, Calendar, Book, Edit } from "lucide-react";
 import { getCurrentUser, isAuthenticated } from "../../utils/auth";
 import {
   getUserLendingOrders,
@@ -10,6 +10,9 @@ import {
   mockOrders,
 } from "../data/mockData";
 import Link from "next/link";
+import Avatar from "@/app/components/ui/Avatar";
+
+
 
 // User data interface
 interface UserData {
@@ -115,18 +118,20 @@ const ProfilePage: React.FC = () => {
     <div className="flex-1 bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Basic Info Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="relative bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          {/* Edit Button */}
+          <Link
+            href="/profile/edit"
+            className="absolute top-4 right-4 px-4 py-2 text-sm text-black rounded-md hover:bg-gray-100 transition flex items-center gap-2"
+          >
+            <Edit className="w-4 h-4" />Edit
+          </Link>
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
             {/* Profile Photo */}
-            <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
-              <img
-                src={currentUser.avatar}
-                alt="User Profile"
-                className="w-full h-full object-cover"
-              />
-            </div>
+            <Avatar user={currentUser} size={96} />
 
-            {/* User Info */}
+            {/* User name */}
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 {currentUser.name}
@@ -152,13 +157,12 @@ const ProfilePage: React.FC = () => {
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star
                         key={star}
-                        className={`w-4 h-4 ${
-                          star <= fullStars
-                            ? "text-yellow-400 fill-current"
-                            : star === fullStars + 1 && hasHalfStar
+                        className={`w-4 h-4 ${star <= fullStars
+                          ? "text-yellow-400 fill-current"
+                          : star === fullStars + 1 && hasHalfStar
                             ? "text-yellow-400 fill-current"
                             : "text-gray-300"
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>
@@ -167,6 +171,8 @@ const ProfilePage: React.FC = () => {
                   </span>
                 </div>
               )}
+
+
 
               {/* Books Lent */}
               <div className="flex items-center text-gray-600 mb-2">
@@ -179,9 +185,11 @@ const ProfilePage: React.FC = () => {
                 <Calendar className="w-4 h-4 mr-2" />
                 <span className="text-sm">Member since {joinDate}</span>
               </div>
+
             </div>
           </div>
         </div>
+
 
         {/* My Orders Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
