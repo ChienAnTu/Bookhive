@@ -18,6 +18,19 @@ class UserResponse(BaseModel):
     email: str
     location: Optional[str] = None
     avatar: Optional[str] = None
+    profilePicture: Optional[str] = None
+
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    dateOfBirth: Optional[str] = None 
+
+    country: Optional[str] = None
+    streetAddress: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipCode: Optional[str] = None
+
     createdAt: str
 
 
@@ -60,6 +73,19 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         location=current_user.location,
         avatar=current_user.avatar,
+        profilePicture=current_user.profile_picture,
+
+        firstName=current_user.first_name,
+        lastName=current_user.last_name,
+        phoneNumber=current_user.phone_number,
+        dateOfBirth=(current_user.date_of_birth.isoformat() if current_user.date_of_birth else None),
+
+        country=current_user.country,
+        streetAddress=current_user.street_address,
+        city=current_user.city,
+        state=current_user.state,
+        zipCode=current_user.zip_code,
+
         createdAt=current_user.created_at.isoformat()
     )
 
