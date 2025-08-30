@@ -29,20 +29,26 @@ This directory contains the FastAPI backend for the BookHive project, focusing o
    ```
 
 3. **Database Setup**:
-   - Run the SQL script at `../vincent-tong-mysql-query-create-db.sql` to create the database and users table:
-     ```
-     mysql -u root -p < ../vincent-tong-mysql-query-create-db.sql
-     ```
-   - Ensure the table has additional fields (name, location, avatar, created_at)—add them manually if needed:
-     ```sql
-     ALTER TABLE users 
-     ADD COLUMN name VARCHAR(100) NOT NULL,
-     ADD COLUMN location VARCHAR(100),
-     ADD COLUMN avatar VARCHAR(255),
-     ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL;
-     ```
-
+   
+   In the command line, use AWS RDS.
+   
+   ```bash
+   mysql -h capstone15db.c7u8yy6k6lxl.ap-southeast-2.rds.amazonaws.com -P 3306 -u admin -p
+   ```
+   
+   ![image-20250830173045147](../docs/doc-pics/image-20250830173045147.png)
+   
+   ```
+   show databases;  
+   use BookHive;
+   ```
+   
+   Now, we can run query script in mysql command line.
+   
+   ![image-20250830173349811](../docs/doc-pics/image-20250830173349811.png)
+   
 4. **Environment Variables**:
+   
    - Copy `../.env.example` to `../.env` (at project root) and fill in values:
      ```
      # Database (required)
@@ -51,12 +57,12 @@ This directory contains the FastAPI backend for the BookHive project, focusing o
      DB_HOST=capstone15db.c7u8yy6k6lxl.ap-southeast-2.rds.amazonaws.com
      DB_PORT=3306
      DB_NAME=BookHive
-
+     
      # JWT (required)
      SECRET_KEY=your-secure-random-key  # Generate with: python -c 'import secrets; print(secrets.token_hex(32))'
      ALGORITHM=HS256
      ACCESS_TOKEN_EXPIRE_MINUTES=30
-
+     
      # CORS (optional)
      ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
      ```
@@ -205,7 +211,7 @@ Model - View - Controller
   ```
   # Login
   curl -X POST "http://localhost:8000/api/v1/auth/login" -H "Content-Type: application/json" -d '{"email": "test@example.com", "password": "pass"}'
-
+  
   # Protected (with token)
   curl -X GET "http://localhost:8000/api/v1/auth/me" -H "Authorization: Bearer <token>"
   ```
