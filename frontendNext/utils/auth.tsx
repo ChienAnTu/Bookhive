@@ -1,4 +1,7 @@
 import axios from "axios";
+import type { User } from "@/app/types/user";
+
+
 
 // API Configuration
 const getApiUrl = () => {
@@ -204,5 +207,28 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
     localStorage.removeItem("access_token");
     delete axios.defaults.headers.common["Authorization"];
     return null;
+  }
+};
+
+// Update user profile
+export const updateUser = async (user: User) => {
+  const API_URL = getApiUrl();
+
+  try {
+    const response = await axios.put(
+      `${API_URL}/api/v1/user/${user.id}`,
+      user,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        withCredentials: true,
+      }
+    );
+
+    return response.data; // 返回更新后的用户数据
+  } catch (error) {
+    console.error("Update API failed:", error);
+    throw error;
   }
 };
