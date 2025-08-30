@@ -1,4 +1,3 @@
-# fastapi/services/book_service.py
 from __future__ import annotations
 from typing import Optional, Tuple, List, Dict, Any
 from uuid import uuid4
@@ -13,8 +12,9 @@ class BookService:
     # ---------- Create ----------
     @staticmethod
     def create(db: Session, owner_id: str, payload: Dict[str, Any]) -> Book:
-        """payload 期望鍵名與 Book model 欄位一致（snake_case）。
-           若你的 route 收到的是前端的 camelCase/特殊命名，可以在 route 先轉鍵名。"""
+        """The payload is expected to have key names consistent with the Book model fields (snake_case).
+            If your route receives camelCase or specially named keys from the frontend, 
+            you can first convert the key names in the route."""
         book = Book(
             id=str(uuid4()),
             owner_id=owner_id,
@@ -36,7 +36,7 @@ class BookService:
             can_sell=bool(payload.get("can_sell", False)),
 
             # Time
-            # date_added 使用 server_default=NOW()，故不必手動塞；update_date 同理
+            # date_added uses server_default=NOW(), so no need to insert manually; same for update_date
             isbn=payload.get("isbn"),
             tags=payload.get("tags") or [],
             publish_year=payload.get("publish_year"),
@@ -77,7 +77,7 @@ class BookService:
         if status:
             stmt = stmt.where(Book.status == status)
 
-        # 先算 total，再分頁取 items（MySQL 上效能較穩定）
+        # Calculate total first, then fetch items with pagination
         total = db.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
@@ -105,7 +105,7 @@ class BookService:
             from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Not the owner")
 
-        # 允許部分更新（僅覆蓋有傳入的欄位）
+        # Allow partial updates (only overwrite fields that are provided)
         updatable = {
             "title_or", "title_en", "original_language", "author", "category", "description",
             "cover_img_url", "condition_img_urls", "status", "condition",
@@ -116,7 +116,7 @@ class BookService:
             if k in updatable:
                 setattr(book, k, v)
 
-        # 讓 update_date 反映更新
+        # Make update_date reflect the update
         book.update_date = datetime.utcnow()
         db.add(book)
         db.commit()
