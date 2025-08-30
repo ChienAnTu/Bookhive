@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from core.dependencies import get_db,get_current_user
@@ -18,6 +18,19 @@ class UserResponse(BaseModel):
     email: str
     location: Optional[str] = None
     avatar: Optional[str] = None
+    profilePicture: Optional[str] = None
+
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    dateOfBirth: Optional[str] = None 
+
+    country: Optional[str] = None
+    streetAddress: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipCode: Optional[str] = None
+
     createdAt: str
 
 
@@ -29,21 +42,24 @@ class DateOfBirth(BaseModel):
 
 # UserUpdate model
 class UserUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone_number: Optional[str] = None
-    date_of_birth: Optional[str] = None   #"YYYY-MM-DD"
+    first_name: Optional[str] = Field(None, alias="firstName")
+    last_name: Optional[str] = Field(None, alias="lastName")
+    name: Optional[str] = Field(None, alias="name")
+    email: Optional[str] = Field(None, alias="email")
+    phone_number: Optional[str] = Field(None, alias="phoneNumber")
+    date_of_birth: Optional[str] = Field(None, alias="dateOfBirth")  # "YYYY-MM-DD"
 
-    country: Optional[str] = None
-    street_address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
+    country: Optional[str] = Field(None, alias="country")
+    street_address: Optional[str] = Field(None, alias="streetAddress")
+    city: Optional[str] = Field(None, alias="city")
+    state: Optional[str] = Field(None, alias="state")
+    zip_code: Optional[str] = Field(None, alias="zipCode")
 
-    avatar: Optional[str] = None
-    profile_picture: Optional[str] = None
+    avatar: Optional[str] = Field(None, alias="avatar")
+    profile_picture: Optional[str] = Field(None, alias="profilePicture")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 @router.get("/me", response_model=UserResponse)
@@ -60,6 +76,19 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         location=current_user.location,
         avatar=current_user.avatar,
+        profilePicture=current_user.profile_picture,
+
+        firstName=current_user.first_name,
+        lastName=current_user.last_name,
+        phoneNumber=current_user.phone_number,
+        dateOfBirth=(current_user.date_of_birth.isoformat() if current_user.date_of_birth else None),
+
+        country=current_user.country,
+        streetAddress=current_user.street_address,
+        city=current_user.city,
+        state=current_user.state,
+        zipCode=current_user.zip_code,
+
         createdAt=current_user.created_at.isoformat()
     )
 
