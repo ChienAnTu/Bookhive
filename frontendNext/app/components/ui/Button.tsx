@@ -4,7 +4,7 @@ import React from "react";
 import { Loader2 } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 
-export type ButtonVariant = "default" | "primary" | "secondary" | "outline";
+export type ButtonVariant = "default" | "primary" | "secondary" | "outline" | "ghost";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps
@@ -25,6 +25,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
   secondary: "bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-400",
   outline:
     "border-2 border-black text-black hover:bg-black hover:text-white focus:ring-gray-500",
+  ghost: "bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-300",
+
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
