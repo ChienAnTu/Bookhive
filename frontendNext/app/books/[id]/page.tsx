@@ -23,8 +23,9 @@ import {
   getCurrentUser,
   calculateDistance
 } from "@/app/data/mockData";
-import { useCartStore } from "@/app/store/cartStore";
-import { toast } from "sonner";
+
+import Avatar from "@/app/components/ui/Avatar";
+
 
 export default function BookDetailPage() {
   const params = useParams();
@@ -282,13 +283,8 @@ export default function BookDetailPage() {
               <Card>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Book Owner</h3>
                 <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
-                    <img
-                      src={owner.avatar}
-                      alt={owner.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  <Avatar user={currentUser} size={96} />
+
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900">{owner.name}</h4>
                     <div className="flex items-center text-gray-600 text-sm mt-1">
