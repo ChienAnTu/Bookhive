@@ -1,26 +1,26 @@
 // mockData.tsx
-
+import { User } from "@/app/types/user";
 import { Book } from "@/app/types/book";
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  location: string;
-  address?: string; // Full address for postal delivery
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  rating: number;
-  booksLent: number;
-  booksBorrowed: number;
-  joinDate: string;
-  bio: string;
-  avatar: string;
-  preferredLanguages: string[];
-  maxDistance: number; // kilometers willing to travel
-}
+// export interface User {
+//   id: string;
+//   name: string;
+//   email: string;
+//   location: string;
+//   address?: string; // Full address for postal delivery
+//   coordinates: {
+//     lat: number;
+//     lng: number;
+//   };
+//   rating: number;
+//   booksLent: number;
+//   booksBorrowed: number;
+//   joinDate: string;
+//   bio: string;
+//   avatar: string;
+//   preferredLanguages: string[];
+//   maxDistance: number; // kilometers willing to travel
+// }
 
 export interface LendingRequest {
   id: string;
@@ -101,91 +101,64 @@ export interface Message {
   };
 }
 
+
 export const mockUsers: User[] = [
   {
     id: "user1",
-    name: "Zhenyi Su",
-    email: "zhenyi.su@email.com",
-    location: "Perth, Western Australia",
-    address: "123 Murray Street, Perth, WA 6000",
-    coordinates: { lat: -31.9505, lng: 115.8605 },
-    rating: 4.8,
-    booksLent: 47,
-    booksBorrowed: 23,
-    joinDate: "2023-03-15",
-    bio: "Avid reader and tech enthusiast. Love sharing great books with fellow readers!",
-    avatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
+    firstName: "Alice",
+    lastName: "Wang",
+    email: "alice@example.com",
+    phoneNumber: "+61 400 123 456",
+    dateOfBirth: { month: "03", day: "12", year: "1995" },
+    country: "Australia",
+    streetAddress: "123 George St",
+    city: "Sydney",
+    state: "NSW",
+    zipCode: "2000",
+    coordinates: { lat: -33.8688, lng: 151.2093 },
+    maxDistance: 10,
+    avatar: "/images/users/alice.jpg",
+    bio: "Avid reader who loves fiction and sharing books with the community.",
     preferredLanguages: ["English", "Mandarin"],
-    maxDistance: 15,
+    createdAt: new Date("2023-01-10"),
   },
   {
     id: "user2",
-    name: "Sarah Johnson",
-    email: "sarah.j@email.com",
-    location: "Fremantle, WA",
-    address: "456 High Street, Fremantle, WA 6160",
-    coordinates: { lat: -32.0569, lng: 115.7439 },
-    rating: 4.9,
-    booksLent: 18,
-    booksBorrowed: 15,
-    joinDate: "2022-11-20",
-    bio: "Bookworm and coffee lover. Always looking for my next great read!",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    preferredLanguages: ["English", "French"],
+    firstName: "David",
+    lastName: "Chen",
+    email: "david@example.com",
+    phoneNumber: "+61 433 987 654",
+    dateOfBirth: { month: "07", day: "24", year: "1990" },
+    country: "Australia",
+    streetAddress: "45 Collins St",
+    city: "Melbourne",
+    state: "VIC",
+    zipCode: "3000",
+    coordinates: { lat: -37.8136, lng: 144.9631 },
     maxDistance: 20,
+    avatar: "/images/users/david.jpg",
+    bio: "Collector of classic literature. Always open to lend and borrow.",
+    preferredLanguages: ["English"],
+    createdAt: new Date("2023-02-05"),
   },
   {
     id: "user3",
-    name: "Marcus Davis",
-    email: "marcus.d@email.com",
-    location: "Subiaco, WA",
-    address: "789 Rokeby Road, Subiaco, WA 6008",
-    coordinates: { lat: -31.9474, lng: 115.8208 },
-    rating: 4.7,
-    booksLent: 9,
-    booksBorrowed: 11,
-    joinDate: "2023-03-10",
-    bio: "History buff and science fiction fan. Happy to share my collection!",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    preferredLanguages: ["English", "Spanish"],
-    maxDistance: 25,
-  },
-  {
-    id: "user4",
-    name: "Elena Rodriguez",
-    email: "elena.r@email.com",
-    location: "Cottesloe, WA",
-    address: "1234 Marine Parade, Cottesloe, WA 6011",
-    coordinates: { lat: -31.9959, lng: 115.7578 },
-    rating: 4.6,
-    booksLent: 14,
-    booksBorrowed: 9,
-    joinDate: "2023-02-28",
-    bio: "Literature professor who loves sharing diverse stories from around the world.",
-    avatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
-    preferredLanguages: ["English", "Spanish", "Portuguese"],
-    maxDistance: 10,
-  },
-  {
-    id: "user5",
-    name: "Hiroshi Tanaka",
-    email: "hiroshi.t@email.com",
-    location: "Northbridge, WA",
-    address: "567 William Street, Northbridge, WA 6003",
-    coordinates: { lat: -31.9489, lng: 115.8573 },
-    rating: 4.9,
-    booksLent: 22,
-    booksBorrowed: 13,
-    joinDate: "2022-08-15",
-    bio: "Manga enthusiast and philosophy reader. Building a bridge between Eastern and Western literature.",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    preferredLanguages: ["Japanese", "English"],
-    maxDistance: 30,
+    firstName: "Sophia",
+    lastName: "Li",
+    email: "sophia@example.com",
+    phoneNumber: "+61 422 765 321",
+    dateOfBirth: { month: "11", day: "05", year: "1998" },
+    country: "Australia",
+    streetAddress: "78 Queen St",
+    city: "Brisbane",
+    state: "QLD",
+    zipCode: "4000",
+    coordinates: { lat: -27.4698, lng: 153.0251 },
+    maxDistance: 15,
+    avatar: "/images/users/sophia.jpg",
+    bio: "Passionate about fantasy novels and community sharing.",
+    preferredLanguages: ["English", "Japanese"],
+    createdAt: new Date("2023-03-12"),
   },
 ];
 

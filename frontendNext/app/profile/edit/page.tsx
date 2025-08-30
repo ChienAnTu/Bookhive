@@ -1,47 +1,40 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUser, isAuthenticated } from "../../utils/auth";
+import { getCurrentUser, isAuthenticated } from "../../../utils/auth";
 import { Camera } from "lucide-react";
+import Button from "@/app/components/ui/Button";
+import Input from "@/app/components/ui/Input";
+import Select from "@/app/components/ui/Select";
+import type { User } from "@/app/types/user";
+import Avatar from "@/app/components/ui/Avatar";
 
-interface UserProfile {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  dateOfBirth: {
-    month: string;
-    day: string;
-    year: string;
-  };
-  country: string;
-  streetAddress: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  profilePicture?: string;
-}
+
+const emptyUser: User = {
+  id: "temp",
+  firstName: "",
+  lastName: "",
+  email: "",
+  phoneNumber: "",
+  dateOfBirth: { month: "", day: "", year: "" },
+  country: "",
+  streetAddress: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  createdAt: new Date(),
+  bio: "",
+  avatar: "https://ui-avatars.com/api/?name=Book+Exchange&background=000&color=fff",
+  preferredLanguages: [],
+};
+
 
 const UpdateProfilePage: React.FC = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [profileData, setProfileData] = useState<UserProfile>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phoneNumber: "",
-    dateOfBirth: {
-      month: "",
-      day: "",
-      year: "",
-    },
-    country: "",
-    streetAddress: "",
-    city: "",
-    state: "",
-    zipCode: "",
-  });
+  const [profileData, setProfileData] = useState<User>(emptyUser);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -53,24 +46,7 @@ const UpdateProfilePage: React.FC = () => {
       try {
         const userData = await getCurrentUser();
         if (userData) {
-          // Transform API data to form structure
-          setProfileData({
-            firstName: userData.name.split(" ")[0] || "",
-            lastName: userData.name.split(" ")[1] || "",
-            email: userData.email,
-            phoneNumber: userData.phoneNumber || "",
-            dateOfBirth: {
-              month: "",
-              day: "",
-              year: "",
-            },
-            country: userData.location || "",
-            streetAddress: userData.address || "",
-            city: userData.city || "",
-            state: userData.state || "",
-            zipCode: userData.zipCode || "",
-            profilePicture: userData.avatar,
-          });
+          setProfileData(userData);
         } else {
           router.push("/login");
         }
@@ -130,24 +106,23 @@ const UpdateProfilePage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             {/* Profile Picture Upload */}
             <div className="mb-6">
-              <div className="flex items-center space-x-6">
+              <h3 className="text-sm font-medium text-gray-700">
+                Profile picture
+              </h3>
+              <div className="flex flex-col items-center">
                 <div className="relative">
-                  <div className="w-24 h-24 bg-gray-300 rounded-full overflow-hidden">
-                    {profileData.profilePicture ? (
-                      <img
-                        src={profileData.profilePicture}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Camera className="w-8 h-8 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <label className="absolute bottom-0 right-0 bg-blue-500 rounded-full p-2 cursor-pointer">
+                  {/* Avatar 显示：如果用户上传过新头像(profilePicture)，优先显示 */}
+                  {profileData.profilePicture ? (
+                    <img src={profileData.profilePicture} alt="Preview" className="w-24 h-24 rounded-full object-cover" />
+                  ) : (
+                    <Avatar user={profileData} size={96} />
+                  )}
+
+
+                  {/* 上传按钮 */}
+                  <label className="absolute bottom-0 right-0 bg-black rounded-full p-2 cursor-pointer">
                     <Camera className="w-4 h-4 text-white" />
-                    <input
+                    <Input
                       type="file"
                       className="hidden"
                       accept="image/*"
@@ -155,15 +130,10 @@ const UpdateProfilePage: React.FC = () => {
                     />
                   </label>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900">
-                    Profile picture
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    JPG, PNG or GIF (max. 2MB)
-                  </p>
-                </div>
+
+                <p className="text-sm text-gray-500 mt-2">JPG or PNG (max. 2MB)</p>
               </div>
+
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -172,10 +142,9 @@ const UpdateProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">
                   First name*
                 </label>
-                <input
+                <Input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.firstName}
                   onChange={(e) =>
                     setProfileData({ ...profileData, firstName: e.target.value })
@@ -187,10 +156,9 @@ const UpdateProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">
                   Last name*
                 </label>
-                <input
+                <Input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.lastName}
                   onChange={(e) =>
                     setProfileData({ ...profileData, lastName: e.target.value })
@@ -202,10 +170,9 @@ const UpdateProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">
                   Email address*
                 </label>
-                <input
+                <Input
                   type="email"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.email}
                   onChange={(e) =>
                     setProfileData({ ...profileData, email: e.target.value })
@@ -217,9 +184,8 @@ const UpdateProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">
                   Phone number
                 </label>
-                <input
+                <Input
                   type="tel"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.phoneNumber}
                   onChange={(e) =>
                     setProfileData({ ...profileData, phoneNumber: e.target.value })
@@ -233,48 +199,33 @@ const UpdateProfilePage: React.FC = () => {
                   Date of birth
                 </label>
                 <div className="grid grid-cols-3 gap-4">
-                  <input
-                    type="text"
-                    placeholder="MM"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={profileData.dateOfBirth.month}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        dateOfBirth: {
-                          ...profileData.dateOfBirth,
-                          month: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                  <input
-                    type="text"
+                  <Input
                     placeholder="DD"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={profileData.dateOfBirth.day}
+                    value={profileData.dateOfBirth?.day || ""}
                     onChange={(e) =>
                       setProfileData({
                         ...profileData,
-                        dateOfBirth: {
-                          ...profileData.dateOfBirth,
-                          day: e.target.value,
-                        },
+                        dateOfBirth: { ...profileData.dateOfBirth!, day: e.target.value },
                       })
                     }
                   />
-                  <input
-                    type="text"
-                    placeholder="YYYY"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={profileData.dateOfBirth.year}
+                  <Input
+                    placeholder="MM"
+                    value={profileData.dateOfBirth?.month || ""}
                     onChange={(e) =>
                       setProfileData({
                         ...profileData,
-                        dateOfBirth: {
-                          ...profileData.dateOfBirth,
-                          year: e.target.value,
-                        },
+                        dateOfBirth: { ...profileData.dateOfBirth!, month: e.target.value },
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="YYYY"
+                    value={profileData.dateOfBirth?.year || ""}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        dateOfBirth: { ...profileData.dateOfBirth!, year: e.target.value },
                       })
                     }
                   />
@@ -284,10 +235,9 @@ const UpdateProfilePage: React.FC = () => {
               {/* Address Information */}
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  Country / Region
+                  Country / Region*
                 </label>
-                <select
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                <Select
                   value={profileData.country}
                   onChange={(e) =>
                     setProfileData({ ...profileData, country: e.target.value })
@@ -296,16 +246,15 @@ const UpdateProfilePage: React.FC = () => {
                   <option value="">Select a country</option>
                   <option value="AU">Australia</option>
                   {/* Add more countries as needed */}
-                </select>
+                </Select>
               </div>
 
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  Street address
+                  Street address*
                 </label>
-                <input
+                <Input
                   type="text"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.streetAddress}
                   onChange={(e) =>
                     setProfileData({
@@ -318,11 +267,10 @@ const UpdateProfilePage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  City
+                  City*
                 </label>
-                <input
+                <Input
                   type="text"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.city}
                   onChange={(e) =>
                     setProfileData({ ...profileData, city: e.target.value })
@@ -332,10 +280,9 @@ const UpdateProfilePage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  State / Province
+                  State / Province*
                 </label>
-                <select
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                <Select
                   value={profileData.state}
                   onChange={(e) =>
                     setProfileData({ ...profileData, state: e.target.value })
@@ -351,33 +298,55 @@ const UpdateProfilePage: React.FC = () => {
                   <option value="ACT">Australian Capital Territory</option>
                   <option value="NT">Northern Territory</option>
                   {/* Add more states */}
-                </select>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  ZIP / Postal
+                  ZIP / Postal*
                 </label>
-                <input
+                <Input
                   type="text"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                   value={profileData.zipCode}
                   onChange={(e) =>
                     setProfileData({ ...profileData, zipCode: e.target.value })
                   }
                 />
               </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Bio
+                </label>
+                <textarea
+                  rows={4}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-black focus:border-black"
+                  value={profileData.bio || ""}
+                  onChange={(e) =>
+                    setProfileData({ ...profileData, bio: e.target.value })
+                  }
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Tell others a bit about yourself and your reading interests.
+                </p>
+              </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="mt-6">
-              <button
-                type="submit"
-                className="w-full sm:w-auto px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            {/* Action Buttons */}
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-black text-black"
+                onClick={() => router.push("/profile")}
               >
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary">
                 Save
-              </button>
+              </Button>
             </div>
+
+
           </form>
         </div>
       </div>
