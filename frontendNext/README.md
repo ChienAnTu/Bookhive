@@ -1,9 +1,33 @@
+# BookHive 📚
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+---
 
-First, run the development server:
+## 🚀 Getting Started
 
+### 1. Install dependencies
+
+Make sure you have **Node.js (>=18)** installed.
+We recommend using **npm**, but you can also use `yarn`, `pnpm`, or `bun`.
+
+```bash
+# install all dependencies
+npm install
+# or
+yarn install
+# or
+pnpm install
+# or
+bun install
+```
+
+```bash
+# and install extra libraries used in this project:
+npm install zustand lucide-react tailwindcss postcss autoprefixer
+```
+
+### 2. Run the development server
 ```bash
 npm run dev
 # or
@@ -14,23 +38,55 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Now open [http://localhost:3000](http://localhost:3000) in your browser.
+The page auto-updates as you edit files in the `app/` directory (e.g. `app/page.tsx`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Installed Packages
 
-## Learn More
+This project uses:
 
-To learn more about Next.js, take a look at the following resources:
+* **[Next.js](https://nextjs.org/)** – React framework for building web apps
+* **[React](https://react.dev/)** – UI library
+* **[TypeScript](https://www.typescriptlang.org/)** – static typing
+* **[Tailwind CSS](https://tailwindcss.com/)** – utility-first CSS framework
+* **[lucide-react](https://lucide.dev/)** – icons
+* **[Zustand](https://github.com/pmndrs/zustand)** – lightweight global state management (used for Cart)
+* **[shadcn/ui](https://ui.shadcn.com/)** – reusable UI components
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If any package is missing, install them manually:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install zustand lucide-react tailwindcss postcss autoprefixer
+```
 
-## Deploy on Vercel
+For UI components (shadcn/ui):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx shadcn-ui init
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🛠 Development Notes
+
+* Run `npm run lint` → check code style
+* Run `npm run build` → build production version
+* Run `npm run start` → start production server
+
+---
+
+## 📚 Learn More
+
+* [Next.js Documentation](https://nextjs.org/docs) – features & API
+* [Learn Next.js](https://nextjs.org/learn) – interactive tutorial
+* [Next.js GitHub](https://github.com/vercel/next.js) – feedback & contributions
+
+---
+
+## ☁️ Deploy on Vercel
+
+The easiest way to deploy your Next.js app is with [Vercel](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
+
+See the [Next.js deployment docs](https://nextjs.org/docs/app/building-your-application/deploying) for details.

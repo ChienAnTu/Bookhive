@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from routes.auth import router as auth_router
 from routes.users import router as user_router
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+from routes.upload import router as upload_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -20,6 +23,13 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+# media root directory: /media is mounted to the app/media folder
+MEDIA_ROOT = Path(__file__).parent / "media"
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
+
+app.include_router(upload_router)
 
 # Include auth router
 app.include_router(auth_router, prefix="/api/v1")
