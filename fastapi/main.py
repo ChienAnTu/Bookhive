@@ -6,6 +6,8 @@ from routes.users import router as user_router
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from routes.upload import router as upload_router
+from routes.books import router as books_router
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -36,6 +38,9 @@ app.include_router(auth_router, prefix="/api/v1")
 
 # user router
 app.include_router(user_router, prefix="/api/v1")
+
+# books router
+app.include_router(books_router)
 
 @app.get("/")
 async def root():
