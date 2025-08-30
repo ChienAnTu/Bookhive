@@ -8,11 +8,11 @@ import {
   MapPin,
   Clock,
   ArrowLeft,
-  Heart,
   Share2,
   MessageCircle,
   Package,
-  Shield
+  Shield,
+  ShoppingBag
 } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -23,6 +23,8 @@ import {
   getCurrentUser,
   calculateDistance
 } from "@/app/data/mockData";
+import { useCartStore } from "@/app/store/cartStore";
+import { toast } from "sonner";
 
 export default function BookDetailPage() {
   const params = useParams();
@@ -99,9 +101,8 @@ export default function BookDetailPage() {
     }
   };
 
-  const handleRequestBook = () => {
-    setIsRequestModalOpen(true);
-  };
+  const addToCart = useCartStore((state) => state.addToCart);
+
 
   const handleSendRequest = () => {
     console.log("Sending request with message:", requestMessage);
@@ -136,7 +137,7 @@ export default function BookDetailPage() {
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Books
+              Back to Book Lists
             </Button>
           </div>
 
@@ -164,32 +165,40 @@ export default function BookDetailPage() {
 
                 <div className="p-4 space-y-3">
                   <Button
-                    onClick={() => router.push(`/borrow/${book.id}`)}
-                    className="w-full"
-                    disabled={book.status !== "listed"}
+    onClick={() => {
+      const ok = useCartStore.getState().addToCart(book, "borrow"); // 👈 指定首选租赁
+      if (ok) {
+        toast?.success?.("Added to cart");
+      } else {
+        toast?.error?.("This book cannot be requested (rent not available).");
+      }
+    }}
+    className="w-full flex items-center justify-center space-x-2"
+    disabled={
+      book.status !== "listed" || (!book.canRent && !book.canSell)
+    } // 👈 同时考虑能力
+  >
+    <ShoppingBag className="w-4 h-4" />
+    <span>
+      {book.status !== "listed"
+        ? "Unlisted"
+        : book.canRent
+        ? "Request This Book"
+        : book.canSell
+        ? "Purchase Only"
+        : "Unavailable"}
+    </span>
+  </Button>
+
+
+                  <Button
+                    variant="outline"
+                    onClick={handleShare}
+                    className="w-full flex items-center justify-center space-x-2"
                   >
-                    {book.status === "listed" ? "Borrow This Book" : "Unlisted"}
+                    <Share2 className="w-4 h-4" />
+                    <span>Share</span>
                   </Button>
-
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={handleToggleFavorite}
-                      className="flex-1 flex items-center justify-center gap-2"
-                    >
-                      <Heart className={`w-4 h-4 ${isFavorited ? "fill-current text-red-500" : ""}`} />
-                      {isFavorited ? "Favorited" : "Favorite"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleShare}
-                      className="flex-1 flex items-center justify-center gap-2"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Share
-                    </Button>
-                  </div>
                 </div>
               </Card>
             </div>
@@ -263,7 +272,7 @@ export default function BookDetailPage() {
                           <Shield className="w-4 h-4" />
                           Deposit:
                         </span>
-                        <span className="font-medium">${book.fees.deposit}</span>
+                        <span className="font-medium">${book.deposit}</span>
                       </div>
                     </div>
                   </div>
@@ -292,8 +301,8 @@ export default function BookDetailPage() {
                           <Star
                             key={star}
                             className={`w-4 h-4 ${star <= Math.floor(owner.rating)
-                                ? "text-yellow-400 fill-current"
-                                : "text-gray-300"
+                              ? "text-yellow-400 fill-current"
+                              : "text-gray-300"
                               }`}
                           />
                         ))}

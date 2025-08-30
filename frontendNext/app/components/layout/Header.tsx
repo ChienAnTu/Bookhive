@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User, LogOut, Plus, Truck, LifeBuoy } from "lucide-react";
+import { User, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
 import {
   logoutUser,
   isAuthenticated,
   getCurrentUser,
 } from "../../../utils/auth";
+import { useCartStore } from "@/app/store/cartStore";
+
 
 const Header: React.FC = () => {
   const router = useRouter();
@@ -85,6 +87,23 @@ const Header: React.FC = () => {
     router.push("/register");
   };
 
+  // Navigate to Shopping Cart
+  const HeaderCart = () => {
+    const cartCount = useCartStore((state) => state.cart.length);
+
+    return (
+      <Link href="/cart" className="relative inline-block">
+        <ShoppingBag className="w-6 h-6 text-gray-700" />
+        {cartCount > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+            {cartCount}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+
   return (
     <header className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 transform-none">
       <div className="w-full px-2 sm:px-4 lg:px-6">
@@ -102,23 +121,23 @@ const Header: React.FC = () => {
           </div>
 
           {/* Search box */}
-<div className="flex-1 flex justify-center px-2 sm:px-4">
-  <div className="w-full max-w-xl">
-    {/* input */}
-    <Input
-      variant="search"
-      placeholder="Search books, authors, tags..."
-      value={searchQuery}
-      onChange={(e) => setSearchQuery(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          console.log("Searching:", searchQuery);
-        }
-      }}
-      className="w-full"
-    />
-  </div>
-</div>
+          <div className="flex-1 flex justify-center px-2 sm:px-4">
+            <div className="w-full max-w-xl">
+              {/* input */}
+              <Input
+                variant="search"
+                placeholder="Search books, authors, tags..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    console.log("Searching:", searchQuery);
+                  }
+                }}
+                className="w-full"
+              />
+            </div>
+          </div>
 
 
           {/* Action buttons area */}
@@ -143,6 +162,12 @@ const Header: React.FC = () => {
                 <Plus className="w-4 h-4" />
               </Button>
             )}
+
+            {/* Shopping Cart button - count items */}
+            <div className="flex items-center space-x-4">
+              <HeaderCart />
+              {/* 这里可以继续放 User / Login 按钮 */}
+            </div>
 
             {/* User profile section - shown when logged in */}
             {isLoggedIn && currentUser ? (
@@ -235,3 +260,4 @@ const Header: React.FC = () => {
 };
 
 export default Header;
+
