@@ -25,7 +25,7 @@ interface RegisterData {
   agree_terms: boolean;
 }
 
-interface UserData {
+export interface UserData {
   id: string;
   name: string;
   email: string;
