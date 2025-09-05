@@ -1,6 +1,7 @@
 // mockData.tsx
 import { User } from "@/app/types/user";
 import { Book } from "@/app/types/book";
+import { Comment, RatingStats } from "@/app/types";
 
 // export interface User {
 //   id: string;
@@ -762,3 +763,123 @@ export const mockComplaints: Complaint[] = [
     createdAt: "2024-01-20T11:00:00Z"
   }
 ];
+
+// 评论和评分数据
+export const mockComments: Comment[] = [
+  {
+    id: "comment1",
+    orderId: "order1",
+    reviewerId: "user1",
+    revieweeId: "user2",
+    bookId: "book1",
+    rating: 5,
+    content: "Sarah was an excellent lender! The book was in perfect condition and she was very responsive to messages. Highly recommend!",
+    tags: ["friendly", "responsive", "good condition"],
+    type: "lender",
+    createdAt: "2024-01-22T10:30:00Z",
+    isAnonymous: false,
+    helpfulCount: 3
+  },
+  {
+    id: "comment2", 
+    orderId: "order1",
+    reviewerId: "user2",
+    revieweeId: "user1",
+    bookId: "book1",
+    rating: 5,
+    content: "Zhenyi was a great borrower. Returned the book on time and in the same condition. Would definitely lend to again!",
+    tags: ["punctual", "careful", "trustworthy"],
+    type: "borrower",
+    createdAt: "2024-01-23T14:20:00Z",
+    isAnonymous: false,
+    helpfulCount: 2
+  },
+  {
+    id: "comment3",
+    orderId: "order2",
+    reviewerId: "user3",
+    revieweeId: "user1",
+    bookId: "book2",
+    rating: 4,
+    content: "Good experience overall. The book arrived as described and Zhenyi was helpful with pickup arrangements.",
+    tags: ["helpful", "organized"],
+    type: "lender",
+    createdAt: "2024-02-05T16:45:00Z",
+    isAnonymous: false,
+    helpfulCount: 1
+  },
+  {
+    id: "comment4",
+    orderId: "order3",
+    reviewerId: "user4",
+    revieweeId: "user3",
+    bookId: "book3",
+    rating: 3,
+    content: "Book was okay but had some minor wear that wasn't mentioned. Communication could have been better.",
+    tags: ["average condition"],
+    type: "lender",
+    createdAt: "2024-01-28T09:10:00Z",
+    isAnonymous: true,
+    helpfulCount: 0
+  },
+  {
+    id: "comment5",
+    orderId: "order4",
+    reviewerId: "user1",
+    revieweeId: "user4",
+    bookId: "book4",
+    rating: 4,
+    content: "Elena was great to work with. Professional and the book handover was smooth.",
+    tags: ["professional", "smooth transaction"],
+    type: "lender",
+    createdAt: "2024-02-10T11:25:00Z",
+    isAnonymous: false,
+    helpfulCount: 2
+  }
+];
+
+// 获取用户的评分统计
+export const getUserRatingStats = (userId: string): RatingStats => {
+  const userComments = mockComments.filter(comment => comment.revieweeId === userId);
+  
+  if (userComments.length === 0) {
+    return {
+      averageRating: 0,
+      totalReviews: 0,
+      ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      recentComments: []
+    };
+  }
+
+  const totalRating = userComments.reduce((sum, comment) => sum + comment.rating, 0);
+  const averageRating = totalRating / userComments.length;
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  userComments.forEach(comment => {
+    distribution[comment.rating as keyof typeof distribution]++;
+  });
+
+  return {
+    averageRating: Math.round(averageRating * 10) / 10,
+    totalReviews: userComments.length,
+    ratingDistribution: distribution,
+    recentComments: userComments
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+  };
+};
+
+// 获取订单的评论
+export const getOrderComments = (orderId: string): Comment[] => {
+  return mockComments.filter(comment => comment.orderId === orderId);
+};
+
+// 获取用户给出的评论
+export const getUserGivenComments = (userId: string): Comment[] => {
+  return mockComments.filter(comment => comment.reviewerId === userId);
+};
+
+// 获取用户收到的评论  
+export const getUserReceivedComments = (userId: string): Comment[] => {
+  return mockComments.filter(comment => comment.revieweeId === userId);
+};
