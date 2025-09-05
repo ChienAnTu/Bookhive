@@ -83,8 +83,8 @@ Key milestones include:
 
 ```
 Bookhive/
-├── frontend/         # Next.js frontend
-├── backend/          # FastAPI backend (TBD)
+├── frontendNext/         # Next.js frontend
+├── fastapi/          # FastAPI backend (TBD)
 ├── docs/             # Project documentation, PRD, meeting notes, diagrams
 └── README.md         # Project overview
 ```
@@ -98,12 +98,14 @@ Bookhive/
 ```bash
 git clone https://github.com/ChienAnTu/Bookhive.git
 cd Bookhive
+cp .env.example .env
 ```
+Then update detail in .env file
 
 ### 2. Frontend Setup
 
 ```bash
-cd frontend
+cd frontendNext
 npm install
 npm run dev
 ```
@@ -112,10 +114,12 @@ Runs the Next.js frontend on [http://localhost:3000](http://localhost:3000)
 
 ### 3. Backend Setup (FastAPI)
 
+Open a new terminal window, navigate to the frontend directory, and start the frontend:
+
 ```bash
-cd backend
+cd fastapi
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Runs backend API at [http://localhost:8000](http://localhost:8000)
