@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { User } from "@/app/types/user";
-
+import { Book } from "@/app/types/book";
 
 
 // API Configuration
@@ -27,6 +27,8 @@ interface RegisterData {
 
 interface UserData {
   id: string;
+  firstName: string;
+  lastName: string;
   name: string;
   email: string;
   location: string;
@@ -171,7 +173,7 @@ export const initAuth = () => {
 };
 
 // Get current user information from API
-export const getCurrentUser = async (): Promise<UserData | null> => {
+export const getCurrentUser = async (): Promise<User | null> => {
   const token = getToken();
   if (!token) return null;
 
@@ -184,31 +186,46 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
     });
 
     const userData = response.data;
-    return {
+
+    const user: User = {
       id: userData.id,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
       name: userData.name,
       email: userData.email,
-      location: userData.location,
-      phoneNumber: userData.phoneNumber || '',
-      address: userData.address || '',
-      city: userData.city || '',
-      state: userData.state || '',
-      zipCode: userData.zipCode || '',
+      phoneNumber: userData.phoneNumber || undefined,
+      dateOfBirth: userData.dateOfBirth || undefined,
+
+      country: userData.country,
+      streetAddress: userData.streetAddress,
+      city: userData.city,
+      state: userData.state,
+      zipCode: userData.zipCode,
+      coordinates: userData.coordinates || undefined,
+      maxDistance: userData.maxDistance || undefined,
+
       avatar:
         userData.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(
           userData.name
         )}&background=f97316&color=fff`,
-      createdAt: userData.createdAt,
+      profilePicture: userData.profilePicture || undefined,
+
+      createdAt: new Date(userData.createdAt),
+
+      bio: userData.bio || undefined,
+      preferredLanguages: userData.preferredLanguages || undefined,
     };
+
+    return user;
   } catch (error) {
     console.error("Failed to get user info:", error);
-    // Clear invalid token if API call fails
     localStorage.removeItem("access_token");
     delete axios.defaults.headers.common["Authorization"];
     return null;
   }
 };
+
 
 // Update user profile
 export const updateUser = async (user: User) => {
@@ -229,6 +246,30 @@ export const updateUser = async (user: User) => {
     return response.data; // 返回更新后的用户数据
   } catch (error) {
     console.error("Update API failed:", error);
+    throw error;
+  }
+};
+
+// start lending - save a new book
+export const createBook = async (book: Book) => {
+  const API_URL = getApiUrl();
+
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/v1/books`,
+      book,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        withCredentials: true,
+      }
+    );
+
+    return response.data; // 返回创建后的书籍
+  } catch (error) {
+    console.error("Create Book API (JSON) failed:", error);
     throw error;
   }
 };

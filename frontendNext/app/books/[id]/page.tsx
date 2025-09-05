@@ -12,7 +12,9 @@ import {
   MessageCircle,
   Package,
   Shield,
-  ShoppingBag
+  ShoppingBag,
+  Book,
+  Languages,
 } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -25,7 +27,8 @@ import {
 } from "@/app/data/mockData";
 
 import Avatar from "@/app/components/ui/Avatar";
-
+import { useCartStore } from "@/app/store/cartStore";
+import { toast } from 'sonner';
 
 export default function BookDetailPage() {
   const params = useParams();
@@ -47,7 +50,7 @@ export default function BookDetailPage() {
   const currentUser = getCurrentUser();
 
   const distance = useMemo(() => {
-    if (!owner || !owner.coordinates) return 0;
+    if (!owner?.coordinates || !currentUser?.coordinates) return 0;
     return calculateDistance(
       currentUser.coordinates.lat,
       currentUser.coordinates.lng,
@@ -101,6 +104,9 @@ export default function BookDetailPage() {
         return "text-gray-600 bg-gray-50 border-gray-200";
     }
   };
+
+  const formatKm = (km: number) =>
+    km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
 
   const addToCart = useCartStore((state) => state.addToCart);
 
@@ -166,30 +172,30 @@ export default function BookDetailPage() {
 
                 <div className="p-4 space-y-3">
                   <Button
-    onClick={() => {
-      const ok = useCartStore.getState().addToCart(book, "borrow"); // 👈 指定首选租赁
-      if (ok) {
-        toast?.success?.("Added to cart");
-      } else {
-        toast?.error?.("This book cannot be requested (rent not available).");
-      }
-    }}
-    className="w-full flex items-center justify-center space-x-2"
-    disabled={
-      book.status !== "listed" || (!book.canRent && !book.canSell)
-    } // 👈 同时考虑能力
-  >
-    <ShoppingBag className="w-4 h-4" />
-    <span>
-      {book.status !== "listed"
-        ? "Unlisted"
-        : book.canRent
-        ? "Request This Book"
-        : book.canSell
-        ? "Purchase Only"
-        : "Unavailable"}
-    </span>
-  </Button>
+                    onClick={() => {
+                      const ok = useCartStore.getState().addToCart(book, "borrow"); // 指定首选租赁
+                      if (ok) {
+                        toast?.success?.("Added to cart");
+                      } else {
+                        toast?.error?.("This book cannot be requested (rent not available).");
+                      }
+                    }}
+                    className="w-full flex items-center justify-center space-x-2"
+                    disabled={
+                      book.status !== "listed" || (!book.canRent && !book.canSell)
+                    }
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>
+                      {book.status !== "listed"
+                        ? "Unlisted"
+                        : book.canRent
+                          ? "Request This Book"
+                          : book.canSell
+                            ? "Purchase Only"
+                            : "Unavailable"}
+                    </span>
+                  </Button>
 
 
                   <Button
@@ -236,23 +242,39 @@ export default function BookDetailPage() {
                   </p>
                 </div>
 
+                <h4 className="font-semibold text-gray-900 mb-3">Book Information</h4>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Book Information</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Category:</span>
+                        <span className="text-gray-500 flex items-center gap-1">
+                          <Book className="w-4 h-4" />
+                        Category:</span>
                         <span className="font-medium">{book.category}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Language:</span>
+                        <span className="text-gray-500 flex items-center gap-1">
+                          <Languages className="w-4 h-4" />
+                        Language:</span>
                         <span className="font-medium">{book.originalLanguage}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 flex items-center gap-1">
+                          <ShoppingBag className="w-4 h-4" />
+                          Trading Way:</span>
+                        <span className="font-medium">
+                          {book.canRent ? "Borrow" : ""}
+                          {book.canSell ? (book.canRent ? " / Buy" : "Buy") : ""}
+                          {(!book.canRent && !book.canSell) && "Unavailable"}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Lending Details</h4>
+
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500 flex items-center gap-1">
@@ -283,13 +305,24 @@ export default function BookDetailPage() {
               <Card>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Book Owner</h3>
                 <div className="flex items-center space-x-4">
-                  <Avatar user={currentUser} size={96} />
+                  <Avatar user={owner} size={64} />
 
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900">{owner.name}</h4>
                     <div className="flex items-center text-gray-600 text-sm mt-1">
                       <MapPin className="w-4 h-4 mr-1" />
-                      <span>{owner.location}  {distance}km away</span>
+                      <p>
+                        {[
+                          owner.city,
+                          owner.state,
+                          owner.zipCode,
+                          owner.country,
+                        ].filter(Boolean).join(", ")}
+                      </p>
+                      <div>
+                        {distance > 0 ? ` • ${formatKm(distance)} away from you` : ""}
+                      </div>
+
                     </div>
                     <div className="flex items-center mt-2">
                       <div className="flex items-center mr-3">
@@ -304,7 +337,7 @@ export default function BookDetailPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600">
-                        {owner.rating} ({owner.booksLent} books lent)
+                        {owner.rating}
                       </span>
                     </div>
                   </div>

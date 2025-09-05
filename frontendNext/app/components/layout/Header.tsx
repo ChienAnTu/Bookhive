@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
+import { User as UserIcon, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
 import {
   logoutUser,
   isAuthenticated,
@@ -14,8 +14,7 @@ import {
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
-
-
+import type { User } from "@/app/types/user";
 
 
 const Header: React.FC = () => {
@@ -23,14 +22,7 @@ const Header: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{
-    id: string;
-    name: string;
-    email: string;
-    location: string;
-    avatar: string;
-    createdAt: string;
-  } | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Check authentication status on component mount and when auth changes
   useEffect(() => {
@@ -170,7 +162,6 @@ const Header: React.FC = () => {
             {/* Shopping Cart button - count items */}
             <div className="flex items-center space-x-4">
               <HeaderCart />
-              {/* 这里可以继续放 User / Login 按钮 */}
             </div>
 
             {/* User profile section - shown when logged in */}
@@ -197,7 +188,7 @@ const Header: React.FC = () => {
                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setShowProfileMenu(false)}
                     >
-                      <User className="w-4 h-4 mr-3" />
+                      <UserIcon className="w-4 h-4 mr-3" />
                       View Profile
                     </Link>
 
