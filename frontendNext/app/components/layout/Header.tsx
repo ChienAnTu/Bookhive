@@ -13,6 +13,8 @@ import {
 } from "../../../utils/auth";
 
 import Avatar from "@/app/components/ui/Avatar";
+import { useCartStore } from "@/app/store/cartStore";
+
 
 
 
