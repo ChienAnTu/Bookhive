@@ -2,7 +2,12 @@ import React from "react";
 import type { User } from "@/app/types/user";
 
 interface AvatarProps {
-  user: User;
+  user: {
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+    profilePicture?: string;
+  };
   size?: number; // 默认 40px
   className?: string;
 }

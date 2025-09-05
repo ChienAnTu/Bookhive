@@ -2,26 +2,6 @@
 import { User } from "@/app/types/user";
 import { Book } from "@/app/types/book";
 
-// export interface User {
-//   id: string;
-//   name: string;
-//   email: string;
-//   location: string;
-//   address?: string; // Full address for postal delivery
-//   coordinates: {
-//     lat: number;
-//     lng: number;
-//   };
-//   rating: number;
-//   booksLent: number;
-//   booksBorrowed: number;
-//   joinDate: string;
-//   bio: string;
-//   avatar: string;
-//   preferredLanguages: string[];
-//   maxDistance: number; // kilometers willing to travel
-// }
-
 export interface LendingRequest {
   id: string;
   bookId: string;
@@ -107,6 +87,7 @@ export const mockUsers: User[] = [
     id: "user1",
     firstName: "Alice",
     lastName: "Wang",
+    name: "Alice Wang",
     email: "alice@example.com",
     phoneNumber: "+61 400 123 456",
     dateOfBirth: { month: "03", day: "12", year: "1995" },
@@ -117,7 +98,7 @@ export const mockUsers: User[] = [
     zipCode: "2000",
     coordinates: { lat: -33.8688, lng: 151.2093 },
     maxDistance: 10,
-    avatar: "/images/users/alice.jpg",
+    avatar: "",
     bio: "Avid reader who loves fiction and sharing books with the community.",
     preferredLanguages: ["English", "Mandarin"],
     createdAt: new Date("2023-01-10"),
@@ -126,6 +107,7 @@ export const mockUsers: User[] = [
     id: "user2",
     firstName: "David",
     lastName: "Chen",
+    name: "David Chen",
     email: "david@example.com",
     phoneNumber: "+61 433 987 654",
     dateOfBirth: { month: "07", day: "24", year: "1990" },
@@ -136,7 +118,7 @@ export const mockUsers: User[] = [
     zipCode: "3000",
     coordinates: { lat: -37.8136, lng: 144.9631 },
     maxDistance: 20,
-    avatar: "/images/users/david.jpg",
+    avatar: "",
     bio: "Collector of classic literature. Always open to lend and borrow.",
     preferredLanguages: ["English"],
     createdAt: new Date("2023-02-05"),
@@ -145,6 +127,7 @@ export const mockUsers: User[] = [
     id: "user3",
     firstName: "Sophia",
     lastName: "Li",
+    name: "Sophia Li",
     email: "sophia@example.com",
     phoneNumber: "+61 422 765 321",
     dateOfBirth: { month: "11", day: "05", year: "1998" },
@@ -155,7 +138,7 @@ export const mockUsers: User[] = [
     zipCode: "4000",
     coordinates: { lat: -27.4698, lng: 153.0251 },
     maxDistance: 15,
-    avatar: "/images/users/sophia.jpg",
+    avatar: "",
     bio: "Passionate about fantasy novels and community sharing.",
     preferredLanguages: ["English", "Japanese"],
     createdAt: new Date("2023-03-12"),

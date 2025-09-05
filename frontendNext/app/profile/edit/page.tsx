@@ -11,13 +11,14 @@ import Select from "@/app/components/ui/Select";
 import type { User } from "@/app/types/user";
 import Avatar from "@/app/components/ui/Avatar";
 import { toast } from "sonner";
-import { updateUser } from "../../../utils/auth";
+import { updateUser } from "@/utils/auth";
 
 
 const emptyUser: User = {
   id: "temp",
   firstName: "",
   lastName: "",
+  name: "",
   email: "",
   phoneNumber: "",
   dateOfBirth: { month: "", day: "", year: "" },
@@ -67,7 +68,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   setIsLoading(true);
 
   try {
-    // 拼接全名
+    // 拼接全名to name
     const payload = {
       ...profileData,
       name: `${profileData.firstName} ${profileData.lastName}`.trim(),
@@ -75,14 +76,14 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     const result = await updateUser(payload);
 
-    console.log("✅ Profile updated:", result);
+    console.log("Profile updated:", result);
     toast.success("Profile updated successfully!");
 
     window.dispatchEvent(new Event("auth-changed"));
     router.push("/profile");
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Update failed");
-    console.error("❌ Failed to update profile:", error);
+    console.error("Failed to update profile:", error);
   } finally {
     setIsLoading(false);
   }
