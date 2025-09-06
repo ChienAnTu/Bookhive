@@ -316,7 +316,6 @@ export default function BookDetailPage() {
                           owner.city,
                           owner.state,
                           owner.zipCode,
-                          owner.country,
                         ].filter(Boolean).join(", ")}
                       </p>
                       <div>
