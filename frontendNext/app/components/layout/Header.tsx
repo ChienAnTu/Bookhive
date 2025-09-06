@@ -10,7 +10,7 @@ import {
   logoutUser,
   isAuthenticated,
   getCurrentUser,
-} from "../../../utils/auth";
+} from "@/utils/auth";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
@@ -33,6 +33,8 @@ const Header: React.FC = () => {
       if (authenticated) {
         // Fetch user data from API if logged in
         const user = await getCurrentUser();
+        console.log("Current user:", user?.name);
+
         setCurrentUser(user);
       } else {
         setCurrentUser(null);
@@ -106,14 +108,15 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center h-16 gap-2">
           {/* Logo section */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center">
+            <Link href={isLoggedIn ? "/home" : "/"} className="flex items-center">
               <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-2">
                 <span className="text-white font-bold text-sm">B</span>
               </div>
               <span className="text-xl font-bold text-gray-900 hidden sm:block">
-                BookHive
+                Book Borrow
               </span>
             </Link>
+
           </div>
 
           {/* Search box */}
@@ -140,7 +143,7 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-2">
             {/* Lend Books button - visible when user is logged in (desktop) */}
             {isLoggedIn && (
-              <Link href="/lend/add">
+              <Link href="/lending/add">
                 <Button
                   variant="outline"
                   size="sm"
@@ -160,9 +163,11 @@ const Header: React.FC = () => {
             )}
 
             {/* Shopping Cart button - count items */}
-            <div className="flex items-center space-x-4">
-              <HeaderCart />
-            </div>
+            {isLoggedIn && (
+              <div className="flex items-center space-x-4">
+                <HeaderCart />
+              </div>
+            )}
 
             {/* User profile section - shown when logged in */}
             {isLoggedIn && currentUser ? (
@@ -176,7 +181,8 @@ const Header: React.FC = () => {
 
                   {/* User name - only visible on large screens */}
                   <span className="hidden lg:block text-sm font-medium text-gray-700 max-w-20 truncate">
-                    {currentUser.name}
+                    {/* {currentUser.name} */}
+                    G'day!
                   </span>
                 </button>
 
