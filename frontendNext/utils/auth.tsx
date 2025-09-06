@@ -227,7 +227,7 @@ export const updateUser = async (user: User) => {
       }
     );
 
-    return response.data; // 返回更新后的用户数据
+    return response.data;
   } catch (error) {
     console.error("Update API failed:", error);
     throw error;
