@@ -67,3 +67,67 @@ export const getBooks = async (params?: {
     return [];
   }
 };
+
+/** Get a book by id */
+export const getBookById = async (bookId: string): Promise<Book | null> => {
+  const API_URL = getApiUrl();
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const res = await axios.get(`${API_URL}/api/v1/books/${bookId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data as Book;
+  } catch (err) {
+    console.error("Get Book By Id failed:", err);
+    return null;
+  }
+};
+
+// Upload image
+export const uploadFile = async (file: File, folder: string): Promise<string> => {
+  const API_URL = getApiUrl();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await axios.post(`${API_URL}/api/v1/upload/${folder}`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+    },
+  });
+
+  return res.data.url; // return URL
+};
+
+// Update book
+export async function updateBook(bookId: string, payload: Partial<Book>) {
+  const API_URL = getApiUrl();
+  const res = await axios.put(`${API_URL}/api/v1/books/${bookId}`, payload, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+  return res.data;
+}
+
+// delete book
+export const deleteBook = async (bookId: string): Promise<boolean> => {
+  const API_URL = getApiUrl();
+  const token = getToken();
+  if (!token) return false;
+
+  try {
+    await axios.delete(`${API_URL}/api/v1/books/${bookId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("Delete Book API failed:", error);
+    return false;
+  }
+};

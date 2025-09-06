@@ -1,92 +1,98 @@
-// Create a new book to lend
+// Edit a lending book
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { Book } from "@/app/types/book";
-import { createBook } from "@/utils/books";
+import { getBookById, updateBook } from "@/utils/books";
 import { getCurrentUser } from "@/utils/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
+
 
 type FormState = Omit<Book, "id" | "ownerId" | "dateAdded" | "updateDate"> & {
   coverFile: File | null;
   conditionFiles: File[];
 };
 
-export default function AddBook() {
-  const [form, setForm] = useState<FormState>({
-    titleOr: "",
-    titleEn: "",
-    originalLanguage: "",
-    author: "",
-    category: "",
-    description: "",
-    coverImgUrl: "",
-    tags: [],
-    deposit: undefined,
-    salePrice: undefined,
-    maxLendingDays: 14,
-    condition: "like-new",
-    conditionImgURLs: [],
-    isbn: "",
-    publishYear: undefined,
-    deliveryMethod: "both",
-    canRent: true,
-    canSell: false,
-    status: "listed",
-
-    coverFile: null,
-    conditionFiles: [],
-  });
-
-const [tagsInput, setTagsInput] = useState("");
-
-  const [showErrors, setShowErrors] = useState(false);
+export default function EditBookPage() {
+  const { id: bookId } = useParams<{ id: string }>();
   const router = useRouter();
 
+  const [form, setForm] = useState<FormState | null>(null);
+  const [tagsInput, setTagsInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [showErrors, setShowErrors] = useState(false);
+
+  // Fill form by current book
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const b = await getBookById(bookId);
+      if (!b) {
+        setLoading(false);
+        return;
+      }
+      setForm({
+        titleOr: b.titleOr,
+        titleEn: b.titleEn,
+        originalLanguage: b.originalLanguage,
+        author: b.author,
+        category: b.category,
+        description: b.description,
+        coverImgUrl: b.coverImgUrl ?? "",
+        conditionImgURLs: b.conditionImgURLs ?? [],
+        status: b.status,
+        condition: b.condition,
+        canRent: b.canRent,
+        canSell: b.canSell,
+        isbn: b.isbn ?? "",
+        tags: b.tags ?? [],
+        publishYear: b.publishYear,
+        maxLendingDays: b.maxLendingDays,
+        deliveryMethod: b.deliveryMethod,
+        salePrice: b.salePrice,
+        deposit: b.deposit,
+
+        // 本地上传控件
+        coverFile: null,
+        conditionFiles: [],
+      });
+      setTagsInput((b.tags ?? []).join(", "));
+      setLoading(false);
+    })();
+  }, [bookId]);
+
+  if (loading || !form) {
+    return <div className="p-6">Loading…</div>;
+  }
+
+  // 通用输入
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
 
     setForm((prev) => {
-      if (name === "tags") {
-        return {
-          ...prev,
-          tags: value.split(",").map((t) => t.trim()).filter(Boolean),
-        };
-      }
-
+      if (!prev) return prev;
       if (["deposit", "salePrice", "publishYear", "maxLendingDays"].includes(name)) {
-        return {
-          ...prev,
-          [name]: value ? Number(value) : undefined,
-        };
+        return { ...prev, [name]: value ? Number(value) : undefined };
       }
-
-      return {
-        ...prev,
-        [name]: type === "checkbox" ? checked : value,
-      };
+      return { ...prev, [name]: type === "checkbox" ? checked : value };
     });
   };
 
-
-  // upload cover page
+  // 封面/成色图文件
   const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setForm((prev) => ({ ...prev, coverFile: file }));
+    setForm((prev) => (prev ? { ...prev, coverFile: file } : prev));
   };
-
-  // upload condition file
   const handleConditionFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setForm((prev) => ({ ...prev, conditionFiles: files }));
+    setForm((prev) => (prev ? { ...prev, conditionFiles: files } : prev));
   };
 
+  // 提交：update 而不是 create
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -100,58 +106,44 @@ const [tagsInput, setTagsInput] = useState("");
       alert("Please login first.");
       return;
     }
-    // 1. create a Book
-    const newBook: Book = {
-      id: `book-${Date.now()}`,
+
+    // 如果需要真实上传图片，放开下面注释，先 upload 再把 URL 写回 payload
+    let coverImgUrl = form.coverImgUrl;
+    // if (form.coverFile) {
+    //   coverImgUrl = await uploadFile(form.coverFile, "books/covers");
+    // }
+    let conditionImgURLs = form.conditionImgURLs ?? [];
+    // if (form.conditionFiles.length) {
+    //   const urls = await Promise.all(form.conditionFiles.map(f => uploadFile(f, "books/conditions")));
+    //   conditionImgURLs = urls;
+    // }
+
+    const payload: Partial<Book> = {
       titleOr: form.titleOr,
-      titleEn: form.titleEn || "",
+      titleEn: form.titleEn,
       originalLanguage: form.originalLanguage,
       author: form.author,
       category: form.category,
       description: form.description,
-      coverImgUrl: form.coverFile
-        ? URL.createObjectURL(form.coverFile)
-        : form.coverImgUrl || "https://via.placeholder.com/300x400?text=No+Cover",
-
-      ownerId: user.id,
-
-      status: "listed",
-      condition: form.condition as Book["condition"],
-      conditionImgURLs: form.conditionFiles.map((f) => URL.createObjectURL(f)),
-
-      dateAdded: new Date().toISOString(),
-      updateDate: new Date().toISOString(),
-
-      isbn: form.isbn || undefined,
-      publishYear: form.publishYear ? Number(form.publishYear) : undefined,
-      tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
-      maxLendingDays: Number(form.maxLendingDays) || 14,
-
-      deliveryMethod: form.deliveryMethod as Book["deliveryMethod"],
+      coverImgUrl,
+      conditionImgURLs,
+      status: form.status,
+      condition: form.condition,
       canRent: form.canRent,
       canSell: form.canSell,
-
-      salePrice: form.salePrice ? Number(form.salePrice) : undefined,
-      deposit: form.deposit ? Number(form.deposit) : undefined,
+      isbn: form.isbn || undefined,
+      tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
+      publishYear: form.publishYear,
+      maxLendingDays: form.maxLendingDays,
+      deliveryMethod: form.deliveryMethod,
+      salePrice: form.salePrice,
+      deposit: form.deposit,
     };
 
-    try {
-      // 2. Call the backend interface
-      const created = await createBook(newBook);
-
-      // 3. feedback
-      console.log("Book created:", created);
-      alert("Book has been listed successfully!");
-
-
-      router.push(`/books/${created.id}`);
-    } catch (error) {
-      console.error("Failed to create book:", error);
-      alert("Failed to list book.");
-    }
-
+    await updateBook(bookId, payload);
+    alert("Saved!");
+    router.push("/lending");
   };
-
 
   return (
     <div className="max-w-6xl mx-auto p-6">
