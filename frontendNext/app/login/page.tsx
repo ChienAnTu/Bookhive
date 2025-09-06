@@ -33,7 +33,7 @@ export default function LoginPage() {
       toast.success("Successfully signed in!");
 
       window.dispatchEvent(new Event("auth-changed"));
-      router.push("/books");
+      router.push("/home");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sign in failed");
     } finally {

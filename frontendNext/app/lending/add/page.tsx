@@ -4,35 +4,45 @@ import { useState } from "react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { Book } from "@/app/types/book";
-import { createBook } from "@/utils/auth";
+import { createBook } from "@/utils/books";
 import { getCurrentUser } from "@/utils/auth";
 import { useRouter } from "next/navigation";
 
+type FormState = Omit<Book, "id" | "ownerId" | "dateAdded" | "updateDate"> & {
+  coverFile: File | null;
+  conditionFiles: File[];
+};
 
 export default function LendBookPage() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     titleOr: "",
     titleEn: "",
     originalLanguage: "",
     author: "",
     category: "",
     description: "",
-    coverImage: null as File | null,
-    tags: "",
-    deposit: "",
-    salePrice: "",
-    lendDuration: "",
+    coverImgUrl: "",
+    tags: [],
+    deposit: undefined,
+    salePrice: undefined,
+    maxLendingDays: 14,
     condition: "like-new",
-    conditionImages: [] as File[],
+    conditionImgURLs: [],
     isbn: "",
-    publishYear: "",
-    deliveryMethod: "",
+    publishYear: undefined,
+    deliveryMethod: "both",
     canRent: true,
     canSell: false,
+    status: "listed",
+
+    coverFile: null,
+    conditionFiles: [],
   });
 
+const [tagsInput, setTagsInput] = useState("");
+
   const [showErrors, setShowErrors] = useState(false);
-const router = useRouter();
+  const router = useRouter();
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -41,16 +51,39 @@ const router = useRouter();
   ) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setForm((prev) => {
+      if (name === "tags") {
+        return {
+          ...prev,
+          tags: value.split(",").map((t) => t.trim()).filter(Boolean),
+        };
+      }
+
+      if (["deposit", "salePrice", "publishYear", "maxLendingDays"].includes(name)) {
+        return {
+          ...prev,
+          [name]: value ? Number(value) : undefined,
+        };
+      }
+
+      return {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
+    });
   };
 
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // upload cover page
+  const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setForm((prev) => ({ ...prev, coverImage: file }));
+    setForm((prev) => ({ ...prev, coverFile: file }));
+  };
+
+  // upload condition file
+  const handleConditionFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setForm((prev) => ({ ...prev, conditionFiles: files }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,11 +94,11 @@ const router = useRouter();
       return;
     }
 
-     const user = await getCurrentUser();
-  if (!user?.id) {
-    alert("Please login first.");
-    return;
-  }
+    const user = await getCurrentUser();
+    if (!user?.id) {
+      alert("Please login first.");
+      return;
+    }
     // 1. create a Book
     const newBook: Book = {
       id: `book-${Date.now()}`,
@@ -75,25 +108,23 @@ const router = useRouter();
       author: form.author,
       category: form.category,
       description: form.description,
-      coverImgUrl: form.coverImage
-        ? URL.createObjectURL(form.coverImage)
-        : "https://via.placeholder.com/300x400?text=No+Cover",
+      coverImgUrl: form.coverFile
+        ? URL.createObjectURL(form.coverFile)
+        : form.coverImgUrl || "https://via.placeholder.com/300x400?text=No+Cover",
 
       ownerId: user.id,
 
       status: "listed",
       condition: form.condition as Book["condition"],
-      conditionImgURLs: form.conditionImages.map((file) =>
-        URL.createObjectURL(file)
-      ),
+      conditionImgURLs: form.conditionFiles.map((f) => URL.createObjectURL(f)),
 
       dateAdded: new Date().toISOString(),
       updateDate: new Date().toISOString(),
 
       isbn: form.isbn || undefined,
       publishYear: form.publishYear ? Number(form.publishYear) : undefined,
-      tags: form.tags.split(",").map((k) => k.trim()).filter(Boolean),
-      maxLendingDays: Number(form.lendDuration) || 14,
+      tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
+      maxLendingDays: Number(form.maxLendingDays) || 14,
 
       deliveryMethod: form.deliveryMethod as Book["deliveryMethod"],
       canRent: form.canRent,
@@ -111,8 +142,8 @@ const router = useRouter();
       console.log("Book created:", created);
       alert("Book has been listed successfully!");
 
-    
-    router.push(`/books/${created.id}`);
+
+      router.push(`/books/${created.id}`);
     } catch (error) {
       console.error("Failed to create book:", error);
       alert("Failed to list book.");
@@ -203,12 +234,13 @@ const router = useRouter();
               </select>
             </div>
 
-            {/* Tags */}
             <Input
               label="Tags (separate by ,)"
-              name="Tags"
-              value={form.tags}
-              onChange={handleChange}
+              name="tags"
+              type="text"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+
             />
 
             {/* ISBN */}
@@ -241,7 +273,7 @@ const router = useRouter();
                   type="file"
                   id="cover-upload"
                   accept="image/*"
-                  onChange={handleFileChange}
+                  onChange={handleCoverFile}
                   className="hidden"
                 />
 
@@ -256,9 +288,9 @@ const router = useRouter();
                 </Button>
 
                 {/* preview */}
-                {form.coverImage && (
+                {form.coverFile && (
                   <img
-                    src={URL.createObjectURL(form.coverImage)}
+                    src={URL.createObjectURL(form.coverFile)}
                     alt="Preview"
                     className="h-20 w-16 object-cover rounded border"
                   />
@@ -267,7 +299,7 @@ const router = useRouter();
             </div>
           </div>
 
-          {/* 右栏：成色 / 交易设置 / 配送 */}
+          {/* right：成色 / 交易设置 / 配送 */}
           <div className="lg:w-1/2 lg:pl-8 space-y-6">
 
             {/* Description */}
@@ -316,13 +348,7 @@ const router = useRouter();
                 id="condition-upload"
                 accept="image/*"
                 multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  setForm((prev) => ({
-                    ...prev,
-                    conditionImages: [...prev.conditionImages, ...files],
-                  }));
-                }}
+                onChange={handleConditionFiles}
                 className="hidden"
               />
 
@@ -338,7 +364,7 @@ const router = useRouter();
 
               {/* preview */}
               <div className="flex gap-2 mt-2 flex-wrap">
-                {form.conditionImages.map((file, index) => (
+                {form.conditionFiles.map((file, index) => (
                   <img
                     key={index}
                     src={URL.createObjectURL(file)}
@@ -411,7 +437,7 @@ const router = useRouter();
                       <Input
                         label="Lend Duration*"
                         name="lendDuration"
-                        value={form.lendDuration}
+                        value={form.maxLendingDays}
                         onChange={handleChange}
                         placeholder="Days"
                         required={form.canRent}
