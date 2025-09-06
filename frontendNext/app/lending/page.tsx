@@ -1,52 +1,80 @@
-// app/lend/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search, Filter, Clock, CheckCircle, XCircle, BookOpen } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, Filter, BookOpen } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import Input from "../components/ui/Input";
-
-interface LendingItem {
-  id: number;
-  title: string;
-  status: "Listed" | "Unlisted" | "LendOut";
-  listedDate: string;
-  dueDate?: string;
-  overdue?: boolean;
-}
-
-const mockData: LendingItem[] = [
-  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
-  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
-  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
-];
-
-type FilterStatus = "all" | "Listed" | "Unlisted" | "LendOut";
+import type { Book } from "@/app/types/book";
+import { getCurrentUser } from "@/utils/auth";
+import { getBooks } from "@/utils/books";
 
 export default function LendingListPage() {
+  const [items, setItems] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
+  const [selectedFilter, setSelectedFilter] = useState<"all" | Book["status"]>("all");
 
+  // 从接口获取当前用户的书
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+
+        const user = await getCurrentUser();
+        if (!user) {
+          setItems([]);
+          return;
+        }
+
+        const list = await getBooks({ ownerId: user.id, page: 1, pageSize: 200 });
+        if (alive) setItems(list);
+      } catch (e: any) {
+        if (alive) setErr(e?.message || "加载失败");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 小工具
+  const statusLabel = (s: Book["status"]) => {
+    if (s === "listed") return "Listed";
+    if (s === "lent") return "Lent Out";
+    if (s === "sold") return "Sold";
+    return "Unlisted";
+  };
+
+  // 搜索 + 过滤
   const filteredBooks = useMemo(() => {
-    let filtered = mockData;
+    let filtered = items;
     if (selectedFilter !== "all") {
       filtered = filtered.filter((b) => b.status === selectedFilter);
     }
     if (search) {
-      filtered = filtered.filter((b) =>
-        b.title.toLowerCase().includes(search.toLowerCase())
+      const q = search.toLowerCase();
+      filtered = filtered.filter(
+        (b) =>
+          b.titleOr.toLowerCase().includes(q) ||
+          (b.author || "").toLowerCase().includes(q)
       );
     }
     return filtered;
-  }, [search, selectedFilter]);
+  }, [items, search, selectedFilter]);
 
+  const countBy = (s: Book["status"]) => items.filter((b) => b.status === s).length;
   const filterOptions = [
-    { value: "all", label: "All", count: mockData.length },
-    { value: "Listed", label: "Listed", count: mockData.filter((b) => b.status === "Listed").length },
-    { value: "Unlisted", label: "Unlisted", count: mockData.filter((b) => b.status === "Unlisted").length },
-    { value: "LendOut", label: "Lend Out", count: mockData.filter((b) => b.status === "LendOut").length },
-  ];
+    { value: "all", label: "All", count: items.length },
+    { value: "listed", label: "Listed", count: countBy("listed") },
+    { value: "unlisted", label: "Unlisted", count: countBy("unlisted") },
+    { value: "lent", label: "Lend Out", count: countBy("lent") },
+    { value: "sold", label: "Sold", count: countBy("sold") },
+  ] as const;
 
   return (
     <div className="flex h-full">
@@ -80,7 +108,7 @@ export default function LendingListPage() {
                 <Button
                   key={option.value}
                   variant={selectedFilter === option.value ? "default" : "outline"}
-                  onClick={() => setSelectedFilter(option.value as FilterStatus)}
+                  onClick={() => setSelectedFilter(option.value as any)}
                   className={`flex items-center gap-2 ${selectedFilter === option.value
                       ? "bg-black text-white hover:bg-gray-800 border-black"
                       : ""
@@ -112,19 +140,19 @@ export default function LendingListPage() {
                 <Card key={book.id}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">{book.title}</h3>
+                      <h3 className="text-lg font-semibold">{book.titleOr}</h3>
                       <p className="text-sm text-gray-600">
                         Status:{" "}
-                        {book.status === "Listed" && (
+                        {book.status === "listed" && (
                           <span className="text-green-600 font-medium">Listed</span>
                         )}
-                        {book.status === "Unlisted" && (
+                        {book.status === "unlisted" && (
                           <span className="text-gray-500 font-medium">Unlisted</span>
                         )}
-                        {book.status === "LendOut" && (
+                        {book.status === "lent" && (
                           <span className="text-blue-600 font-medium">Lend Out</span>
                         )}
-                        {" | "}Listed On {book.listedDate}
+                        {" | "}Listed On {book.dateAdded}
                       </p>
                       {book.dueDate && (
                         <p
@@ -138,17 +166,17 @@ export default function LendingListPage() {
                   </div>
 
                   <div className="flex gap-2 mt-3">
-                    {book.status === "Listed" && (
+                    {book.status === "listed" && (
                       <Button variant="outline" size="sm">
                         Unlist
                       </Button>
                     )}
-                    {book.status === "Unlisted" && (
+                    {book.status === "unlisted" && (
                       <Button variant="outline" size="sm">
                         List
                       </Button>
                     )}
-                    {book.status === "LendOut" && (
+                    {book.status === "lent" && (
                       <>
                         <Button variant="outline" size="sm">
                           Detail

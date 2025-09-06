@@ -4,7 +4,7 @@ import { Book } from "@/app/types/book";
 
 
 // API Configuration
-const getApiUrl = () => {
+export const getApiUrl = () => {
   if (process.env.NODE_ENV === "production") {
     return "https://your-production-api.com";
   }
@@ -23,22 +23,6 @@ interface RegisterData {
   password: string;
   confirm_password: string;
   agree_terms: boolean;
-}
-
-interface UserData {
-  id: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  email: string;
-  location: string;
-  avatar: string;
-  createdAt: string;
-  phoneNumber?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
 }
 
 // User login function
@@ -179,7 +163,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
   try {
     const API_URL = getApiUrl();
-    const response = await axios.get(`${API_URL}/api/v1/auth/me`, {
+    const response = await axios.get(`${API_URL}/api/v1/user/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -250,26 +234,3 @@ export const updateUser = async (user: User) => {
   }
 };
 
-// start lending - save a new book
-export const createBook = async (book: Book) => {
-  const API_URL = getApiUrl();
-
-  try {
-    const response = await axios.post(
-      `${API_URL}/api/v1/books`,
-      book,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        withCredentials: true,
-      }
-    );
-
-    return response.data; // 返回创建后的书籍
-  } catch (error) {
-    console.error("Create Book API (JSON) failed:", error);
-    throw error;
-  }
-};

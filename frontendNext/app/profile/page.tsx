@@ -11,27 +11,14 @@ import {
 } from "../data/mockData";
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
+import type { User } from "@/app/types/user";
 
-
-
-// User data interface
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  location: string;
-  avatar: string;
-  createdAt: string;
-  // Additional fields that might be needed for profile
-  rating?: number;
-  booksLent?: number;
-  booksBorrowed?: number;
-}
 
 const ProfilePage: React.FC = () => {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  console.log("adrress:", currentUser?.streetAddress);
 
   // Check authentication and load user data
   useEffect(() => {
@@ -142,43 +129,40 @@ const ProfilePage: React.FC = () => {
                 <span className="text-sm">{currentUser.email}</span>
               </div>
 
-              {/* Location */}
-              <div className="flex items-center text-gray-600 mb-2">
-                <MapPin className="w-4 h-4 mr-2" />
-                <span className="text-sm">
-                  {currentUser.location || "Location not set"}
+
+              {/* Renting stars */}
+              <div className="flex items-center mt-2 mb-2">
+                <div className="flex items-center mr-3">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-4 h-4 ${star <= Math.floor(currentUser.rating)
+                        ? "text-yellow-400 fill-current"
+                        : "text-gray-300"
+                        }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-gray-600">
+                  {currentUser.rating}
                 </span>
               </div>
 
-              {/* Star Rating */}
-              {rating > 0 && (
-                <div className="flex items-center mb-2">
-                  <div className="flex items-center mr-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-4 h-4 ${star <= fullStars
-                          ? "text-yellow-400 fill-current"
-                          : star === fullStars + 1 && hasHalfStar
-                            ? "text-yellow-400 fill-current"
-                            : "text-gray-300"
-                          }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-600">
-                    {rating} ({booksBorrowed} reviews)
-                  </span>
-                </div>
-              )}
-
-
-
-              {/* Books Lent */}
+              {/* Location */}
               <div className="flex items-center text-gray-600 mb-2">
-                <Book className="w-4 h-4 mr-2" />
-                <span className="text-sm">{booksLent} books lent out</span>
+
+
+                <MapPin className="w-4 h-4 mr-2" />
+                <p>
+                  {[
+                    currentUser.streetAddress,
+                    currentUser.city,
+                    currentUser.state,
+                    currentUser.zipCode,
+                  ].filter(Boolean).join(", ")}
+                </p>
               </div>
+
 
               {/* Member Since */}
               <div className="flex items-center text-gray-600">
@@ -200,7 +184,7 @@ const ProfilePage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Lending */}
             <Link
-              href="/lend"
+              href="/lending"
               className="block bg-blue-50 border border-blue-200 rounded-lg p-4 text-center hover:bg-blue-100 transition"
             >
               <div className="text-2xl font-bold text-blue-600 mb-1">
@@ -214,7 +198,7 @@ const ProfilePage: React.FC = () => {
 
             {/* Borrowing */}
             <Link
-              href="/borrow"
+              href="/borrowing"
               className="block bg-green-50 border border-green-200 rounded-lg p-4 text-center hover:bg-green-100 transition"
             >
               <div className="text-2xl font-bold text-green-600 mb-1">

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -68,10 +67,20 @@ const handleSubmit = async (e: React.FormEvent) => {
   setIsLoading(true);
 
   try {
-    // 拼接全名to name
+    //dateOfBirth
+    let dateOfBirthStr: string | null = null;
+    if (profileData.dateOfBirth) {
+      const { year, month, day } = profileData.dateOfBirth;
+      if (year && month && day) {
+        dateOfBirthStr = `${year}-${month}-${day}`;
+      }
+    }
+
     const payload = {
       ...profileData,
+      // combine name
       name: `${profileData.firstName} ${profileData.lastName}`.trim(),
+      ...(dateOfBirthStr ? { dateOfBirth: dateOfBirthStr } : {}),
     };
 
     const result = await updateUser(payload);
@@ -88,6 +97,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     setIsLoading(false);
   }
 };
+
 
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,15 +139,10 @@ const handleSubmit = async (e: React.FormEvent) => {
               </h3>
               <div className="flex flex-col items-center">
                 <div className="relative">
-                  {/* Avatar 显示：如果用户上传过新头像(profilePicture)，优先显示 */}
-                  {profileData.profilePicture ? (
-                    <img src={profileData.profilePicture} alt="Preview" className="w-24 h-24 rounded-full object-cover" />
-                  ) : (
+                  {/* Avatar */}
                     <Avatar user={profileData} size={96} />
-                  )}
-
-
-                  {/* 上传按钮 */}
+                  
+                  {/* upload */}
                   <label className="absolute bottom-0 right-0 bg-black rounded-full p-2 cursor-pointer">
                     <Camera className="w-4 h-4 text-white" />
                     <Input
