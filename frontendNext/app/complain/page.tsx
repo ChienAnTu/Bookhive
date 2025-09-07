@@ -23,9 +23,8 @@ import {
   mockBooks,
   getUserById 
 } from "@/app/data/mockData";
+import { ComplaintStatus, ComplaintType } from "../types/order";
 
-type ComplaintStatus = "pending" | "investigating" | "resolved" | "closed";
-type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "other";
 type FilterStatus = "all" | ComplaintStatus;
 
 export default function ComplainPage() {

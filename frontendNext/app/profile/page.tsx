@@ -8,9 +8,18 @@ import {
   getUserLendingOrders,
   getUserBorrowingOrders,
   mockOrders,
+  mockUsers,
+  mockBooks,
 } from "../data/mockData";
 import Link from "next/link";
-import Avatar from "@/app/components/ui/Avatar";
+import StarRating from "../components/ui/StarRating";
+import { 
+  mockComments, 
+  getUserRatingStats, 
+  getUserReceivedComments,
+} from "../data/mockData";
+import { Comment } from '../types';
+import { User } from '../types/user';
 
 
 
@@ -129,7 +138,9 @@ const ProfilePage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
             {/* Profile Photo */}
-            <Avatar user={currentUser} size={96} />
+            <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-semibold">
+              {currentUser.name.split(' ').map(n => n.charAt(0)).join('')}
+            </div>
 
             {/* User name */}
             <div className="flex-1">
@@ -192,12 +203,12 @@ const ProfilePage: React.FC = () => {
 
 
         {/* My Orders Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
             My Orders
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             {/* Lending */}
             <Link
               href="/lend"
@@ -244,6 +255,189 @@ const ProfilePage: React.FC = () => {
               </div>
             </Link>
           </div>
+
+          {/* Recent Orders for Reviews */}
+          <div className="border-t pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Recent Completed Orders</h3>
+              <Link 
+                href="/orders" 
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                View All Orders
+              </Link>
+            </div>
+            
+            {(() => {
+              const recentCompletedOrders = mockOrders
+                .filter(order => 
+                  (order.borrowerId === currentUser.id || order.lenderId === currentUser.id) &&
+                  (order.status === 'delivered' || order.status === 'completed')
+                )
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .slice(0, 3);
+
+              return recentCompletedOrders.length > 0 ? (
+                <div className="space-y-3">
+                  {recentCompletedOrders.map(order => {
+                    const book = mockBooks.find(b => b.id === order.bookId);
+                    const isUserBorrower = order.borrowerId === currentUser.id;
+                    const otherUserId = isUserBorrower ? order.lenderId : order.borrowerId;
+                    const otherUser = mockUsers.find(u => u.id === otherUserId);
+                    
+                    if (!book || !otherUser) return null;
+                    
+                    return (
+                      <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-16 bg-gray-200 rounded flex-shrink-0 overflow-hidden">
+                            {book.coverImgUrl ? (
+                              <img
+                                src={book.coverImgUrl}
+                                alt={book.titleOr}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                                <span className="text-lg">📚</span>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 text-sm">{book.titleOr}</p>
+                            <p className="text-xs text-gray-600">
+                              {isUserBorrower ? 'Borrowed from' : 'Lent to'} {otherUser.firstName} {otherUser.lastName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(order.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/orders/${order.id}/review`}
+                          className="px-3 py-1 bg-black text-white text-xs rounded-full hover:bg-gray-800 transition"
+                        >
+                          Write Review
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <p className="text-sm">No completed orders yet</p>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Reviews & Ratings Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+            Reviews & Ratings
+          </h2>
+
+          {(() => {
+            const userStats = getUserRatingStats(currentUser.id);
+            const receivedComments = getUserReceivedComments(currentUser.id);
+            
+            return (
+              <>
+                {/* Rating Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <StarRating rating={Math.round(userStats.averageRating)} readonly size="lg" />
+                      <span className="text-2xl font-bold text-gray-900 ml-3">
+                        {userStats.averageRating.toFixed(1)}
+                      </span>
+                    </div>
+                    <p className="text-gray-600">Based on {userStats.totalReviews} reviews</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3">Rating Distribution</h4>
+                    {[5, 4, 3, 2, 1].map(ratingLevel => {
+                      const count = userStats.ratingDistribution[ratingLevel as keyof typeof userStats.ratingDistribution];
+                      const percentage = userStats.totalReviews > 0 ? (count / userStats.totalReviews) * 100 : 0;
+                      
+                      return (
+                        <div key={ratingLevel} className="flex items-center mb-1">
+                          <span className="text-sm text-gray-600 w-8">{ratingLevel} star</span>
+                          <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-gray-600 w-8">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Recent Reviews */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Recent Reviews</h3>
+                    <Link 
+                      href="/profile/reviews" 
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      View All Reviews
+                    </Link>
+                  </div>
+                  
+                  {receivedComments.length > 0 ? (
+                    <div className="space-y-4">
+                      {receivedComments.slice(0, 3).map(comment => {
+                        const reviewer = mockUsers.find(user => user.id === comment.reviewerId);
+                        return (
+                          <div key={comment.id} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
+                                  {comment.isAnonymous ? 'A' : (reviewer?.firstName?.charAt(0) || 'U')}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">
+                                    {comment.isAnonymous ? 'Anonymous User' : `${reviewer?.firstName} ${reviewer?.lastName}` || 'Unknown User'}
+                                  </p>
+                                  <StarRating rating={comment.rating} readonly size="sm" />
+                                </div>
+                              </div>
+                              <span className="text-sm text-gray-500">
+                                {new Date(comment.createdAt).toLocaleDateString('en-US')}
+                              </span>
+                            </div>
+                            <p className="text-gray-700">{comment.content}</p>
+                            {comment.tags && comment.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {comment.tags.map((tag, index) => (
+                                  <span 
+                                    key={index}
+                                    className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No reviews received yet
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

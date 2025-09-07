@@ -666,6 +666,10 @@ export function getBookById(id: string) {
   return mockBooks.find((book) => book.id === id);
 }
 
+export const getOrderById = (orderId: string): Order | undefined => {
+  return mockOrders.find(order => order.id === orderId);
+};
+
 // Helper function to get user's lending orders
 export const getUserLendingOrders = (userId: string): Order[] => {
   return mockOrders.filter((order) => order.lenderId === userId);

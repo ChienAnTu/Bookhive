@@ -21,8 +21,8 @@ import {
   mockBooks,
   getUserById
 } from "@/app/data/mockData";
+import { OrderStatus } from "../types/order";
 
-type OrderStatus = "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
 type FilterStatus = "all" | OrderStatus;
 
 export default function ShippingPage() {
@@ -63,6 +63,9 @@ export default function ShippingPage() {
       case "in-transit": return <Truck className="w-5 h-5 text-orange-500" />;
       case "delivered": return <CheckCircle className="w-5 h-5 text-green-500" />;
       case "cancelled": return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case "ongoing": return <Clock className="w-5 h-5 text-blue-500" />;
+      case "completed": return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case "overdue": return <AlertCircle className="w-5 h-5 text-red-500" />;
       default: return <Clock className="w-5 h-5 text-gray-500" />;
     }
   };
@@ -74,6 +77,9 @@ export default function ShippingPage() {
       case "in-transit": return "text-orange-700 bg-orange-50 border-orange-200";
       case "delivered": return "text-green-700 bg-green-50 border-green-200";
       case "cancelled": return "text-red-700 bg-red-50 border-red-200";
+      case "ongoing": return "text-blue-700 bg-blue-50 border-blue-200";
+      case "completed": return "text-green-700 bg-green-50 border-green-200";
+      case "overdue": return "text-red-700 bg-red-50 border-red-200";
       default: return "text-gray-700 bg-gray-50 border-gray-200";
     }
   };
@@ -101,6 +107,9 @@ export default function ShippingPage() {
     { value: "shipped", label: "Shipped", count: userOrders.filter(o => o.status === "shipped").length },
     { value: "in-transit", label: "In Transit", count: userOrders.filter(o => o.status === "in-transit").length },
     { value: "delivered", label: "Delivered", count: userOrders.filter(o => o.status === "delivered").length },
+    { value: "ongoing", label: "Ongoing", count: userOrders.filter(o => o.status === "ongoing").length },
+    { value: "completed", label: "Completed", count: userOrders.filter(o => o.status === "completed").length },
+    { value: "overdue", label: "Overdue", count: userOrders.filter(o => o.status === "overdue").length },
     { value: "cancelled", label: "Cancelled", count: userOrders.filter(o => o.status === "cancelled").length }
   ];
 
@@ -206,12 +215,12 @@ export default function ShippingPage() {
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             <MapPin className="w-4 h-4 mr-2" />
-                            <span>{role === "Borrowing" ? "From" : "To"}: {otherUser.location}</span>
+                            <span>{role === "Borrowing" ? "From" : "To"}: {otherUser.city}, {otherUser.state}</span>
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             {getStatusIcon(order.status)}
                             <span className="ml-2">
-                              {role === "Borrowing" ? "Borrowing from" : "Lending to"} {otherUser.name}
+                              {role === "Borrowing" ? "Borrowing from" : "Lending to"} {otherUser.firstName} {otherUser.lastName}
                             </span>
                           </div>
                         </div>
