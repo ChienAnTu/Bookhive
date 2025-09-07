@@ -1,0 +1,199 @@
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, WebSocketException
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from typing import List
+import json
+
+from core.dependencies import get_db, get_current_user
+from core.security import decode_access_token
+from services.message_service import MessageService
+from models.message import Message
+from models.user import User
+
+router = APIRouter(prefix="/messages", tags=["Messages"])
+
+class MessageCreate(BaseModel):
+    receiver_email: str
+    content: str
+
+class MessageResponse(BaseModel):
+    message_id: str
+    sender_email: str
+    receiver_email: str
+    content: str
+    timestamp: str
+    is_read: bool
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, WebSocket] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        """Accept WebSocket connection and store user's connection"""
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+
+    def disconnect(self, user_id: str):
+        """Remove user's WebSocket connection"""
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+    async def send_personal_message(self, message: dict, user_id: str):
+        """Send real-time message to specific user via WebSocket"""
+        if user_id in self.active_connections:
+            await self.active_connections[user_id].send_json(message)
+
+manager = ConnectionManager()
+
+async def get_current_user_ws(
+    websocket: WebSocket,
+    token: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Authenticate user for WebSocket connection"""
+    credential_exception = WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+    try:
+        payload = decode_access_token(token)
+        email: str = payload.get("sub")
+        if email is None:
+            raise credential_exception
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            raise credential_exception
+        return user
+    except:
+        raise credential_exception
+
+@router.post("/send", response_model=MessageResponse)
+async def send_message(
+    message_data: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Send a message to another user and notify them via WebSocket"""
+    receiver = db.query(User).filter(User.email == message_data.receiver_email).first()
+    if not receiver:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+    service = MessageService(db)
+    message = service.send_message(current_user.user_id, receiver.user_id, message_data.content)
+    
+    # Send real-time update via WebSocket
+    ws_message = {
+        "type": "message",
+        "data": {
+            "sender_email": current_user.email,
+            "content": message.content,
+            "timestamp": message.timestamp.isoformat()
+        }
+    }
+    await manager.send_personal_message(ws_message, receiver.user_id)
+    
+    return MessageResponse(
+        message_id=message.message_id,
+        sender_email=current_user.email,
+        receiver_email=message_data.receiver_email,
+        content=message.content,
+        timestamp=message.timestamp.isoformat(),
+        is_read=message.is_read
+    )
+
+@router.get("/conversation/{other_user_email}", response_model=List[MessageResponse])
+def get_conversation(
+    other_user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all messages in a conversation between current user and another user"""
+    other_user = db.query(User).filter(User.email == other_user_email).first()
+    if not other_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    service = MessageService(db)
+    messages = service.get_conversation(current_user.user_id, other_user.user_id)
+    return [
+        MessageResponse(
+            message_id=m.message_id,
+            sender_email=db.query(User).filter(User.user_id == m.sender_id).first().email,
+            receiver_email=db.query(User).filter(User.user_id == m.receiver_id).first().email,
+            content=m.content,
+            timestamp=m.timestamp.isoformat(),
+            is_read=m.is_read
+        ) for m in messages
+    ]
+
+@router.get("/conversations")
+def get_conversations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all users that current user has had conversations with"""
+    service = MessageService(db)
+    partners = service.get_user_conversations(current_user.user_id)
+    return [{"email": p.email, "name": p.name} for p in partners if p]
+
+@router.put("/mark-read/{message_id}")
+def mark_message_as_read(
+    message_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark a specific message as read by the receiver"""
+    service = MessageService(db)
+    success = service.mark_message_as_read(message_id, current_user.user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Message not found or already read")
+    return {"message": "Message marked as read", "message_id": message_id}
+
+@router.put("/mark-conversation-read/{other_user_email}")
+def mark_conversation_as_read(
+    other_user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark all unread messages from a specific user as read"""
+    other_user = db.query(User).filter(User.email == other_user_email).first()
+    if not other_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    service = MessageService(db)
+    count = service.mark_conversation_as_read(current_user.user_id, other_user.user_id)
+    return {"message": f"Marked {count} messages as read", "count": count}
+
+@router.get("/unread-count")
+def get_unread_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get total count of unread messages for current user"""
+    service = MessageService(db)
+    count = service.get_unread_count(current_user.user_id)
+    return {"unread_count": count}
+
+@router.get("/unread-count/{other_user_email}")
+def get_unread_count_by_sender(
+    other_user_email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get count of unread messages from a specific sender"""
+    other_user = db.query(User).filter(User.email == other_user_email).first()
+    if not other_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    service = MessageService(db)
+    count = service.get_unread_count_by_sender(current_user.user_id, other_user.user_id)
+    return {"unread_count": count, "sender_email": other_user_email}
+
+@router.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    current_user: User = Depends(get_current_user_ws)
+):
+    """WebSocket endpoint for real-time message notifications"""
+    await manager.connect(current_user.user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Handle incoming messages if needed, but for now, assuming sends are via HTTP
+    except WebSocketDisconnect:
+        manager.disconnect(current_user.user_id)
