@@ -332,110 +332,59 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Reviews & Ratings Section */}
+        {/* Reviews that I've written Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Reviews & Ratings
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Reviews that I've written
+            </h2>
+            <Link 
+              href="/profile/reviews" 
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              See More &gt;&gt;
+            </Link>
+          </div>
 
           {(() => {
-            const userStats = getUserRatingStats(currentUser.id);
-            const receivedComments = getUserReceivedComments(currentUser.id);
+            // Get reviews written by this user
+            const givenComments = mockComments.filter(comment => comment.reviewerId === currentUser.id);
             
-            return (
-              <>
-                {/* Rating Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <div className="flex items-center mb-2">
-                      <StarRating rating={Math.round(userStats.averageRating)} readonly size="lg" />
-                      <span className="text-2xl font-bold text-gray-900 ml-3">
-                        {userStats.averageRating.toFixed(1)}
-                      </span>
-                    </div>
-                    <p className="text-gray-600">Based on {userStats.totalReviews} reviews</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Rating Distribution</h4>
-                    {[5, 4, 3, 2, 1].map(ratingLevel => {
-                      const count = userStats.ratingDistribution[ratingLevel as keyof typeof userStats.ratingDistribution];
-                      const percentage = userStats.totalReviews > 0 ? (count / userStats.totalReviews) * 100 : 0;
-                      
-                      return (
-                        <div key={ratingLevel} className="flex items-center mb-1">
-                          <span className="text-sm text-gray-600 w-8">{ratingLevel} star</span>
-                          <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${percentage}%` }}
-                            />
+            return givenComments.length > 0 ? (
+              <div className="space-y-4">
+                {givenComments.slice(0, 3).map(comment => {
+                  const reviewee = mockUsers.find(user => user.id === comment.revieweeId);
+                  return (
+                    <div key={comment.id} className="flex items-start space-x-4 pb-4 border-b border-gray-100 last:border-b-0">
+                      <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                        {reviewee?.firstName?.charAt(0) || 'U'}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center mb-1">
+                          <h4 className="font-semibold text-gray-900 mr-2">
+                            {reviewee?.firstName || 'Unknown User'}
+                          </h4>
+                          <div className="flex items-center">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-4 h-4 ${star <= comment.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                              />
+                            ))}
                           </div>
-                          <span className="text-sm text-gray-600 w-8">{count}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Recent Reviews */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Recent Reviews</h3>
-                    <Link 
-                      href="/profile/reviews" 
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      View All Reviews
-                    </Link>
-                  </div>
-                  
-                  {receivedComments.length > 0 ? (
-                    <div className="space-y-4">
-                      {receivedComments.slice(0, 3).map(comment => {
-                        const reviewer = mockUsers.find(user => user.id === comment.reviewerId);
-                        return (
-                          <div key={comment.id} className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center">
-                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
-                                  {comment.isAnonymous ? 'A' : (reviewer?.firstName?.charAt(0) || 'U')}
-                                </div>
-                                <div>
-                                  <p className="font-medium text-gray-900">
-                                    {comment.isAnonymous ? 'Anonymous User' : `${reviewer?.firstName} ${reviewer?.lastName}` || 'Unknown User'}
-                                  </p>
-                                  <StarRating rating={comment.rating} readonly size="sm" />
-                                </div>
-                              </div>
-                              <span className="text-sm text-gray-500">
-                                {new Date(comment.createdAt).toLocaleDateString('en-US')}
-                              </span>
-                            </div>
-                            <p className="text-gray-700">{comment.content}</p>
-                            {comment.tags && comment.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {comment.tags.map((tag, index) => (
-                                  <span 
-                                    key={index}
-                                    className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {comment.content}
+                        </p>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      No reviews received yet
-                    </div>
-                  )}
-                </div>
-              </>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">No reviews written yet</p>
+              </div>
             );
           })()}
         </div>
