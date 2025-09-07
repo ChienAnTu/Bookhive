@@ -9,3 +9,5 @@ python-dotenv
 pydantic
 email-validator
 PyMySQL
+websockets
+fastapi_mail
