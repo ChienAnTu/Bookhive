@@ -64,7 +64,7 @@ export default function LendBookPage() {
       coverImgUrl: form.coverImage
         ? URL.createObjectURL(form.coverImage)
         : "https://via.placeholder.com/300x400?text=No+Cover",
-      ownerId: "user1", // TODO: 替换为当前登录用户
+      ownerId: "user1", // TODO: Replace with current logged-in user
 
       status: "listed",
       condition: form.condition as Book["condition"],
@@ -224,7 +224,7 @@ export default function LendBookPage() {
           </label>
 
           <div className="flex items-center gap-4">
-            {/* 隐藏的 input */}
+            {/* Hidden input */}
             <input
               type="file"
               id="cover-upload"
@@ -279,7 +279,7 @@ export default function LendBookPage() {
             Condition Photos
           </label>
 
-          {/* 隐藏的 input */}
+          {/* Hidden input */}
           <input
             type="file"
             id="condition-upload"

@@ -6,7 +6,7 @@ import { ArrowLeft, Star } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import Modal from '@/app/components/ui/Modal';
 import StarRating from '@/app/components/ui/StarRating';
-import { getCurrentUser, getOrderById, getUserById } from '@/app/data/mockData';
+import { getCurrentUser, getOrderById, getUserById, reviewTags } from '@/app/data/mockData';
 import { Comment } from '@/app/types';
 
 export default function OrderReviewPage() {
@@ -39,7 +39,7 @@ export default function OrderReviewPage() {
     );
   }
 
-  // 确定要评价的用户（借书人评价出借人，出借人评价借书人）
+  // Determine which user to review (borrower reviews lender, lender reviews borrower)
   const revieweeId = order.borrowerId === currentUser.id ? order.lenderId : order.borrowerId;
   const reviewee = getUserById(revieweeId);
   const isUserBorrower = order.borrowerId === currentUser.id;
@@ -64,10 +64,10 @@ export default function OrderReviewPage() {
       helpfulCount: 0
     };
 
-    // 这里应该调用API保存评论
+    // Here should call API to save the comment
     console.log('Submitting review:', review);
 
-    // 重置表单
+    // Reset form
     setNewReview({
       rating: 5,
       content: '',
@@ -76,20 +76,9 @@ export default function OrderReviewPage() {
     });
     setIsReviewModalOpen(false);
 
-    // 返回到profile页面
+    // Return to profile page
     router.push('/profile');
   };
-
-  const predefinedTags = [
-    'Excellent communication',
-    'Fast response',
-    'Book in great condition',
-    'Easy pickup/delivery',
-    'Very reliable',
-    'Friendly person',
-    'Flexible timing',
-    'Professional',
-  ];
 
   const toggleTag = (tag: string) => {
     setNewReview(prev => ({
@@ -187,7 +176,7 @@ export default function OrderReviewPage() {
                 Add Tags (Optional)
               </label>
               <div className="flex flex-wrap gap-2">
-                {predefinedTags.map((tag) => (
+                {reviewTags.map((tag: string) => (
                   <button
                     key={tag}
                     type="button"

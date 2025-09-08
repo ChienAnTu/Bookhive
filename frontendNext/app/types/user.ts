@@ -14,31 +14,31 @@ export interface Coordinates {
 export interface User {
   id: string;
 
-  // 基本信息
+  // Basic information
   firstName: string;
   lastName: string;
   email: string;
   phoneNumber?: string;
   dateOfBirth?: DateOfBirth;
 
-  // 地址信息
+  // Address information
   country: string;
   streetAddress: string;
   city: string;
   state: string;
   zipCode: string;
-  coordinates?: Coordinates;  // 经纬度，方便计算距离
-  maxDistance?: number;       // 借书的最大距离（公里）
+  coordinates?: Coordinates;  // Coordinates for distance calculation
+  maxDistance?: number;       // Maximum distance for book lending (kilometers)
 
-  // 头像
-  avatar?: string;           // 从 API 获取的头像 URL
-  profilePicture?: string;   // 本地上传的 base64
+  // Profile picture
+  avatar?: string;           // Avatar URL from API
+  profilePicture?: string;   // Local uploaded base64
 
-  // 系统信息
+  // System information
   createdAt: Date;
 
-  // 社交 / 数据统计
-  bio?: string;               // 用户简介
-  preferredLanguages?: string[]; // 偏好语言
+  // Social / Statistics
+  bio?: string;               // User bio
+  preferredLanguages?: string[]; // Preferred languages
 
 }

@@ -167,7 +167,7 @@ export default function BookDetailPage() {
                 <div className="p-4 space-y-3">
                   <Button
     onClick={() => {
-      const ok = useCartStore.getState().addToCart(book, "borrow"); // 👈 指定首选租赁
+      const ok = useCartStore.getState().addToCart(book, "borrow"); // Specify preferred rental
       if (ok) {
         toast?.success?.("Added to cart");
       } else {
@@ -177,7 +177,7 @@ export default function BookDetailPage() {
     className="w-full flex items-center justify-center space-x-2"
     disabled={
       book.status !== "listed" || (!book.canRent && !book.canSell)
-    } // 👈 同时考虑能力
+    } // Also consider capability
   >
     <ShoppingBag className="w-4 h-4" />
     <span>

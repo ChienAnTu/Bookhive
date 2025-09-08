@@ -21,7 +21,8 @@ import {
   getCurrentUser,
   mockComplaints,
   mockBooks,
-  getUserById 
+  getUserById,
+  complaintTypes
 } from "@/app/data/mockData";
 import { ComplaintStatus, ComplaintType } from "../types/order";
 
@@ -128,13 +129,6 @@ export default function ComplainPage() {
     { value: "investigating", label: "Investigating", count: userComplaints.filter(c => c.status === "investigating").length },
     { value: "resolved", label: "Resolved", count: userComplaints.filter(c => c.status === "resolved").length },
     { value: "closed", label: "Closed", count: userComplaints.filter(c => c.status === "closed").length }
-  ];
-
-  const complaintTypes: { value: ComplaintType; label: string }[] = [
-    { value: "book-condition", label: "Book Condition" },
-    { value: "delivery", label: "Delivery Issue" },
-    { value: "user-behavior", label: "User Behavior" },
-    { value: "other", label: "Other" }
   ];
 
   return (

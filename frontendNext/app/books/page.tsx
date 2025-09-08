@@ -59,14 +59,14 @@ export default function BooksPage() {
 
   const router = useRouter();
 
-  // 点击跳转详情
+  // Click to navigate to details
   const handleViewDetails = (bookId: string) => {
     router.push(`/books/${bookId}`);
   };
 
   return (
     <div className="flex h-full">
-      {/* Filter Sidebar - 使用flex比例布局 */}
+      {/* Filter Sidebar - using flex proportional layout */}
       <div className="hidden lg:flex lg:w-1/5 lg:min-w-48 lg:max-w-64">
         <BookFilter
           filters={filters}
@@ -76,7 +76,7 @@ export default function BooksPage() {
         />
       </div>
 
-      {/* Main content area - 自动占用剩余空间 */}
+      {/* Main content area - automatically occupies remaining space */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
           {/* Simple header showing results count */}
@@ -121,7 +121,7 @@ export default function BooksPage() {
         </div>
       </div>
 
-      {/* Mobile Filter - 移动端显示 */}
+      {/* Mobile Filter - mobile display */}
       <div className="lg:hidden">
         <BookFilter
           filters={filters}

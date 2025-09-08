@@ -8,7 +8,7 @@ export type CartItem = Book & {
 
 interface CartState {
   cart: CartItem[];
-  // 可传入首选模式；返回是否成功
+  // Can pass preferred mode; returns whether successful
   addToCart: (book: Book, preferredMode?: "borrow" | "purchase") => boolean;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
@@ -20,20 +20,20 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   addToCart: (book, preferredMode) => {
     const { cart } = get();
-    if (cart.find((b) => b.id === book.id)) return true; // 已在购物车，视为成功
+    if (cart.find((b) => b.id === book.id)) return true; // Already in cart, consider as successful
 
-    // 计算最终 mode（优先用 preferredMode，其次按能力自动选）
+    // Calculate final mode (prefer preferredMode, then auto-select based on capability)
     let finalMode: "borrow" | "purchase" | null = null;
 
     if (preferredMode === "borrow" && book.canRent) finalMode = "borrow";
     else if (preferredMode === "purchase" && book.canSell) finalMode = "purchase";
     else if (preferredMode == null) {
-      // 未指定则自动选择：能租优先
+      // Auto-select if not specified: prefer rent
       if (book.canRent) finalMode = "borrow";
       else if (book.canSell) finalMode = "purchase";
     }
 
-    if (!finalMode) return false; // 两者都不支持 → 失败
+    if (!finalMode) return false; // Neither supported → failure
 
     set({ cart: [...cart, { ...book, mode: finalMode }] });
     return true;

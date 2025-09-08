@@ -67,7 +67,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   setIsLoading(true);
 
   try {
-    // 拼接全名
+    // Concatenate full name
     const payload = {
       ...profileData,
       name: `${profileData.firstName} ${profileData.lastName}`.trim(),
@@ -128,7 +128,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               </h3>
               <div className="flex flex-col items-center">
                 <div className="relative">
-                  {/* Avatar 显示：如果用户上传过新头像(profilePicture)，优先显示 */}
+                  {/* Avatar display: if user has uploaded new avatar (profilePicture), display it first */}
                   {profileData.profilePicture ? (
                     <img src={profileData.profilePicture} alt="Preview" className="w-24 h-24 rounded-full object-cover" />
                   ) : (
@@ -136,7 +136,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   )}
 
 
-                  {/* 上传按钮 */}
+                  {/* Upload button */}
                   <label className="absolute bottom-0 right-0 bg-black rounded-full p-2 cursor-pointer">
                     <Camera className="w-4 h-4 text-white" />
                     <Input

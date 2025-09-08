@@ -170,7 +170,7 @@ const Header: React.FC = () => {
             {/* Shopping Cart button - count items */}
             <div className="flex items-center space-x-4">
               <HeaderCart />
-              {/* 这里可以继续放 User / Login 按钮 */}
+              {/* Here can continue to place User / Login buttons */}
             </div>
 
             {/* User profile section - shown when logged in */}

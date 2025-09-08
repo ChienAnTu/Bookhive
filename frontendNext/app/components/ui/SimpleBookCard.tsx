@@ -1,5 +1,5 @@
 import React from "react";
-// 引入类型 
+// Import types 
 import type { Book } from "@/app/types/book"; 
 
 import Card from "./Card";
@@ -8,7 +8,7 @@ interface SimpleBookCardProps {
   book: Book;
 }
 
-// 简单的图书卡片组件
+// Simple book card component
 export default function SimpleBookCard({ book }: SimpleBookCardProps) {
   return (
     <Card className="flex-shrink-0 w-[clamp(180px,20vw,240px)] hover:shadow-lg transition-shadow">

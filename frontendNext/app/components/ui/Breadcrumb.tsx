@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 
 export interface BreadcrumbItem {
   label: string;
-  href?: string; // 没有 href 表示当前页面
+  href?: string; // No href means current page
 }
 
 interface BreadcrumbProps {

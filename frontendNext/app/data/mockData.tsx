@@ -2,6 +2,8 @@
 import { User } from "@/app/types/user";
 import { Book } from "@/app/types/book";
 import { Comment, RatingStats } from "@/app/types";
+import { LendingItem } from "@/app/types/lending";
+import { Complaint, ComplaintType } from "@/app/types/order";
 
 // export interface User {
 //   id: string;
@@ -719,18 +721,12 @@ export function calculateDistance(
   return Math.round(distance * 10) / 10; // Round to 1 decimal place
 }
 
-export interface Complaint {
-  id: string;
-  complainantId: string;
-  subject: string;
-  description: string;
-  type: "book-condition" | "delivery" | "user-behavior" | "other";
-  status: "pending" | "investigating" | "resolved" | "closed";
-  orderId?: string;
-  adminResponse?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
+// Lending item data for lend page
+export const mockLendingItems: LendingItem[] = [
+  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
+  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
+  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
+];
 
 export const mockComplaints: Complaint[] = [
   {
@@ -768,7 +764,27 @@ export const mockComplaints: Complaint[] = [
   }
 ];
 
-// 评论和评分数据
+// Complaint types data
+export const complaintTypes: { value: ComplaintType; label: string }[] = [
+  { value: "book-condition", label: "Book Condition" },
+  { value: "delivery", label: "Delivery Issue" },
+  { value: "user-behavior", label: "User Behavior" },
+  { value: "other", label: "Other" }
+];
+
+// Predefined tags for reviews
+export const reviewTags = [
+  'Excellent communication',
+  'Fast response',
+  'Book in great condition',
+  'Easy pickup/delivery',
+  'Very reliable',
+  'Friendly person',
+  'Flexible timing',
+  'Professional',
+];
+
+// Comment and rating data
 export const mockComments: Comment[] = [
   {
     id: "comment1",
@@ -842,7 +858,7 @@ export const mockComments: Comment[] = [
   }
 ];
 
-// 获取用户的评分统计
+// Get user's rating statistics
 export const getUserRatingStats = (userId: string): RatingStats => {
   const userComments = mockComments.filter(comment => comment.revieweeId === userId);
   
@@ -873,17 +889,17 @@ export const getUserRatingStats = (userId: string): RatingStats => {
   };
 };
 
-// 获取订单的评论
+// Get order comments
 export const getOrderComments = (orderId: string): Comment[] => {
   return mockComments.filter(comment => comment.orderId === orderId);
 };
 
-// 获取用户给出的评论
+// Get comments given by user
 export const getUserGivenComments = (userId: string): Comment[] => {
   return mockComments.filter(comment => comment.reviewerId === userId);
 };
 
-// 获取用户收到的评论  
+// Get comments received by user  
 export const getUserReceivedComments = (userId: string): Comment[] => {
   return mockComments.filter(comment => comment.revieweeId === userId);
 };

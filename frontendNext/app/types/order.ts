@@ -42,22 +42,22 @@ export interface Order {
   borrowerId: string;
   lenderId: string;
 
-  // 时间
+  // Timing
   startDate: Date;
   endDate: Date;
   returnDate?: Date;
 
-  // 费用
+  // Fees
   totalAmount: number;
 
-  // 状态
+  // Status
   status: OrderStatus;
   deliveryMethod: DeliveryMethod;
   
-  // 运输信息
+  // Shipping information
   shippingInfo?: ShippingInfo;
   
-  // 评价信息
+  // Review information
   rating?: number;
   review?: string;
   

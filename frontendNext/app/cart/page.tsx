@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 
-// 与 store 中的 CartItem 对齐：Book & { mode }
+// Align with CartItem in store: Book & { mode }
 type CartItem = {
   id: string;
   ownerId: string | null;
@@ -17,14 +17,14 @@ type CartItem = {
   author?: string;
   status?: "listed" | "unlisted" | "lent" | "sold" | string;
   deliveryMethod?: "post" | "pickup" | "both" | string | null;
-  // 价格相关（来自 Book）
+  // Price-related (from Book)
   salePrice?: number | null;
   deposit?: number | null;
   fees?: {
     serviceFee: number;
     estimatedShipping?: number;
   } | null;
-  // 能否租/卖
+  // Can rent/sell
   canRent: boolean;
   canSell: boolean;
   // 购物车选择

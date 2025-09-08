@@ -1,8 +1,8 @@
 import React from "react";
-// 引入类型
+// Import types
 import type { Book } from "@/app/types/book";
 
-// 引入数据
+// Import data
 import { mockBooks } from "@/app/data/mockData";
 
 import Button from "../ui/Button";

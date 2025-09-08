@@ -13,6 +13,7 @@ import {
 } from "../data/mockData";
 import Link from "next/link";
 import StarRating from "../components/ui/StarRating";
+import Button from "../components/ui/Button";
 import { 
   mockComments, 
   getUserRatingStats, 
@@ -313,11 +314,13 @@ const ProfilePage: React.FC = () => {
                             </p>
                           </div>
                         </div>
-                        <Link
-                          href={`/orders/${order.id}/review`}
-                          className="px-3 py-1 bg-black text-white text-xs rounded-full hover:bg-gray-800 transition"
-                        >
-                          Write Review
+                        <Link href={`/orders/${order.id}/review`}>
+                          <Button 
+                            size="sm"
+                            className="bg-black text-white hover:bg-gray-800"
+                          >
+                            Write Review
+                          </Button>
                         </Link>
                       </div>
                     );

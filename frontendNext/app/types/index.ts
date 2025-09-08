@@ -1,33 +1,35 @@
 export * from "./user";
 export * from "./book";
 export * from "./order";
+export * from "./lending";
+export * from "./complaint";
 
-// 简单的 API 响应
+// Simple API response
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   message?: string;
 }
 
-// 评论和评分接口
+// Comment and rating interfaces
 export interface Comment {
   id: string;
   orderId: string;
-  reviewerId: string; // 评价者ID
-  revieweeId: string; // 被评价者ID
+  reviewerId: string; // Reviewer ID
+  revieweeId: string; // Reviewee ID
   bookId: string;
-  rating: number; // 1-5星评分
-  content: string; // 评价内容
-  tags?: string[]; // 评价标签，如 "friendly", "punctual", "good condition" 等
-  type: "lender" | "borrower"; // 评价类型：对出借者还是借阅者的评价
+  rating: number; // 1-5 star rating
+  content: string; // Review content
+  tags?: string[]; // Review tags like "friendly", "punctual", "good condition" etc
+  type: "lender" | "borrower"; // Review type: for lender or borrower
   createdAt: string;
   updatedAt?: string;
-  isAnonymous?: boolean; // 是否匿名评价
-  helpfulCount?: number; // 有用的评价数
-  reportCount?: number; // 举报数
+  isAnonymous?: boolean; // Whether anonymous review
+  helpfulCount?: number; // Number of helpful reviews
+  reportCount?: number; // Number of reports
 }
 
-// 评价统计接口
+// Review statistics interface
 export interface RatingStats {
   averageRating: number;
   totalReviews: number;

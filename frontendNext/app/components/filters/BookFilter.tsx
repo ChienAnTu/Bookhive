@@ -213,14 +213,14 @@ const BookFilter: React.FC<BookFilterProps> = ({
 
   return (
     <>
-      {/* Desktop Filter - 使用完整宽度，由父容器控制比例 */}
+      {/* Desktop Filter - Use full width, controlled by parent container proportion */}
       <div className="hidden lg:block w-full h-full overflow-y-auto border-r border-gray-200">
         <div className={`bg-transparent p-4 ${className}`}>
           <FilterContent />
         </div>
       </div>
 
-      {/* Mobile Filter Button - 移动端浮动按钮 */}
+      {/* Mobile Filter Button - Mobile floating button */}
       <div className="lg:hidden fixed bottom-4 right-4 z-50">
         <button
           onClick={() => setIsMobileFilterOpen(true)}
@@ -235,7 +235,7 @@ const BookFilter: React.FC<BookFilterProps> = ({
         </button>
       </div>
 
-      {/* Mobile Filter Modal - 移动端底部弹出框 */}
+      {/* Mobile Filter Modal - Mobile bottom popup */}
       {isMobileFilterOpen && (
         <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
           <div className="fixed inset-x-0 bottom-0 bg-white rounded-t-xl max-h-[80vh] overflow-y-auto">

@@ -77,7 +77,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
       className="w-full overflow-hidden h-full flex flex-col transform-none"
       onClick={() => onViewDetails?.(book.id)}
     >
-      {/* 封面图片区域 */}
+      {/* Cover image area */}
       <div className="relative w-full">
         {/* delivery method */}
         <div className="absolute top-3 left-3 z-10">
@@ -106,7 +106,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
         </div>
       </div>
 
-      {/* 信息区域 */}
+      {/* Information area */}
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex-1">
           {/* title and author */}

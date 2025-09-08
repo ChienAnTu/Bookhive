@@ -12,7 +12,7 @@ export interface Book {
   ownerId: string;
   // borrowerId?: string;
 
-  // 状态
+  // Status
   status: "listed" | "unlisted" | "lent" | "sold";
   condition: "new" | "like-new" | "good" | "fair";
   conditionImgURLs?: string[];
@@ -20,26 +20,26 @@ export interface Book {
   canRent: boolean;
   canSell: boolean;
   
-  // 时间相关
+  // Time-related
   dateAdded: string;
   updateDate: string;
 
-  // 书籍属性
+  // Book properties
   isbn?: string;
   tags: string[];
   publishYear?: number;
   maxLendingDays: number;
 
-  // 配送
+  // Delivery
   deliveryMethod: "post" | "pickup" | "both";
 
-  // Borrow费用
+  // Borrow fees
   // fees: {
   //   serviceFee: number;       // Platform 10% service fee (non-refundable)
   //   estimatedShipping?: number; // Estimated shipping cost (for post delivery)
   // };
 
-  // Sale费用
+  // Sale fees
   salePrice?: number;          // Sale amount (non-refundable)
   deposit?: number;          // Security deposit amount (refundable)
 
