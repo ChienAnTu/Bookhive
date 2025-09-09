@@ -1,6 +1,8 @@
 // mockData.tsx
 import { User } from "@/app/types/user";
 import { Book } from "@/app/types/book";
+import { Order } from "@/app/types/order";
+
 import { Comment, RatingStats } from "@/app/types";
 
 export interface LendingRequest {
@@ -13,35 +15,6 @@ export interface LendingRequest {
   createdAt: string;
 }
 
-export interface Order {
-  id: string;
-  bookId: string;
-  bookTitle: string;
-  bookAuthor: string;
-  bookImageUrl: string;
-  lenderId: string;
-  lenderName: string;
-  lenderAvatar: string;
-  borrowerId: string;
-  borrowerName: string;
-  borrowerAvatar: string;
-  status: "completed" | "ongoing" | "overdue" | "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
-  startDate: string;
-  dueDate: string;
-  returnedDate?: string;
-  rating?: number; // Rating given by the user after transaction
-  review?: string; // Review left by the user
-  deliveryMethod: "post" | "self-help" | "both";
-  location: string; // Location where the transaction took place
-  conversationId: string; // Link to the conversation for this order
-  createdAt: string; // When the order was created
-  shippingInfo?: {
-    trackingNumber: string;
-    carrier: string;
-    estimatedDelivery: string;
-    address: string;
-  };
-}
 
 export interface Conversation {
   id: string;
@@ -520,119 +493,128 @@ export const mockBooks: Book[] = [
 ];
 
 
-
-
-
 export const mockOrders: Order[] = [
   {
     id: "order1",
-    bookId: "book11",
-    bookTitle: "The Martian",
-    bookAuthor: "Andy Weir",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300&h=400&fit=crop",
-    lenderId: "user2",
-    lenderName: "Sarah Johnson",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user1",
-    borrowerName: "Zhenyi Su",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "delivered",
-    startDate: "2023-12-01",
-    dueDate: "2023-12-21",
-    returnedDate: "2023-12-20",
-    rating: 5,
-    review:
-      "Amazing book! Sarah was super helpful and the book was in perfect condition.",
-    deliveryMethod: "post",
-    location: "Fremantle, WA",
-    conversationId: "conv_completed1",
+    bookIds: ["book11"], // Where the Crawdads Sing (owner=user2)
+    ownerId: "user2",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "COMPLETED",
+    startAt: "2023-12-01T00:00:00Z",
+    dueAt: "2023-12-22T00:00:00Z", // 21 days
+    returnedAt: "2023-12-20T00:00:00Z",
+    completedAt: "2023-12-21T08:00:00Z",
+
     createdAt: "2023-11-28T10:30:00Z",
-    shippingInfo: {
+    updatedAt: "2023-12-21T08:00:00Z",
+
+    deliveryMethod: "post",
+    shippingOut: {
+      carrier: "AUSPOST",
       trackingNumber: "AU123456789",
-      carrier: "Australia Post",
-      estimatedDelivery: "2023-12-03",
-      address: "123 Main St, Fremantle WA 6160"
+      trackingUrl: "https://auspost.com.au/mypost/track/#/details/AU123456789",
     },
+
+    // Pricing（book11.deposit=15 → 1500 cents）
+    deposit: { amount: 1500 },
+    serviceFee: { amount: 200 },     // $2
+    shippingOutFee: { amount: 800 }, // $8
+    totalPaid: { amount: 2500 },     // 1500 + 200 + 800
+    totalRefunded: { amount: 1500 }, // full deposit
+    notes: "Returned early, great condition.",
   },
+
   {
     id: "order2",
-    bookId: "book12",
-    bookTitle: "Educated",
-    bookAuthor: "Tara Westover",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
-    lenderId: "user1",
-    lenderName: "Zhenyi Su",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user3",
-    borrowerName: "Marcus Davis",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    status: "shipped",
-    startDate: "2024-01-15",
-    dueDate: "2024-02-15",
-    deliveryMethod: "self-help",
-    location: "Perth, WA",
-    conversationId: "conv_ongoing1",
+    bookIds: ["book12"], // The Alchemist (owner=user3)
+    ownerId: "user3",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "PENDING_SHIPMENT",
     createdAt: "2024-01-10T14:20:00Z",
+    updatedAt: "2024-01-10T14:20:00Z",
+
+    deliveryMethod: "pickup", // book12 supports both → choose pickup
+
+    deposit: { amount: 1200 }, // 12 → 1200 cents
+    serviceFee: { amount: 200 },
+    totalPaid: { amount: 1400 },
+    notes: "Pickup to be arranged at UWA library.",
   },
+
   {
     id: "order3",
-    bookId: "book3",
-    bookTitle: "Dune",
-    bookAuthor: "Frank Herbert",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop",
-    lenderId: "user1",
-    lenderName: "Zhenyi Su",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user2",
-    borrowerName: "Sarah Johnson",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    status: "in-transit",
-    startDate: "2024-01-15",
-    dueDate: "2024-02-15",
-    deliveryMethod: "post",
-    location: "Perth, WA",
-    conversationId: "conv_ongoing2",
+    bookIds: ["book3"], // Dune (owner=user1)
+    ownerId: "user1",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "BORROWING",
+    startAt: "2024-01-15T00:00:00Z",
+    dueAt: "2024-02-14T00:00:00Z", // 30 days
+
     createdAt: "2024-01-12T09:15:00Z",
-    shippingInfo: {
-      trackingNumber: "AU987654321",
-      carrier: "FedEx",
-      estimatedDelivery: "2024-01-18",
-      address: "456 Ocean Dr, Perth WA 6000"
-    },
+    updatedAt: "2024-01-15T00:00:00Z",
+
+    deliveryMethod: "pickup",
+
+    deposit: { amount: 1800 }, // 18 → 1800 cents
+    serviceFee: { amount: 200 },
+    totalPaid: { amount: 2000 },
+    notes: "In-person handover completed.",
   },
+
   {
     id: "order4",
-    bookId: "book13",
-    bookTitle: "Becoming",
-    bookAuthor: "Michelle Obama",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
-    lenderId: "user3",
-    lenderName: "Marcus Davis",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user1",
-    borrowerName: "Zhenyi Su",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "pending",
-    startDate: "2024-01-20",
-    dueDate: "2024-02-10",
-    deliveryMethod: "post",
-    location: "Subiaco, WA",
-    conversationId: "conv_ongoing3",
+    bookIds: ["book6"], // Sapiens (owner=user2)
+    ownerId: "user2",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "PENDING_PAYMENT",
     createdAt: "2024-01-18T16:45:00Z",
+    updatedAt: "2024-01-18T16:45:00Z",
+
+    deliveryMethod: "post",
+
+    // unpaid
+    deposit: { amount: 1600 }, // 16 → 1600 cents
+    serviceFee: { amount: 200 },
+    totalPaid: { amount: 0 },
+    notes: "Awaiting payment to confirm the order.",
+  },
+
+  // Multiple books ordered at same time（owner=user2；delivery=post）
+  {
+    id: "order5_multi",
+    bookIds: ["book11", "book1", "book6"], // owners all = user2
+    ownerId: "user2",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "BORROWING",
+    createdAt: "2024-02-01T02:00:00Z",
+    startAt: "2024-02-01T04:00:00Z",
+    // dueAt 统一：max(maxLendingDays) = max(21, 21, 28) = 28
+    dueAt: "2024-02-29T04:00:00Z",
+
+    updatedAt: "2024-02-01T04:00:00Z",
+
+    deliveryMethod: "post",
+    shippingOut: {
+      carrier: "AUSPOST",
+      trackingNumber: "AU555666777",
+      trackingUrl: "https://auspost.com.au/mypost/track/#/details/AU555666777",
+    },
+
+    // 押金合计：book11(15) + book1(15) + book6(16) = 46 → 4600 cents
+    deposit: { amount: 4600 },
+    serviceFee: { amount: 200 },
+    shippingOutFee: { amount: 900 },
+    totalPaid: { amount: 4600 + 200 + 900 }, // 5700
+    notes: "Multi-book order; all shipped together via AusPost.",
   },
 ];
+
+
 
 // Helper function to get user data by ID
 export const getUserById = (userId: string): User | undefined => {
@@ -651,7 +633,7 @@ export function getBookById(id: string) {
 
 // Helper function to get user's lending orders
 export const getUserLendingOrders = (userId: string): Order[] => {
-  return mockOrders.filter((order) => order.lenderId === userId);
+  return mockOrders.filter((order) => order.ownerId === userId);
 };
 
 // Helper function to get user's borrowing orders
