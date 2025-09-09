@@ -201,7 +201,7 @@ export default function CheckoutPage() {
       {/* Address */}
       <Card>
         <div className="p-4 space-y-3">
-          <h2 className="text-lg font-semibold">Shipping Address</h2>
+          <h2 className="text-lg font-semibold">Delivery Address</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Contact Name" value={address.contactName} onChange={(e)=>setAddress({...address, contactName: e.target.value})} name="contactName" />
             <Input label="Phone" value={address.phone||""} onChange={(e)=>setAddress({...address, phone: e.target.value})} name="phone" />
