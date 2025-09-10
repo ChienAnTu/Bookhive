@@ -10,7 +10,7 @@ import Button from "../components/ui/Button";
 
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
-import { mockOrders, mockBooks } from "@/app/data/mockData";
+import { mockOrders, mockBooks, mockUsers } from "@/app/data/mockData";
 
 import { getCurrentUser } from "@/utils/auth";
 //import { getOrders, updateOrder, cancelOrder } from "@/utils/orders";
@@ -183,6 +183,8 @@ export default function OrderListPage() {
                 filteredOrders.map((o) => {
                   const booksInOrder = o.bookIds.map((id) => booksMap[id]).filter(Boolean) as Book[];
                   const first = booksInOrder[0];
+                  const ownerName = mockUsers.find(u => u.id === o.ownerId)?.name || "Unknown Owner";
+
                   const extra = Math.max(0, booksInOrder.length - 1);
 
                   const meta = STATUS_META[o.status];
@@ -221,6 +223,7 @@ export default function OrderListPage() {
                         <div>
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             {/* title*/}
+                            <div>
                             <h3
                               className="text-lg font-semibold text-black cursor-pointer hover:underline"
                               onClick={() => router.push(`/borrowing/${o.id}`)}
@@ -229,11 +232,15 @@ export default function OrderListPage() {
                               {first?.titleOr || "Untitled Book"}
                               {extra > 0 && <span className="text-gray-500"> + {extra} more</span>}
                             </h3>
+                            <p className="text-sm text-gray-500">
+                              Owner: <span className="font-medium">{ownerName}</span>
+                            </p>
+                            </div>
 
                             {/* statuss */}
                             <div className="flex items-center gap-2">
                               <span className={`text-lg font-medium ${meta.className}`}>{meta.label}</span>
-                              
+
                             </div>
                           </div>
 
@@ -242,21 +249,20 @@ export default function OrderListPage() {
                           <div className="text-sm text-gray-500 mt-1 flex flex-col gap-1">
                             <div className="flex items-center gap-3 flex-wrap">
                               <span>Created: {fmtDate(o.createdAt)}</span>
-                              {o.startAt && <span>Start: {fmtDate(o.startAt)}</span>}
                             </div>
                             {o.dueAt && (
                               <div className="flex text-black font-medium items-center gap-1">
                                 <Clock className="w-4 h-4" />
                                 <span>Due: {fmtDate(o.dueAt)}</span>
                                 {isOverdueBadge && (
-                                <span className="inline-flex items-center gap-1 text-sm font-medium text-red-600">
-                                  <AlertTriangle className="w-4 h-4" /> Overdue
-                                </span>
-                              )}
+                                  <span className="inline-flex items-center gap-1 text-sm font-medium text-red-600">
+                                    <AlertTriangle className="w-4 h-4" /> Overdue
+                                  </span>
+                                )}
                               </div>
                             )}
-                            
-                          </div>                          
+
+                          </div>
                         </div>
 
                         {/* actions */}
@@ -278,31 +284,10 @@ export default function OrderListPage() {
                               className="border-black text-black hover:bg-black hover:text-white"
                               onClick={() => router.push(`/messages?orderId=${o.id}`)}
                             >
-                              Message
+                              Message Owner
                             </Button>
                           )}
 
-                          {o.status === "PENDING_SHIPMENT" && (
-                            <Button
-                              size="sm"
-                              className="bg-black text-white hover:bg-gray-800"
-                              onClick={() => router.push(`/borrowing/${o.id}/shipping`)}
-                            >
-                              Add / View Tracking
-                            </Button>
-                          )}
-
-                          {(o.status === "RETURNED" || o.status === "BORROWING" || o.status === "OVERDUE") && (
-                            <Button
-                              size="sm"
-                              className="bg-black text-white hover:bg-gray-800"
-                              onClick={() => router.push(`/borrowing/${o.id}/confirm-return`)}
-                            >
-                              Confirm Return
-                            </Button>
-                          )}
-
-                          
                         </div>
                       </div>
                     </Card>
