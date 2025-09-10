@@ -6,8 +6,8 @@ import Link from "next/link";
 
 export default function BookThumbnailCard({ book }: { book: Book }) {
   return (
-    <Link href={`/books/${book.id}`} className="block w-32 sm:w-40 flex-shrink-0">
-      <div className="group cursor-pointer">
+    <Link href={`/books/${book.id}`} className="block flex-shrink-0">
+      <div className="group cursor-pointer w-20 sm:w-24">
         {/* 封面 */}
         <div className="w-full aspect-[3/4] overflow-hidden rounded-lg bg-gray-100">
           {book.coverImgUrl ? (
@@ -23,10 +23,16 @@ export default function BookThumbnailCard({ book }: { book: Book }) {
           )}
         </div>
 
-        {/* 标题 + 作者 */}
+        {/* 标题 */}
         <div className="mt-2">
-          <div className="text-sm font-medium text-black line-clamp-2">{book.titleOr}</div>
-        </div>
+  <div
+    className="text-sm font-medium text-black line-clamp-2 text-center"
+    title={book.titleOr}
+  >
+    {book.titleOr}
+  </div>
+</div>
+
       </div>
     </Link>
   );

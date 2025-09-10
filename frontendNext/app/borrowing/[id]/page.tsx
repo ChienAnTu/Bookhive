@@ -11,8 +11,11 @@ import Button from "@/app/components/ui/Button";
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
 import BookThumbnailCard from "@/app/components/common/BookThumbnailCard";
-import { mockOrders, mockBooks } from "@/app/data/mockData";
+import { mockOrders, mockBooks, mockUsers } from "@/app/data/mockData";
 import { getBookById } from "@/utils/books";
+import type { User } from "@/app/types/user";
+import { getCurrentUser } from "@/utils/auth";
+
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -59,12 +62,22 @@ export default function OrderDetailPage() {
   );
 
   const isOverdue =
-    !!order &&
+    order &&
     (order.status === "BORROWING" || order.status === "OVERDUE") &&
-    !!order.dueAt &&
+    order.dueAt &&
     new Date(order.dueAt).getTime() < Date.now();
 
+  const [user, setUser] = useState<User | null>(null);
 
+  useEffect(() => {
+    (async () => {
+      const u = await getCurrentUser();
+      setUser(u);
+    })();
+  }, []);
+
+  const isOwner = user?.id === order?.ownerId;
+  const isBorrower = user?.id === order?.borrowerId;
 
   if (!order) {
     return (
@@ -106,12 +119,20 @@ export default function OrderDetailPage() {
         <Card className="p-4">
           <h2 className="text-lg font-semibold mb-3">Order Info</h2>
 
-          {/* Created/Start Date；Due date */}
-          <div className="text-sm text-gray-500 mt-1 flex flex-col gap-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="font-medium">Created: {fmtDate(order.createdAt)}</span>
-              {order.startAt && <span className="font-medium">Start: {fmtDate(order.startAt)}</span>}
+          {/* Owner & Borrower */}
+          <div className="text-sm text-gray-500 mt-3 flex flex-col gap-1">
+            <div>
+              Owner: <span>
+                {mockUsers.find(u => u.id === order.ownerId)?.name || "Unknown Owner"}
+              </span>
             </div>
+            <div>
+              Borrower: <span>
+                {mockUsers.find(u => u.id === order.borrowerId)?.name || "Unknown Borrower"}
+              </span>
+            </div>
+
+            {/* Due date */}
             {order.dueAt && (
               <div className="flex text-black font-medium items-center gap-1">
                 <Clock className="w-4 h-4" />
@@ -130,15 +151,15 @@ export default function OrderDetailPage() {
         <Card>
           <h2 className="text-lg font-semibold mb-3">Shipping Info</h2>
 
-          <div className="mt-3 text-sm">
-            <div>Delivery Method: <span className="font-medium">{order.deliveryMethod}</span></div>
+          <div className="mt-3  text-gray-500 text-sm">
+            <div>Delivery Method: <span className="font-medium text-black">{order.deliveryMethod}</span></div>
             {(order.shippingOut?.trackingNumber || order.shippingReturn?.trackingNumber) && (
-              <div className="mt-2 text-gray-700 flex items-center gap-6 flex-wrap">
+              <div className="mt-2 flex items-center gap-6 flex-wrap">
                 {order.shippingOut?.trackingNumber && (
                   <span className="inline-flex items-center gap-1">
                     <Truck className="w-4 h-4" /> Outbound:&nbsp;
                     {order.shippingOut?.trackingUrl ? (
-                      <a className="underline" href={order.shippingOut.trackingUrl} target="_blank" rel="noreferrer">
+                      <a className="underline font-medium text-black" href={order.shippingOut.trackingUrl} target="_blank" rel="noreferrer">
                         {order.shippingOut.trackingNumber}
                       </a>
                     ) : (
@@ -238,41 +259,21 @@ export default function OrderDetailPage() {
         <h3 className="text-base font-semibold mb-3">Actions</h3>
         <div className="flex flex-wrap gap-2">
 
-          {/* Message Owner */}
-          {order.status !== "COMPLETED" && order.status !== "CANCELED" && (
-            <Button
-              variant="outline"
-              className="border-black text-black hover:bg-black hover:text-white"
-              onClick={() => router.push(`/messages?orderId=${order.id}`)}
-            >
-              Message Owner
-            </Button>
-          )}
-
+          {/* Borrower action */}
           {/* Pay Now */}
-          {order.status === "PENDING_PAYMENT" && (
+          {isBorrower && order.status === "PENDING_PAYMENT" && (
             <Button className="bg-black text-white hover:bg-gray-800" onClick={() => alert("TODO: Pay flow")}>
               Pay Now
             </Button>
           )}
 
-          {/* Add Tracking */}
-          {order.status === "PENDING_SHIPMENT" && (
+          {/* Return */}
+          {isBorrower && (order.status === "BORROWING" || order.status === "OVERDUE") && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
-              onClick={() => router.push(`/orders/${order.id}/shipping`)}
+              onClick={() => router.push(`/borrow/${order.id}/confirm-return`)}
             >
-              Add Tracking
-            </Button>
-          )}
-
-          {/* Confirm Return */}
-          {(order.status === "RETURNED" || order.status === "BORROWING" || order.status === "OVERDUE") && (
-            <Button
-              className="bg-black text-white hover:bg-gray-800"
-              onClick={() => router.push(`/orders/${order.id}/confirm-return`)}
-            >
-              Confirm Return
+              Return
             </Button>
           )}
 
@@ -287,15 +288,38 @@ export default function OrderDetailPage() {
             </Button>
           )}
 
-          {/* Support：所有订单都能用 */}
-          {order.status !== "COMPLETED" && (
-          <Button
-            variant="outline"
-            className="border-black text-black hover:bg-black hover:text-white"
-            onClick={() => router.push(`/complain?orderId=${order.id}`)}
-          >
-            Support
-          </Button>
+          {/* Owner Action */}
+          {/* Add Tracking */}
+          {isOwner && order.status === "PENDING_SHIPMENT" && (
+            <Button
+              className="bg-black text-white hover:bg-gray-800"
+              onClick={() => router.push(`/orders/${order.id}/shipping`)}
+            >
+              Ship
+            </Button>
+          )}
+
+          {/* Common Actions */}
+          {/* Message */}
+          {order.status !== "COMPLETED" && order.status !== "CANCELED" && (
+            <Button
+              variant="outline"
+              className="border-black text-black hover:bg-black hover:text-white"
+              onClick={() => router.push(`/messages?orderId=${order.id}`)}
+            >
+              Message
+            </Button>
+          )}
+
+          {/* Support */}
+          {order.status !== "COMPLETED" && order.status !== "PENDING_PAYMENT" && order.status !== "CANCELED" && (
+            <Button
+              variant="outline"
+              className="border-black text-black hover:bg-black hover:text-white"
+              onClick={() => router.push(`/complain?orderId=${order.id}`)}
+            >
+              Support
+            </Button>
           )}
 
           {/* Write Review */}
@@ -314,10 +338,10 @@ export default function OrderDetailPage() {
       <Card className="p-4">
         <h3 className="text-base font-semibold mb-2">More Details</h3>
         <div className="grid md:grid-cols-2 text-sm gap-y-1">
-          <div>Order ID: <span className="font-mono">{order.id}</span></div>
+          <div>Order ID: <span className="font-medium">{order.id}</span></div>
           <div>Status: <span className="font-medium">{STATUS_META[order.status].label}</span></div>
           <div>Created: <span className="font-medium">{fmtDate(order.createdAt)}</span></div>
-          {order.startAt && <div>Start: <span className="font-medium">{fmtDate(order.startAt)}</span></div>}
+          {order.startAt && <div>Start Borrowing: <span className="font-medium">{fmtDate(order.startAt)}</span></div>}
           {order.dueAt && <div>Due: <span className="font-medium">{fmtDate(order.dueAt)}</span></div>}
           {order.returnedAt && <div>Returned: <span className="font-medium">{fmtDate(order.returnedAt)}</span></div>}
           {order.completedAt && <div>Completed: <span className="font-medium">{fmtDate(order.completedAt)}</span></div>}
