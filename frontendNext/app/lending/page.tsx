@@ -189,7 +189,7 @@ export default function LendingListPage() {
                         </button>
                         <button
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => onHistory(book.id)}
+                          onClick={() => router.push(`/borrowing/${book.id}/history`)}
                         >
                           History
                         </button>
@@ -288,13 +288,17 @@ export default function LendingListPage() {
                       )}
                       {book.status === "lent" && (
                         <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-black text-black hover:bg-black hover:text-white"
-                          >
-                            Detail
-                          </Button>
+                          {book.currentOrderId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-black text-black hover:bg-black hover:text-white"
+                              onClick={() => router.push(`/borrowing/${book.currentOrderId}`)}
+                            >
+                              Detail
+                            </Button>
+                          )}
+
                           <Button
                             size="sm"
                             className="bg-black text-white hover:bg-gray-800"
