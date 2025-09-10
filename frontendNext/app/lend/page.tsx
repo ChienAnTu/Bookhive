@@ -6,21 +6,7 @@ import { Search, Filter, Clock, CheckCircle, XCircle, BookOpen } from "lucide-re
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-
-interface LendingItem {
-  id: number;
-  title: string;
-  status: "Listed" | "Unlisted" | "LendOut";
-  listedDate: string;
-  dueDate?: string;
-  overdue?: boolean;
-}
-
-const mockData: LendingItem[] = [
-  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
-  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
-  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
-];
+import { mockLendingItems } from "@/app/data/mockData";
 
 type FilterStatus = "all" | "Listed" | "Unlisted" | "LendOut";
 
@@ -29,12 +15,12 @@ export default function LendingListPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
 
   const filteredBooks = useMemo(() => {
-    let filtered = mockData;
+    let filtered = mockLendingItems;
     if (selectedFilter !== "all") {
-      filtered = filtered.filter((b) => b.status === selectedFilter);
+      filtered = filtered.filter((b: any) => b.status === selectedFilter);
     }
     if (search) {
-      filtered = filtered.filter((b) =>
+      filtered = filtered.filter((b: any) =>
         b.title.toLowerCase().includes(search.toLowerCase())
       );
     }
@@ -42,10 +28,10 @@ export default function LendingListPage() {
   }, [search, selectedFilter]);
 
   const filterOptions = [
-    { value: "all", label: "All", count: mockData.length },
-    { value: "Listed", label: "Listed", count: mockData.filter((b) => b.status === "Listed").length },
-    { value: "Unlisted", label: "Unlisted", count: mockData.filter((b) => b.status === "Unlisted").length },
-    { value: "LendOut", label: "Lend Out", count: mockData.filter((b) => b.status === "LendOut").length },
+    { value: "all", label: "All", count: mockLendingItems.length },
+    { value: "Listed", label: "Listed", count: mockLendingItems.filter((b: any) => b.status === "Listed").length },
+    { value: "Unlisted", label: "Unlisted", count: mockLendingItems.filter((b: any) => b.status === "Unlisted").length },
+    { value: "LendOut", label: "Lend Out", count: mockLendingItems.filter((b: any) => b.status === "LendOut").length },
   ];
 
   return (
@@ -108,7 +94,7 @@ export default function LendingListPage() {
                 </div>
               </Card>
             ) : (
-              filteredBooks.map((book) => (
+              filteredBooks.map((book: any) => (
                 <Card key={book.id}>
                   <div className="flex items-start justify-between">
                     <div>
@@ -126,12 +112,12 @@ export default function LendingListPage() {
                         )}
                         {" | "}Listed On {book.listedDate}
                       </p>
-                      {book.dueDate && (
+                      {(book as any).dueDate && (
                         <p
-                          className={`text-sm ${book.overdue ? "text-red-600 font-semibold" : "text-gray-700"
+                          className={`text-sm ${(book as any).overdue ? "text-red-600 font-semibold" : "text-gray-700"
                             }`}
                         >
-                          Due Date {book.dueDate}
+                          Due Date {(book as any).dueDate}
                         </p>
                       )}
                     </div>

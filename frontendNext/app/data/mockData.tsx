@@ -715,6 +715,31 @@ export function calculateDistance(
   return Math.round(distance * 10) / 10; // Round to 1 decimal place
 }
 
+// Xinyu's pages data
+export const mockLendingItems = [
+  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
+  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
+  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
+];
+
+export const complaintTypes = [
+  { value: "book-condition", label: "Book Condition" },
+  { value: "delivery", label: "Delivery Issue" },
+  { value: "user-behavior", label: "User Behavior" },
+  { value: "other", label: "Other" }
+];
+
+export const reviewTags = [
+  'Excellent communication',
+  'Fast response', 
+  'Book in great condition',
+  'Easy pickup/delivery',
+  'Very reliable',
+  'Friendly person',
+  'Flexible timing',
+  'Professional',
+];
+
 export interface Complaint {
   id: string;
   complainantId: string;
