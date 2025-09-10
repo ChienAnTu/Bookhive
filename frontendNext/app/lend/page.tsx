@@ -17,10 +17,10 @@ export default function LendingListPage() {
   const filteredBooks = useMemo(() => {
     let filtered = mockLendingItems;
     if (selectedFilter !== "all") {
-      filtered = filtered.filter((b) => b.status === selectedFilter);
+      filtered = filtered.filter((b: LendingItem) => b.status === selectedFilter);
     }
     if (search) {
-      filtered = filtered.filter((b) =>
+      filtered = filtered.filter((b: LendingItem) =>
         b.title.toLowerCase().includes(search.toLowerCase())
       );
     }
@@ -29,9 +29,9 @@ export default function LendingListPage() {
 
   const filterOptions = [
     { value: "all", label: "All", count: mockLendingItems.length },
-    { value: "Listed", label: "Listed", count: mockLendingItems.filter((b) => b.status === "Listed").length },
-    { value: "Unlisted", label: "Unlisted", count: mockLendingItems.filter((b) => b.status === "Unlisted").length },
-    { value: "LendOut", label: "Lend Out", count: mockLendingItems.filter((b) => b.status === "LendOut").length },
+    { value: "Listed", label: "Listed", count: mockLendingItems.filter((b: LendingItem) => b.status === "Listed").length },
+    { value: "Unlisted", label: "Unlisted", count: mockLendingItems.filter((b: LendingItem) => b.status === "Unlisted").length },
+    { value: "LendOut", label: "Lend Out", count: mockLendingItems.filter((b: LendingItem) => b.status === "LendOut").length },
   ];
 
   return (
@@ -94,7 +94,7 @@ export default function LendingListPage() {
                 </div>
               </Card>
             ) : (
-              filteredBooks.map((book) => (
+              filteredBooks.map((book: LendingItem) => (
                 <Card key={book.id}>
                   <div className="flex items-start justify-between">
                     <div>
