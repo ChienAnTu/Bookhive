@@ -866,3 +866,26 @@ export const getUserGivenComments = (userId: string): Comment[] => {
 export const getUserReceivedComments = (userId: string): Comment[] => {
   return mockComments.filter(comment => comment.revieweeId === userId);
 };
+
+// Complaint Types for Xinyu's complain page
+export const complaintTypes = [
+  "book-condition",
+  "delivery", 
+  "user-behavior",
+  "other"
+] as const;
+
+// Review Tags for comment/review functionality
+export const reviewTags = [
+  "friendly",
+  "responsive", 
+  "good condition",
+  "punctual",
+  "careful",
+  "trustworthy",
+  "helpful",
+  "organized",
+  "professional",
+  "smooth transaction",
+  "average condition"
+] as const;
