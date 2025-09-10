@@ -59,6 +59,13 @@ def create_complaint(
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
+    """
+    Use this API to create a new complaint.
+    Send complaint type, subject, description, and optionally related orderId or respondentId.
+    It will return the created complaint with status = "pending".
+
+    - respondendId is the one you're complaining about.
+    """
     c = ComplaintService.create(
         db,
         complainant_id=user.user_id,
@@ -79,6 +86,14 @@ def list_complaints(
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
+    """
+    GET /complaints?role=mine&status=pending
+
+    Use this API to list complaints.
+    - If role=mine, it shows complaints related to the current user (as complainant or respondent).
+    - If role=admin, it shows all complaints (requires admin user). -> You need admin account for this.
+    You can filter by status (pending, investigating, resolved, closed).
+    """
     if role == "admin" and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
         raise HTTPException(status_code=403, detail="Admin only")
     if role == "admin":                              # TODO: Change the admin to a proper judging logic
@@ -94,6 +109,14 @@ def get_complaint(
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
+    """
+    Use this API to view one complaint in detail.
+    It returns the complaint information plus all messages linked to it.
+    Only the complainant, respondent, or an admin can access it.
+
+    - complaint_id is auto-generated ID of this complaint.
+    """
+
     c = ComplaintService.get(db, complaint_id)
     if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -108,6 +131,13 @@ def add_message(
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
+    """
+    Use this API to add a message inside an existing complaint.
+    Provide the message body text.
+    The response will return the new message object with senderId and createdAt.
+    - complaint_id is auto-generated ID of this complaint.
+    """
+
     c = ComplaintService.get(db, complaint_id)
     if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -125,6 +155,14 @@ def resolve_complaint(
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
 ):
+    """
+    Use this API for admin users to handle a complaint.  -> You need admin account for this.
+    Send a new status (investigating, resolved, or closed) and optional adminResponse.
+    It will return the updated complaint record with the new status and admin notes.
+
+    - complaint_id is auto-generated ID of this complaint.
+    """
+
     if user.user_id != "admin":                 # TODO: Change the admin to a proper judging logic
         raise HTTPException(status_code=403, detail="Admin only")
     c = ComplaintService.admin_update(
