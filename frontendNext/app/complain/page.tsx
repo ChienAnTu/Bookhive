@@ -21,7 +21,8 @@ import {
   getCurrentUser,
   mockComplaints,
   mockBooks,
-  getUserById 
+  getUserById,
+  complaintTypes
 } from "@/app/data/mockData";
 
 type ComplaintStatus = "pending" | "investigating" | "resolved" | "closed";
@@ -131,7 +132,7 @@ export default function ComplainPage() {
     { value: "closed", label: "Closed", count: userComplaints.filter(c => c.status === "closed").length }
   ];
 
-  const complaintTypes: { value: ComplaintType; label: string }[] = [
+  const complaintTypeOptions: { value: ComplaintType; label: string }[] = [
     { value: "book-condition", label: "Book Condition" },
     { value: "delivery", label: "Delivery Issue" },
     { value: "user-behavior", label: "User Behavior" },
@@ -298,7 +299,7 @@ export default function ComplainPage() {
               onChange={(e) => setNewComplaint({...newComplaint, type: e.target.value as ComplaintType})}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              {complaintTypes.map((type) => (
+              {complaintTypeOptions.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>
