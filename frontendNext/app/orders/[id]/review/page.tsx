@@ -6,7 +6,7 @@ import { ArrowLeft, Star } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
 import Modal from '@/app/components/ui/Modal';
 import StarRating from '@/app/components/ui/StarRating';
-import { getCurrentUser, getOrderById, getUserById } from '@/app/data/mockData';
+import { getCurrentUser, getOrderById, getUserById, reviewTags } from '@/app/data/mockData';
 import { Comment } from '@/app/types';
 
 export default function OrderReviewPage() {

@@ -719,6 +719,42 @@ export function calculateDistance(
   return Math.round(distance * 10) / 10; // Round to 1 decimal place
 }
 
+// Lending data for lend page
+export interface LendingItem {
+  id: number;
+  title: string;
+  status: "Listed" | "Unlisted" | "LendOut";
+  listedDate: string;
+  dueDate?: string;
+  overdue?: boolean;
+}
+
+export const mockLendingItems: LendingItem[] = [
+  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
+  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
+  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
+];
+
+// Complaint types for complain page
+export const complaintTypes: { value: string; label: string }[] = [
+  { value: "book-condition", label: "Book Condition" },
+  { value: "delivery", label: "Delivery Issue" },
+  { value: "user-behavior", label: "User Behavior" },
+  { value: "other", label: "Other" }
+];
+
+// Review tags for review page
+export const reviewTags = [
+  'Excellent communication',
+  'Fast response',
+  'Book in great condition',
+  'Easy pickup/delivery',
+  'Very reliable',
+  'Friendly person',
+  'Flexible timing',
+  'Professional',
+];
+
 export interface Complaint {
   id: string;
   complainantId: string;
