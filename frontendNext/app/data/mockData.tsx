@@ -883,3 +883,19 @@ export const getUserGivenComments = (userId: string): Comment[] => {
 export const getUserReceivedComments = (userId: string): Comment[] => {
   return mockComments.filter(comment => comment.revieweeId === userId);
 };
+
+// Lending Items for lend page
+export interface LendingItem {
+  id: number;
+  title: string;
+  status: "Listed" | "Unlisted" | "LendOut";
+  listedDate: string;
+  dueDate?: string;
+  overdue?: boolean;
+}
+
+export const mockLendingItems: LendingItem[] = [
+  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
+  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
+  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
+];

@@ -6,21 +6,7 @@ import { Search, Filter, Clock, CheckCircle, XCircle, BookOpen } from "lucide-re
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-
-interface LendingItem {
-  id: number;
-  title: string;
-  status: "Listed" | "Unlisted" | "LendOut";
-  listedDate: string;
-  dueDate?: string;
-  overdue?: boolean;
-}
-
-const mockData: LendingItem[] = [
-  { id: 1, title: "Harry Potter 1", status: "Listed", listedDate: "2025-09-25" },
-  { id: 2, title: "Harry Potter 2", status: "LendOut", listedDate: "2025-09-25", dueDate: "2025-09-25" },
-  { id: 3, title: "Harry Potter 3", status: "Unlisted", listedDate: "2025-09-25" },
-];
+import { mockLendingItems, type LendingItem } from "@/app/data/mockData";
 
 type FilterStatus = "all" | "Listed" | "Unlisted" | "LendOut";
 
@@ -29,12 +15,12 @@ export default function LendingListPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
 
   const filteredBooks = useMemo(() => {
-    let filtered = mockData;
+    let filtered = mockLendingItems;
     if (selectedFilter !== "all") {
-      filtered = filtered.filter((b) => b.status === selectedFilter);
+      filtered = filtered.filter((b: LendingItem) => b.status === selectedFilter);
     }
     if (search) {
-      filtered = filtered.filter((b) =>
+      filtered = filtered.filter((b: LendingItem) =>
         b.title.toLowerCase().includes(search.toLowerCase())
       );
     }
@@ -42,10 +28,10 @@ export default function LendingListPage() {
   }, [search, selectedFilter]);
 
   const filterOptions = [
-    { value: "all", label: "All", count: mockData.length },
-    { value: "Listed", label: "Listed", count: mockData.filter((b) => b.status === "Listed").length },
-    { value: "Unlisted", label: "Unlisted", count: mockData.filter((b) => b.status === "Unlisted").length },
-    { value: "LendOut", label: "Lend Out", count: mockData.filter((b) => b.status === "LendOut").length },
+    { value: "all", label: "All", count: mockLendingItems.length },
+    { value: "Listed", label: "Listed", count: mockLendingItems.filter((b: LendingItem) => b.status === "Listed").length },
+    { value: "Unlisted", label: "Unlisted", count: mockLendingItems.filter((b: LendingItem) => b.status === "Unlisted").length },
+    { value: "LendOut", label: "Lend Out", count: mockLendingItems.filter((b: LendingItem) => b.status === "LendOut").length },
   ];
 
   return (
@@ -108,7 +94,7 @@ export default function LendingListPage() {
                 </div>
               </Card>
             ) : (
-              filteredBooks.map((book) => (
+              filteredBooks.map((book: LendingItem) => (
                 <Card key={book.id}>
                   <div className="flex items-start justify-between">
                     <div>
