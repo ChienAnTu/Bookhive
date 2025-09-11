@@ -5,13 +5,19 @@ import { useState } from "react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { Book } from "@/app/types/book";
-import { createBook } from "@/utils/books";
+import { createBook, uploadFile } from "@/utils/books";
 import { getCurrentUser } from "@/utils/auth";
 import { useRouter } from "next/navigation";
 
+type UploadedFile = {
+  file?: File;   // 本地文件（用于预览）
+  url: string;   // 后端返回的 URL
+
+};
+
 type FormState = Omit<Book, "id" | "ownerId" | "dateAdded" | "updateDate"> & {
-  coverFile: File | null;
-  conditionFiles: File[];
+  coverFile: UploadedFile | null;     // 封面 → 单个文件
+  conditionFiles: UploadedFile[];     // 条件图 → 多个文件
 };
 
 export default function AddBook() {
@@ -40,7 +46,7 @@ export default function AddBook() {
     conditionFiles: [],
   });
 
-const [tagsInput, setTagsInput] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
 
   const [showErrors, setShowErrors] = useState(false);
   const router = useRouter();
@@ -75,17 +81,58 @@ const [tagsInput, setTagsInput] = useState("");
   };
 
 
-  // upload cover page
-  const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setForm((prev) => ({ ...prev, coverFile: file }));
+  // upload image
+  // cover image
+  const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("The size of the picture cannot exceed 2MB");
+      return;
+    }
+
+    try {
+      const url = await uploadFile(file, "book");
+      setForm((prev) => ({
+        ...prev,
+        coverFile: { file, url },   // 包含 file + url
+        coverImgUrl: url,
+      }));
+    } catch (err) {
+      console.error("Cover image upload failed:", err);
+    }
   };
 
-  // upload condition file
-  const handleConditionFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setForm((prev) => ({ ...prev, conditionFiles: files }));
-  };
+  // condition files
+  const handleConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+
+  try {
+    const uploaded = await Promise.all(
+      files.map(async (file) => {
+        if (file.size > 2 * 1024 * 1024) {
+          alert("The size of the picture cannot exceed 2MB");
+          return null; // 返回 null
+        }
+        const url = await uploadFile(file, "book");
+        return { file, url }; // 返回对象
+      })
+    );
+
+    // 过滤掉 null
+    const valid = uploaded.filter((f): f is { file: File; url: string } => f !== null);
+
+    setForm((prev) => ({
+      ...prev,
+      conditionFiles: [...prev.conditionFiles, ...valid],
+    }));
+  } catch (err) {
+    console.error("Condition image upload failed:", err);
+  }
+};
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,15 +156,13 @@ const [tagsInput, setTagsInput] = useState("");
       author: form.author,
       category: form.category,
       description: form.description,
-      coverImgUrl: form.coverFile
-        ? URL.createObjectURL(form.coverFile)
-        : form.coverImgUrl || "https://via.placeholder.com/300x400?text=No+Cover",
+      coverImgUrl: form.coverFile?.url || "https://via.placeholder.com/300x400?text=No+Cover",
 
       ownerId: user.id,
 
       status: "listed",
       condition: form.condition as Book["condition"],
-      conditionImgURLs: form.conditionFiles.map((f) => URL.createObjectURL(f)),
+      conditionImgURLs: form.conditionFiles.map((f) => f.url),
 
       dateAdded: new Date().toISOString(),
       updateDate: new Date().toISOString(),
@@ -166,7 +211,7 @@ const [tagsInput, setTagsInput] = useState("");
       >
         <div className="lg:flex lg:divide-x lg:divide-gray-200">
 
-          {/* left：基本信息 / 元信息 / 图片 */}
+          {/* left*/}
           <div className="lg:w-1/2 lg:pr-8 space-y-6">
 
             {/* Title + Language */}
@@ -265,11 +310,11 @@ const [tagsInput, setTagsInput] = useState("");
             {/* Cover Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cover Image
+                Cover Image (max. 2MB)
               </label>
 
               <div className="flex items-center gap-4">
-                {/* 隐藏的 input */}
+                {/* hidded input */}
                 <input
                   type="file"
                   id="cover-upload"
@@ -288,19 +333,26 @@ const [tagsInput, setTagsInput] = useState("");
                   Upload Image
                 </Button>
 
-                {/* preview */}
+                {/* preview cover*/}
                 {form.coverFile && (
                   <img
-                    src={URL.createObjectURL(form.coverFile)}
+                    src={
+                      form.coverFile.url
+                        ? form.coverFile.url
+                        : form.coverFile.file
+                          ? URL.createObjectURL(form.coverFile.file)
+                          : ""
+                    }
                     alt="Preview"
                     className="h-20 w-16 object-cover rounded border"
                   />
                 )}
+
               </div>
             </div>
           </div>
 
-          {/* right：成色 / 交易设置 / 配送 */}
+          {/* right */}
           <div className="lg:w-1/2 lg:pl-8 space-y-6">
 
             {/* Description */}
@@ -340,10 +392,10 @@ const [tagsInput, setTagsInput] = useState("");
             {/* Condition Photos */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Condition Photos
+                Condition Photos (max. 2MB)
               </label>
 
-              {/* 隐藏的 input */}
+              {/* hidded input */}
               <input
                 type="file"
                 id="condition-upload"
@@ -363,17 +415,17 @@ const [tagsInput, setTagsInput] = useState("");
                 Upload Images
               </Button>
 
-              {/* preview */}
+              {/* preview condition imgs*/}
               <div className="flex gap-2 mt-2 flex-wrap">
-                {form.conditionFiles.map((file, index) => (
+                {form.conditionFiles.map((f, i) => (
                   <img
-                    key={index}
-                    src={URL.createObjectURL(file)}
-                    alt={`Condition ${index + 1}`}
+                    src={f.url || (f.file ? URL.createObjectURL(f.file) : "")}
+                    alt={`Condition ${i + 1}`}
                     className="h-20 w-16 object-cover rounded border"
                   />
                 ))}
               </div>
+
             </div>
 
             <hr className="my-6 border-gray-300" />

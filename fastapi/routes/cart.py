@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -62,7 +62,7 @@ def add_item_to_cart(
 
 @router.delete("/items", status_code=status.HTTP_200_OK)
 def remove_items_from_cart(
-    cart_item_ids: List[str],
+    cart_item_ids: List[str] = Body(...),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
