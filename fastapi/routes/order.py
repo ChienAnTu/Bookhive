@@ -61,6 +61,12 @@ async def create_order(
         # validate user
         owner = db.query(User).filter(User.user_id == order_data.owner_id).first()
         borrower = db.query(User).filter(User.user_id == order_data.borrower_id).first()
+        # check if borrower is current user
+        if current_user.user_id != order_data.borrower_id:
+            raise HTTPException(
+                status_code=403, 
+                detail="You are not allowed to create an order for another user"
+            )
         
         if not owner:
             raise HTTPException(status_code=404, detail="The owner doesn't exist")
