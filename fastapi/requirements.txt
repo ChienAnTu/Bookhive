@@ -11,3 +11,4 @@ email-validator
 PyMySQL
 websockets
 fastapi_mail
+Pillow
