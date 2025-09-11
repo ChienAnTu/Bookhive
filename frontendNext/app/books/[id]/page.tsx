@@ -3,19 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Star,
-  MapPin,
-  Clock,
-  ArrowLeft,
-  Share2,
-  MessageCircle,
-  Package,
-  Shield,
-  ShoppingBag,
-  Book as BookIcon,
-  Languages,
-} from "lucide-react";
+import { Star, MapPin, Clock, Share2, MessageCircle, Package, Shield, ShoppingBag, Book as BookIcon, Languages } from "lucide-react";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
@@ -27,7 +15,6 @@ import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
 import { getUserById } from "@/utils/auth";
-import { addItemToCart } from "@/utils/cart";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
@@ -49,7 +36,8 @@ export default function BookDetailPage() {
   const [owner, setOwner] = useState<User | null>(null);
 
   const addToCart = useCartStore((state) => state.addToCart);
-
+  const cart = useCartStore((state) => state.cart);
+  const alreadyInCart = cart.some((item) => item.bookId === book?.id);
 
   const distance = useMemo(() => {
     if (!owner?.coordinates || !currentUser?.coordinates) return 0;
@@ -186,35 +174,46 @@ export default function BookDetailPage() {
                 </div>
 
                 {/* Request This Book */}
+                {/* Request This Book */}
                 <div className="p-4 space-y-3">
                   <Button
                     onClick={async () => {
+                      if (!book) return;
+
+                      // 已在购物车
+                      if (alreadyInCart) {
+                        toast.error("This book is already in your cart");
+                        return;
+                      }
+
                       try {
-                        await addItemToCart({
-                          bookId: book.id,
-                          ownerId: book.ownerId,
-                          actionType: book.canRent ? "borrow" : "purchase",
-                          price: book.salePrice,
-                          deposit: book.deposit,
-                        });
-                        toast?.success?.("Added to cart");
+                        const result = await addToCart(book, book.canRent ? "borrow" : "purchase");
+                        if (result) {
+                          toast.success("Added to cart");
+                        } else {
+                          toast.error("Failed to add item");
+                        }
                       } catch (err) {
                         console.error("Failed to add item:", err);
-                        toast?.error?.("Failed to add item");
+                        toast.error("Failed to add item");
                       }
                     }}
                     className="w-full flex items-center justify-center space-x-2"
-                    disabled={book.status !== "listed" || (!book.canRent && !book.canSell)}
+                    disabled={
+                      alreadyInCart || book.status !== "listed" || (!book.canRent && !book.canSell)
+                    }
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>
-                      {book.status !== "listed"
-                        ? "Unlisted"
-                        : book.canRent
-                          ? "Request This Book"
-                          : book.canSell
-                            ? "Purchase Only"
-                            : "Unavailable"}
+                      {alreadyInCart
+                        ? "Already in Cart"
+                        : book.status !== "listed"
+                          ? "Unlisted"
+                          : book.canRent
+                            ? "Request This Book"
+                            : book.canSell
+                              ? "Purchase Only"
+                              : "Unavailable"}
                     </span>
                   </Button>
 

@@ -4,16 +4,17 @@ import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
 import { addItemToCart, removeItemsFromCart, getMyCart } from "@/utils/cart";
 
-export type CartItem = Book & { 
+export type CartItem = Book & {
   cartItemId: string;  // cart_item primary key
-  mode: "borrow" | "purchase" 
+  bookId: string;
+  mode: "borrow" | "purchase";
 };
 
 interface CartState {
   cart: CartItem[];
   loading: boolean;
   fetchCart: () => Promise<void>;
-  addToCart: (book: Book, preferredMode?: "borrow" | "purchase") => Promise<boolean>;
+  addToCart: (book: Book, preferredMode?: "borrow" | "purchase") => Promise<true | false | "duplicate">;
   removeFromCart: (cartItemIds: string[]) => Promise<void>;
   clearCart: () => void;
   setMode: (id: string, mode: "borrow" | "purchase") => void;
@@ -55,7 +56,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   // 添加到购物车
   addToCart: async (book, preferredMode) => {
     const { cart } = get();
-    if (cart.find((b) => b.id === book.id)) return true;
+
+    // ✅ 已存在，返回 "duplicate"
+    if (cart.some((b) => b.bookId === book.id)) {
+      return "duplicate";
+    }
 
     // 根据书的能力决定最终模式
     let finalMode: "borrow" | "purchase" | null = null;
@@ -67,7 +72,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
     if (!finalMode) return false;
 
-    // 调后端 API（注意这里要用 bookId，而不是 id）
+    // 调后端 API
     const res = await addItemToCart({
       bookId: book.id,
       ownerId: book.ownerId,
@@ -77,7 +82,10 @@ export const useCartStore = create<CartState>((set, get) => ({
     });
 
     // 更新本地 store
-    set({ cart: [...cart, { ...book, cartItemId: res.cartItemId, mode: finalMode }] });
+    set((state) => ({
+      cart: [...state.cart, { ...book, bookId: book.id, cartItemId: res.cartItemId, mode: finalMode }],
+    }));
+
     return true;
   },
 
