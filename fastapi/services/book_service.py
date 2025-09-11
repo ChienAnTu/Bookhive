@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Tuple, List, Dict, Any, Literal
 from uuid import uuid4
 from datetime import datetime
+import shlex
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, and_
@@ -150,14 +151,26 @@ class BookService:
             stmt = stmt.where(Book.status == status)
 
         # Keywords (title/author/description)
+        # if q:
+        #     kw = f"%{q.strip()}%"
+        #     stmt = stmt.where(or_(
+        #         Book.title_or.ilike(kw),
+        #         Book.title_en.ilike(kw),
+        #         Book.author.ilike(kw),
+        #         Book.description.ilike(kw)
+        #     ))
+        # Keywords (title/author/description)
         if q:
-            kw = f"%{q.strip()}%"
-            stmt = stmt.where(or_(
-                Book.title_or.ilike(kw),
-                Book.title_en.ilike(kw),
-                Book.author.ilike(kw),
-                Book.description.ilike(kw)
-            ))
+            tokens = [t for t in shlex.split(q.strip()) if t]
+            for tok in tokens:
+                like = f"%{tok}%"
+                stmt = stmt.where(or_(
+                    Book.title_or.ilike(like),
+                    Book.title_en.ilike(like),
+                    Book.author.ilike(like),
+                    Book.description.ilike(like),
+                ))
+
 
         # Language
         if lang:
