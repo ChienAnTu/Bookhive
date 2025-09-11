@@ -147,6 +147,75 @@ authentication:
 ## Messaging System
 The messaging system allows users to send private messages in real-time using WebSockets, with persistence in the database, read receipts, and unread counts.
 
+### Image Attachments
+- Messages can include an optional image attachment. The server validates image type/size and stores files under `/media/messageAttachments/{sender_id}/`.
+- Responses and WebSocket payloads include `image_url` when an image is attached.
+
+#### DB Migration
+Run this against your existing MySQL database to support image messages (if u have already created the table in mysql, otherwise, just execute the .sql file in docs will do the job):
+```sql
+ALTER TABLE `messages`
+  MODIFY `content` varchar(1000) NULL,
+  ADD COLUMN `image_path` varchar(255) NULL AFTER `content`;
+```
+
+If recreating the table, ensure `content` is nullable and `image_path` exists.
+
+#### Dependencies
+Install Pillow (used for image validation):
+```
+pip install Pillow
+```
+Already added in `requirements.txt`.
+
+#### Endpoint: Send Message With Image
+- **POST /api/v1/messages/send-with-image**
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Content-Type**: `multipart/form-data`
+  - **Form fields**:
+    - `receiver_email` (string, required)
+    - `content` (string, optional)
+    - `file` (image file, required)
+  - **Notes**: Accepts png, jpg/jpeg, gif, webp up to 5MB.
+  - **Example (curl)**:
+    ```bash
+    curl -X POST "http://localhost:8000/api/v1/messages/send-with-image" \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -F "receiver_email=user@example.com" \
+      -F "content=Check this out" \
+      -F "file=@/path/to/image.jpg"
+    ```
+  - **Example Response**:
+    ```json
+    {
+      "message_id": "uuid",
+      "sender_email": "alice@example.com",
+      "receiver_email": "user@example.com",
+      "content": "Check this out",
+      "image_url": "/media/messageAttachments/<sender_id>/<filename>.jpg",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "is_read": false
+    }
+    ```
+
+#### File Storage
+- Files are saved to `fastapi/media/messageAttachments/{sender_id}/{uuid.ext}`.
+- Static files are served under `/media` (configured in `main.py`). You can open the `image_url` in the browser to verify upload success.
+
+#### WebSocket Payload
+When a message is sent, receivers connected via WebSocket get:
+```json
+{
+  "type": "message",
+  "data": {
+    "sender_email": "alice@example.com",
+    "content": "Hello",
+    "image_url": "/media/messageAttachments/<sender_id>/<filename>.jpg",
+    "timestamp": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
 ### Setup
 1. **Install Dependencies**:
    - Ensure `websockets` is installed: `pip install websockets`.
