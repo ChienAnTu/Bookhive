@@ -151,7 +151,6 @@ class BookService:
         if status != "all":
             stmt = stmt.where(Book.status == status)
 
-        
         # Compound keywords (title/author/description/ISBN)
         if q:
             tokens = [t for t in shlex.split(q.strip()) if t]
