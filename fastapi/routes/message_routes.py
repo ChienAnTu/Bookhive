@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, WebSocketException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Query, WebSocketException, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
+import uuid
+from pathlib import Path
+from PIL import Image
+import io
 import json
 
 from core.dependencies import get_db, get_current_user
@@ -15,13 +19,14 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
 
 class MessageCreate(BaseModel):
     receiver_email: str
-    content: str
+    content: str | None = None
 
 class MessageResponse(BaseModel):
     message_id: str
     sender_email: str
     receiver_email: str
-    content: str
+    content: str | None
+    image_url: str | None
     timestamp: str
     is_read: bool
 
@@ -84,6 +89,7 @@ async def send_message(
         "data": {
             "sender_email": current_user.email,
             "content": message.content,
+            "image_url": message.image_path,
             "timestamp": message.timestamp.isoformat()
         }
     }
@@ -94,6 +100,7 @@ async def send_message(
         sender_email=current_user.email,
         receiver_email=message_data.receiver_email,
         content=message.content,
+        image_url=message.image_path,
         timestamp=message.timestamp.isoformat(),
         is_read=message.is_read
     )
@@ -116,6 +123,7 @@ def get_conversation(
             sender_email=db.query(User).filter(User.user_id == m.sender_id).first().email,
             receiver_email=db.query(User).filter(User.user_id == m.receiver_id).first().email,
             content=m.content,
+            image_url=m.image_path,
             timestamp=m.timestamp.isoformat(),
             is_read=m.is_read
         ) for m in messages
@@ -197,3 +205,79 @@ async def websocket_endpoint(
             # Handle incoming messages if needed, but for now, assuming sends are via HTTP
     except WebSocketDisconnect:
         manager.disconnect(current_user.user_id)
+
+# ---- Image upload for messages ----
+
+MESSAGE_ATTACHMENTS_ROOT = Path(__file__).resolve().parent.parent / "media" / "messageAttachments"
+MESSAGE_ATTACHMENTS_ROOT.mkdir(parents=True, exist_ok=True)
+
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_IMAGE_EXT = {"png", "jpg", "jpeg", "gif", "webp"}
+
+def _detect_image_ext(data: bytes) -> str | None:
+    try:
+        img = Image.open(io.BytesIO(data))
+        fmt = (img.format or "").lower()
+        return "jpg" if fmt == "jpeg" else fmt
+    except Exception:
+        return None
+
+def _safe_segment(s: str) -> str:
+    return "".join(ch for ch in s if ch.isalnum() or ch in "-_") or "user"
+
+@router.post("/send-with-image", response_model=MessageResponse)
+async def send_message_with_image(
+    receiver_email: str = Form(...),
+    content: str | None = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Send a message with an image attachment. Content is optional."""
+    receiver = db.query(User).filter(User.email == receiver_email).first()
+    if not receiver:
+        raise HTTPException(status_code=404, detail="Receiver not found")
+
+    # Read and validate file
+    data = await file.read()
+    if len(data) == 0:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (>5MB)")
+    ext = _detect_image_ext(data)
+    if ext not in ALLOWED_IMAGE_EXT:
+        raise HTTPException(status_code=400, detail="Unsupported or invalid image")
+
+    # Save under sender-based directory
+    sender_id = _safe_segment(current_user.user_id)
+    user_dir = MESSAGE_ATTACHMENTS_ROOT / sender_id
+    user_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    save_path = user_dir / filename
+    save_path.write_bytes(data)
+
+    public_path = f"/media/messageAttachments/{sender_id}/{filename}"
+
+    service = MessageService(db)
+    message = service.send_message(current_user.user_id, receiver.user_id, content, image_path=public_path)
+
+    ws_message = {
+        "type": "message",
+        "data": {
+            "sender_email": current_user.email,
+            "content": message.content,
+            "image_url": message.image_path,
+            "timestamp": message.timestamp.isoformat()
+        }
+    }
+    await manager.send_personal_message(ws_message, receiver.user_id)
+
+    return MessageResponse(
+        message_id=message.message_id,
+        sender_email=current_user.email,
+        receiver_email=receiver_email,
+        content=message.content,
+        image_url=message.image_path,
+        timestamp=message.timestamp.isoformat(),
+        is_read=message.is_read
+    )
