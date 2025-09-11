@@ -48,7 +48,7 @@ app.include_router(books_router)
 
 
 # cart router
-app.include_router(cart_router)
+app.include_router(cart_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
