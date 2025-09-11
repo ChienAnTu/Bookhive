@@ -3,6 +3,7 @@ from typing import Optional, Tuple, List, Dict, Any, Literal
 from uuid import uuid4
 from datetime import datetime
 import shlex
+import re
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, and_
@@ -150,27 +151,28 @@ class BookService:
         if status != "all":
             stmt = stmt.where(Book.status == status)
 
-        # Keywords (title/author/description)
-        # if q:
-        #     kw = f"%{q.strip()}%"
-        #     stmt = stmt.where(or_(
-        #         Book.title_or.ilike(kw),
-        #         Book.title_en.ilike(kw),
-        #         Book.author.ilike(kw),
-        #         Book.description.ilike(kw)
-        #     ))
-        # Keywords (title/author/description)
+        
+        # Compound keywords (title/author/description/ISBN)
         if q:
             tokens = [t for t in shlex.split(q.strip()) if t]
+            # From database book table remove '-', ' ' from ISBN to pure digits
+            isbn_norm = func.replace(func.replace(Book.isbn, '-', ''), ' ', '')
+
             for tok in tokens:
                 like = f"%{tok}%"
-                stmt = stmt.where(or_(
+                tok_digits = re.sub(r"\D", "", tok)  # An digits-only token for ISBN searching
+
+                per_token_or = or_(
                     Book.title_or.ilike(like),
                     Book.title_en.ilike(like),
                     Book.author.ilike(like),
                     Book.description.ilike(like),
-                ))
 
+                    # Use both LIKE and == to query ISBN
+                    Book.isbn.ilike(like),
+                    (isbn_norm == tok_digits) if tok_digits and len(tok_digits) in (10, 13) else False,
+                )
+                stmt = stmt.where(per_token_or)
 
         # Language
         if lang:
