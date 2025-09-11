@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any, Literal
 from uuid import uuid4
 from datetime import datetime
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_
 
 from models.book import Book
 
@@ -132,3 +132,97 @@ class BookService:
             raise HTTPException(status_code=403, detail="Not the owner")
         db.delete(book)
         db.commit()
+
+    # ---------- Search ----------
+    @staticmethod
+    def search_books(
+        db: Session, *, q: Optional[str], lang: Optional[str], status: str,
+        can_rent: Optional[bool], can_sell: Optional[bool],
+        delivery: Optional[str], min_price: Optional[float], max_price: Optional[float],
+        sort: Literal["relevance","newest","price_asc","price_desc"],
+        page: int, page_size: int
+    ) -> Tuple[list[dict], int]:
+
+        stmt = select(Book)
+
+        # Status
+        if status != "all":
+            stmt = stmt.where(Book.status == status)
+
+        # Keywords (title/author/description)
+        if q:
+            kw = f"%{q.strip()}%"
+            stmt = stmt.where(or_(
+                Book.title_or.ilike(kw),
+                Book.title_en.ilike(kw),
+                Book.author.ilike(kw),
+                Book.description.ilike(kw)
+            ))
+
+        # Language
+        if lang:
+            stmt = stmt.where(Book.original_language == lang)
+
+        # For lend / For sell
+        if can_rent is not None:
+            stmt = stmt.where(Book.can_rent == can_rent)
+        if can_sell is not None:
+            stmt = stmt.where(Book.can_sell == can_sell)
+
+        # Delivery method (post/pickup/both)
+        if delivery and delivery != "any":
+            if delivery == "delivery":
+                delivery = "post"
+            if delivery == "self_pickup":
+                delivery = "pickup"
+            stmt = stmt.where(or_(
+                Book.delivery_method == delivery,
+                Book.delivery_method == "both"
+            ))
+
+        # Price range (sale_price OR rent deposit)
+        if min_price is not None:
+            stmt = stmt.where(or_(
+                Book.sale_price >= min_price,
+                Book.deposit    >= min_price
+            ))
+        if max_price is not None:
+            stmt = stmt.where(or_(
+                Book.sale_price <= max_price,
+                Book.deposit    <= max_price
+            ))
+
+        # Ordering
+        if sort == "newest":
+            stmt = stmt.order_by(Book.date_added.desc())
+        elif sort == "price_asc":
+            stmt = stmt.order_by(func.coalesce(Book.sale_price, Book.deposit).asc())
+        elif sort == "price_desc":
+            stmt = stmt.order_by(func.coalesce(Book.sale_price, Book.deposit).desc())
+        else:
+            stmt = stmt.order_by(Book.date_added.desc())
+
+        # Total
+        total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
+
+        # Pagination
+        offset = (page - 1) * page_size
+        rows = db.execute(stmt.offset(offset).limit(page_size)).scalars().all()
+
+        # Transfer to frontend structure
+        def to_read(b: Book):
+            return {
+                "id": b.id,
+                "titleOr": b.title_or,
+                "author": b.author,
+                "status": b.status,
+                "coverImgUrl": b.cover_img_url,
+                "canRent": b.can_rent,
+                "canSell": b.can_sell,
+                "deposit": float(b.deposit) if b.deposit is not None else None,
+                "salePrice": float(b.sale_price) if b.sale_price is not None else None,
+                "deliveryMethod": b.delivery_method,
+                "ownerId": b.owner_id,
+                "createdAt": b.date_added,
+            }
+        return [to_read(b) for b in rows], total
