@@ -129,6 +129,31 @@ def list_books(
     items, total = BookService.list(db, page, page_size, q, author, category, owner_id, status)
     return {"items": [_to_read(b) for b in items], "total": total, "page": page, "page_size": page_size}
 
+
+# -------- Search --------
+@router.get("/search")
+def search_books(
+    q: Optional[str] = Query(None, description="keyword in title/author/desc"),
+    lang: Optional[str] = Query(None),
+    status: Literal["listed","unlisted","all"] = "listed",
+    canRent: Optional[bool] = None,
+    canSell: Optional[bool] = None,
+    delivery: Literal["any","post","pickup","both"] = "any",
+    minPrice: Optional[float] = None,
+    maxPrice: Optional[float] = None,
+    sort: Literal["relevance","newest","price_asc","price_desc"] = "relevance",
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+):
+    items, total = BookService.search_books(
+        db=db, q=q, lang=lang, status=status, can_rent=canRent, can_sell=canSell,
+        delivery=delivery, min_price=minPrice, max_price=maxPrice,
+        sort=sort, page=page, page_size=page_size
+    )
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
 # -------- Get by ID --------
 @router.get("/{book_id}", response_model=dict)
 def get_book(book_id: str, db: Session = Depends(get_db)):
@@ -163,3 +188,5 @@ def delete_book(
 ):
     BookService.delete(db, book_id, user.user_id)
     return None
+
+
