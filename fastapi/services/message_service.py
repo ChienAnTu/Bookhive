@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from models.message import Message
@@ -12,13 +13,20 @@ class MessageService:
         """Generate unique message ID"""
         return str(uuid.uuid4())[:25]
 
-    def send_message(self, sender_id: str, receiver_id: str, content: str) -> Message:
-        """Create and save a new message to database"""
+    def send_message(self, sender_id: str, receiver_id: str, content: Optional[str] = None, image_path: Optional[str] = None) -> Message:
+        """Create and save a new message to database with optional image attachment.
+
+        At least one of content or image_path must be provided.
+        """
+        if (content is None or content.strip() == "") and (image_path is None or image_path.strip() == ""):
+            raise ValueError("Message must contain text content or an image attachment")
+
         message = Message(
             message_id=self.generate_message_id(),
             sender_id=sender_id,
             receiver_id=receiver_id,
-            content=content
+            content=(content if (content is not None and content.strip() != "") else None),
+            image_path=(image_path if (image_path is not None and image_path.strip() != "") else None)
         )
         self.db.add(message)
         self.db.commit()
