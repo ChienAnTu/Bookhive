@@ -327,7 +327,7 @@ export default function BookDetailPage() {
               </Card>
 
               {/* owner info */}
-              {/* {owner && (
+              {owner && (
                 <Card>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Book Owner</h3>
                   <div className="flex items-center space-x-4">
@@ -377,7 +377,7 @@ export default function BookDetailPage() {
 
                   </div>
                 </Card>
-              )} */}
+              )}
             </div>
           </div>
         </div>
