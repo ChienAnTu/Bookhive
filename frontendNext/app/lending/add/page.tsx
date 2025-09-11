@@ -10,14 +10,14 @@ import { getCurrentUser } from "@/utils/auth";
 import { useRouter } from "next/navigation";
 
 type UploadedFile = {
-  file?: File;   // 本地文件（用于预览）
-  url: string;   // 后端返回的 URL
+  file?: File;
+  url: string;
 
 };
 
 type FormState = Omit<Book, "id" | "ownerId" | "dateAdded" | "updateDate"> & {
-  coverFile: UploadedFile | null;     // 封面 → 单个文件
-  conditionFiles: UploadedFile[];     // 条件图 → 多个文件
+  coverFile: UploadedFile | null;
+  conditionFiles: UploadedFile[];
 };
 
 export default function AddBook() {
@@ -66,6 +66,33 @@ export default function AddBook() {
         };
       }
 
+      // choose language
+      if (name === "originalLanguage") {
+        let updated = { ...prev, originalLanguage: value };
+
+        // if language = English and TitleEn is null, then syn titleOr
+        if (value === "English" && !prev.titleEn) {
+          updated.titleEn = prev.titleOr;
+        }
+        return updated;
+      }
+
+      if (name === "titleOr") {
+        let updated = { ...prev, titleOr: value };
+
+        if (prev.originalLanguage === "English" && !prev.titleEn) {
+          updated.titleEn = value;
+        }
+        return updated;
+      }
+
+      if (name === "tags") {
+        return {
+          ...prev,
+          tags: value.split(",").map((t) => t.trim()).filter(Boolean),
+        };
+      }
+
       if (["deposit", "salePrice", "publishYear", "maxLendingDays"].includes(name)) {
         return {
           ...prev,
@@ -95,7 +122,7 @@ export default function AddBook() {
       const url = await uploadFile(file, "book");
       setForm((prev) => ({
         ...prev,
-        coverFile: { file, url },   // 包含 file + url
+        coverFile: { file, url },   // file + url
         coverImgUrl: url,
       }));
     } catch (err) {
@@ -105,34 +132,42 @@ export default function AddBook() {
 
   // condition files
   const handleConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files || []);
-  if (!files.length) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-  try {
-    const uploaded = await Promise.all(
-      files.map(async (file) => {
-        if (file.size > 2 * 1024 * 1024) {
-          alert("The size of the picture cannot exceed 2MB");
-          return null; // 返回 null
-        }
-        const url = await uploadFile(file, "book");
-        return { file, url }; // 返回对象
-      })
-    );
+    try {
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          if (file.size > 2 * 1024 * 1024) {
+            alert("The size of the picture cannot exceed 2MB");
+            return null;
+          }
+          const url = await uploadFile(file, "book");
+          return { file, url };
+        })
+      );
 
-    // 过滤掉 null
-    const valid = uploaded.filter((f): f is { file: File; url: string } => f !== null);
+      const valid = uploaded.filter((f): f is { file: File; url: string } => f !== null);
 
-    setForm((prev) => ({
-      ...prev,
-      conditionFiles: [...prev.conditionFiles, ...valid],
-    }));
-  } catch (err) {
-    console.error("Condition image upload failed:", err);
-  }
-};
+      setForm((prev) => ({
+        ...prev,
+        conditionFiles: [...prev.conditionFiles, ...valid],
+      }));
+    } catch (err) {
+      console.error("Condition image upload failed:", err);
+    }
+  };
 
-
+  // remove condition files
+  const handleRemoveConditionFile = (index: number) => {
+    setForm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        conditionFiles: prev.conditionFiles.filter((_, i) => i !== index),
+      };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,7 +252,7 @@ export default function AddBook() {
             {/* Title + Language */}
             <div className="flex gap-2 items-start">
               <Input
-                label="Title - Origin*"
+                label="Title (Original Language)*"
                 name="titleOr"
                 value={form.titleOr}
                 onChange={handleChange}
@@ -245,7 +280,7 @@ export default function AddBook() {
 
             {/* Title En */}
             <Input
-              label="Title - En*"
+              label="Title (English)*"
               name="titleEn"
               value={form.titleEn}
               onChange={handleChange}
@@ -295,7 +330,7 @@ export default function AddBook() {
               name="isbn"
               value={form.isbn}
               onChange={handleChange}
-              placeholder="Optional-International Standard Book Number"
+              placeholder="International Standard Book Number"
             />
 
             {/* Publish Year */}
@@ -418,11 +453,21 @@ export default function AddBook() {
               {/* preview condition imgs*/}
               <div className="flex gap-2 mt-2 flex-wrap">
                 {form.conditionFiles.map((f, i) => (
-                  <img
-                    src={f.url || (f.file ? URL.createObjectURL(f.file) : "")}
-                    alt={`Condition ${i + 1}`}
-                    className="h-20 w-16 object-cover rounded border"
-                  />
+                  <div key={i} className="relative">
+                    <img
+                      src={f.url || (f.file ? URL.createObjectURL(f.file) : "")}
+                      alt={`Condition ${i + 1}`}
+                      className="h-20 w-16 object-cover rounded border"
+                    />
+                    {/* delete */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveConditionFile(i)}
+                      className="absolute top-0 right-0 bg-red-600 text-white text-xs rounded-full px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ))}
               </div>
 
