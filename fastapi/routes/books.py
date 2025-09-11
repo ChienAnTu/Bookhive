@@ -133,7 +133,7 @@ def list_books(
 # -------- Search --------
 @router.get("/search")
 def search_books(
-    q: Optional[str] = Query(None, description="keyword in title/author/desc"),
+    q: Optional[str] = Query(None, description="keyword in title/author/description/ISBN"),
     lang: Optional[str] = Query(None),
     status: Literal["listed","unlisted","all"] = "listed",
     canRent: Optional[bool] = None,
