@@ -181,12 +181,15 @@ export default function LendingListPage() {
                         className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <button
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => router.push(`/lending/edit/${book.id}`)}
-                        >
-                          Edit
-                        </button>
+                        {(book.status === "listed" || book.status === "unlisted") && (
+                          <button
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => router.push(`/lending/edit/${book.id}`)}
+                          >
+                            Edit
+                          </button>
+                        )}
+
                         <button
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => router.push(`/borrowing/${book.id}/history`)}

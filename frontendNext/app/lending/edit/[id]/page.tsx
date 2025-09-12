@@ -5,14 +5,18 @@ import { useState, useEffect } from "react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { Book } from "@/app/types/book";
-import { getBookById, updateBook } from "@/utils/books";
+import { getBookById, updateBook, uploadFile } from "@/utils/books";
 import { getCurrentUser } from "@/utils/auth";
 import { useRouter, useParams } from "next/navigation";
 
+type UploadedFile = {
+  file?: File;
+  url: string;
+};
 
 type FormState = Omit<Book, "id" | "ownerId" | "dateAdded" | "updateDate"> & {
-  coverFile: File | null;
-  conditionFiles: File[];
+  coverFile: UploadedFile | null;
+  conditionFiles: UploadedFile[];
 };
 
 export default function EditBookPage() {
@@ -54,10 +58,10 @@ export default function EditBookPage() {
         salePrice: b.salePrice,
         deposit: b.deposit,
 
-        // 本地上传控件
-        coverFile: null,
-        conditionFiles: [],
+        coverFile: b.coverImgUrl ? { url: b.coverImgUrl } : null,
+        conditionFiles: (b.conditionImgURLs || []).map((url) => ({ url })),
       });
+
       setTagsInput((b.tags ?? []).join(", "));
       setLoading(false);
     })();
@@ -67,7 +71,6 @@ export default function EditBookPage() {
     return <div className="p-6">Loading…</div>;
   }
 
-  // 通用输入
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -75,6 +78,7 @@ export default function EditBookPage() {
 
     setForm((prev) => {
       if (!prev) return prev;
+
       if (["deposit", "salePrice", "publishYear", "maxLendingDays"].includes(name)) {
         return { ...prev, [name]: value ? Number(value) : undefined };
       }
@@ -82,17 +86,61 @@ export default function EditBookPage() {
     });
   };
 
-  // 封面/成色图文件
-  const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setForm((prev) => (prev ? { ...prev, coverFile: file } : prev));
-  };
-  const handleConditionFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setForm((prev) => (prev ? { ...prev, conditionFiles: files } : prev));
+  // upload cover
+  const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("The size of the picture cannot exceed 2MB");
+      return;
+    }
+    const url = await uploadFile(file, "book");
+    setForm((prev) =>
+      prev ? { ...prev, coverFile: { file, url }, coverImgUrl: url } : prev
+    );
   };
 
-  // 提交：update 而不是 create
+  // upload condition imgs
+  const handleConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const uploaded = await Promise.all(
+      files.map(async (file) => {
+        if (file.size > 2 * 1024 * 1024) {
+          alert("The size of the picture cannot exceed 2MB");
+          return null;
+        }
+        const url = await uploadFile(file, "book");
+        return { file, url } as UploadedFile;
+      })
+    );
+
+    const valid: UploadedFile[] = uploaded.filter(
+      (f): f is UploadedFile => f !== null
+    );
+
+    setForm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        conditionFiles: [...prev.conditionFiles, ...valid],
+      };
+    });
+
+  };
+
+  // remove condition files
+  const handleRemoveConditionFile = (index: number) => {
+  setForm((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      conditionFiles: prev.conditionFiles.filter((_, i) => i !== index),
+    };
+  });
+};
+
+  // update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -107,17 +155,6 @@ export default function EditBookPage() {
       return;
     }
 
-    // 如果需要真实上传图片，放开下面注释，先 upload 再把 URL 写回 payload
-    let coverImgUrl = form.coverImgUrl;
-    // if (form.coverFile) {
-    //   coverImgUrl = await uploadFile(form.coverFile, "books/covers");
-    // }
-    let conditionImgURLs = form.conditionImgURLs ?? [];
-    // if (form.conditionFiles.length) {
-    //   const urls = await Promise.all(form.conditionFiles.map(f => uploadFile(f, "books/conditions")));
-    //   conditionImgURLs = urls;
-    // }
-
     const payload: Partial<Book> = {
       titleOr: form.titleOr,
       titleEn: form.titleEn,
@@ -125,8 +162,8 @@ export default function EditBookPage() {
       author: form.author,
       category: form.category,
       description: form.description,
-      coverImgUrl,
-      conditionImgURLs,
+      coverImgUrl: form.coverFile?.url || "",
+      conditionImgURLs: form.conditionFiles.map((f) => f.url),
       status: form.status,
       condition: form.condition,
       canRent: form.canRent,
@@ -158,13 +195,13 @@ export default function EditBookPage() {
       >
         <div className="lg:flex lg:divide-x lg:divide-gray-200">
 
-          {/* left：基本信息 / 元信息 / 图片 */}
+          {/* left */}
           <div className="lg:w-1/2 lg:pr-8 space-y-6">
 
             {/* Title + Language */}
             <div className="flex gap-2 items-start">
               <Input
-                label="Title - Origin*"
+                label="Title (Original Language)*"
                 name="titleOr"
                 value={form.titleOr}
                 onChange={handleChange}
@@ -192,7 +229,7 @@ export default function EditBookPage() {
 
             {/* Title En */}
             <Input
-              label="Title - En*"
+              label="Title (English)*"
               name="titleEn"
               value={form.titleEn}
               onChange={handleChange}
@@ -242,7 +279,7 @@ export default function EditBookPage() {
               name="isbn"
               value={form.isbn}
               onChange={handleChange}
-              placeholder="Optional-International Standard Book Number"
+              placeholder="International Standard Book Number"
             />
 
             {/* Publish Year */}
@@ -257,7 +294,7 @@ export default function EditBookPage() {
             {/* Cover Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cover Image
+                Cover Image (max. 2MB)
               </label>
 
               <div className="flex items-center gap-4">
@@ -283,7 +320,13 @@ export default function EditBookPage() {
                 {/* preview */}
                 {form.coverFile && (
                   <img
-                    src={URL.createObjectURL(form.coverFile)}
+                    src={
+                      form.coverFile.url
+                        ? form.coverFile.url
+                        : form.coverFile.file
+                          ? URL.createObjectURL(form.coverFile.file)
+                          : ""
+                    }
                     alt="Preview"
                     className="h-20 w-16 object-cover rounded border"
                   />
@@ -292,7 +335,7 @@ export default function EditBookPage() {
             </div>
           </div>
 
-          {/* right：成色 / 交易设置 / 配送 */}
+          {/* right */}
           <div className="lg:w-1/2 lg:pl-8 space-y-6">
 
             {/* Description */}
@@ -332,10 +375,10 @@ export default function EditBookPage() {
             {/* Condition Photos */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Condition Photos
+                Condition Photos (max. 2MB)
               </label>
 
-              {/* 隐藏的 input */}
+              {/* hidded input */}
               <input
                 type="file"
                 id="condition-upload"
@@ -357,15 +400,25 @@ export default function EditBookPage() {
 
               {/* preview */}
               <div className="flex gap-2 mt-2 flex-wrap">
-                {form.conditionFiles.map((file, index) => (
-                  <img
-                    key={index}
-                    src={URL.createObjectURL(file)}
-                    alt={`Condition ${index + 1}`}
-                    className="h-20 w-16 object-cover rounded border"
-                  />
-                ))}
-              </div>
+  {form.conditionFiles.map((f, i) => (
+    <div key={i} className="relative">
+      <img
+        src={f.url || (f.file ? URL.createObjectURL(f.file) : "")}
+        alt={`Condition ${i + 1}`}
+        className="h-20 w-16 object-cover rounded border"
+      />
+      {/* delete */}
+      <button
+        type="button"
+        onClick={() => handleRemoveConditionFile(i)}
+        className="absolute top-0 right-0 bg-red-600 text-white text-xs rounded-full px-1"
+      >
+        ✕
+      </button>
+    </div>
+  ))}
+</div>
+
             </div>
 
             <hr className="my-6 border-gray-300" />
@@ -377,7 +430,7 @@ export default function EditBookPage() {
               </label>
 
               <div className="space-y-4">
-                {/* Sell 区块 */}
+                {/* Sell */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2">
                     <input
@@ -389,7 +442,7 @@ export default function EditBookPage() {
                     Sell
                   </label>
 
-                  {/* 仅当 canSell = true 时显示 & 必填 */}
+                  {/* canSell = true */}
                   {form.canSell && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
@@ -404,7 +457,7 @@ export default function EditBookPage() {
                   )}
                 </div>
 
-                {/* Rent 区块 */}
+                {/* Rent */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2">
                     <input
@@ -416,7 +469,7 @@ export default function EditBookPage() {
                     Lend Out
                   </label>
 
-                  {/* 仅当 canRent = true 时显示 & 必填 */}
+                  {/* when canRent = true */}
                   {form.canRent && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
@@ -497,12 +550,12 @@ export default function EditBookPage() {
           </div>
         </div>
 
-        {/* 提交区：占满两列 */}
+        {/* Save change */}
         <div className="lg:col-span-2">
           <hr className="my-4 border-gray-200" />
           <div className="flex justify-end">
             <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto">
-              Submit
+              Save
             </Button>
           </div>
         </div>

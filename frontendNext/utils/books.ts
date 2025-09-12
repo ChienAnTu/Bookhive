@@ -78,6 +78,8 @@ export const getBookById = async (bookId: string): Promise<Book | null> => {
     const res = await axios.get(`${API_URL}/api/v1/books/${bookId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+      console.log("Response status:", res.status);
+
     return res.data as Book;
   } catch (err) {
     console.error("Get Book By Id failed:", err);
@@ -85,21 +87,26 @@ export const getBookById = async (bookId: string): Promise<Book | null> => {
   }
 };
 
-// Upload image
-export const uploadFile = async (file: File, folder: string): Promise<string> => {
+// Upload images
+export async function uploadFile (file: File, scene: string): Promise<string> {
   const API_URL = getApiUrl();
+  const token = getToken();
+
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("scene", scene);
 
-  const res = await axios.post(`${API_URL}/api/v1/upload/${folder}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-    },
-  });
+  const res = await axios.post(`${API_URL}/upload/image`, formData, {
+  headers: {
+    "Content-Type": "multipart/form-data",
+    Authorization: `Bearer ${token}`,
+  },
+});
 
-  return res.data.url; // return URL
-};
+
+  // return a URL
+  return `${API_URL}${res.data.path}`; 
+}
 
 // Update book
 export async function updateBook(bookId: string, payload: Partial<Book>) {

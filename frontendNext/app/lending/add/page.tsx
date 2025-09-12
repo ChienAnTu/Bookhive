@@ -5,13 +5,19 @@ import { useState } from "react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { Book } from "@/app/types/book";
-import { createBook } from "@/utils/books";
+import { createBook, uploadFile } from "@/utils/books";
 import { getCurrentUser } from "@/utils/auth";
 import { useRouter } from "next/navigation";
 
+type UploadedFile = {
+  file?: File;
+  url: string;
+
+};
+
 type FormState = Omit<Book, "id" | "ownerId" | "dateAdded" | "updateDate"> & {
-  coverFile: File | null;
-  conditionFiles: File[];
+  coverFile: UploadedFile | null;
+  conditionFiles: UploadedFile[];
 };
 
 export default function AddBook() {
@@ -40,7 +46,7 @@ export default function AddBook() {
     conditionFiles: [],
   });
 
-const [tagsInput, setTagsInput] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
 
   const [showErrors, setShowErrors] = useState(false);
   const router = useRouter();
@@ -53,6 +59,33 @@ const [tagsInput, setTagsInput] = useState("");
     const { name, value, type, checked } = e.target as HTMLInputElement;
 
     setForm((prev) => {
+      if (name === "tags") {
+        return {
+          ...prev,
+          tags: value.split(",").map((t) => t.trim()).filter(Boolean),
+        };
+      }
+
+      // choose language
+      if (name === "originalLanguage") {
+        let updated = { ...prev, originalLanguage: value };
+
+        // if language = English and TitleEn is null, then syn titleOr
+        if (value === "English" && !prev.titleEn) {
+          updated.titleEn = prev.titleOr;
+        }
+        return updated;
+      }
+
+      if (name === "titleOr") {
+        let updated = { ...prev, titleOr: value };
+
+        if (prev.originalLanguage === "English" && !prev.titleEn) {
+          updated.titleEn = value;
+        }
+        return updated;
+      }
+
       if (name === "tags") {
         return {
           ...prev,
@@ -75,16 +108,65 @@ const [tagsInput, setTagsInput] = useState("");
   };
 
 
-  // upload cover page
-  const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setForm((prev) => ({ ...prev, coverFile: file }));
+  // upload image
+  // cover image
+  const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("The size of the picture cannot exceed 2MB");
+      return;
+    }
+
+    try {
+      const url = await uploadFile(file, "book");
+      setForm((prev) => ({
+        ...prev,
+        coverFile: { file, url },   // file + url
+        coverImgUrl: url,
+      }));
+    } catch (err) {
+      console.error("Cover image upload failed:", err);
+    }
   };
 
-  // upload condition file
-  const handleConditionFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // condition files
+  const handleConditionFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setForm((prev) => ({ ...prev, conditionFiles: files }));
+    if (!files.length) return;
+
+    try {
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          if (file.size > 2 * 1024 * 1024) {
+            alert("The size of the picture cannot exceed 2MB");
+            return null;
+          }
+          const url = await uploadFile(file, "book");
+          return { file, url };
+        })
+      );
+
+      const valid = uploaded.filter((f): f is { file: File; url: string } => f !== null);
+
+      setForm((prev) => ({
+        ...prev,
+        conditionFiles: [...prev.conditionFiles, ...valid],
+      }));
+    } catch (err) {
+      console.error("Condition image upload failed:", err);
+    }
+  };
+
+  // remove condition files
+  const handleRemoveConditionFile = (index: number) => {
+    setForm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        conditionFiles: prev.conditionFiles.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,15 +191,13 @@ const [tagsInput, setTagsInput] = useState("");
       author: form.author,
       category: form.category,
       description: form.description,
-      coverImgUrl: form.coverFile
-        ? URL.createObjectURL(form.coverFile)
-        : form.coverImgUrl || "https://via.placeholder.com/300x400?text=No+Cover",
+      coverImgUrl: form.coverFile?.url || "https://via.placeholder.com/300x400?text=No+Cover",
 
       ownerId: user.id,
 
       status: "listed",
       condition: form.condition as Book["condition"],
-      conditionImgURLs: form.conditionFiles.map((f) => URL.createObjectURL(f)),
+      conditionImgURLs: form.conditionFiles.map((f) => f.url),
 
       dateAdded: new Date().toISOString(),
       updateDate: new Date().toISOString(),
@@ -166,13 +246,13 @@ const [tagsInput, setTagsInput] = useState("");
       >
         <div className="lg:flex lg:divide-x lg:divide-gray-200">
 
-          {/* left：基本信息 / 元信息 / 图片 */}
+          {/* left*/}
           <div className="lg:w-1/2 lg:pr-8 space-y-6">
 
             {/* Title + Language */}
             <div className="flex gap-2 items-start">
               <Input
-                label="Title - Origin*"
+                label="Title (Original Language)*"
                 name="titleOr"
                 value={form.titleOr}
                 onChange={handleChange}
@@ -200,7 +280,7 @@ const [tagsInput, setTagsInput] = useState("");
 
             {/* Title En */}
             <Input
-              label="Title - En*"
+              label="Title (English)*"
               name="titleEn"
               value={form.titleEn}
               onChange={handleChange}
@@ -250,7 +330,7 @@ const [tagsInput, setTagsInput] = useState("");
               name="isbn"
               value={form.isbn}
               onChange={handleChange}
-              placeholder="Optional-International Standard Book Number"
+              placeholder="International Standard Book Number"
             />
 
             {/* Publish Year */}
@@ -265,11 +345,11 @@ const [tagsInput, setTagsInput] = useState("");
             {/* Cover Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cover Image
+                Cover Image (max. 2MB)
               </label>
 
               <div className="flex items-center gap-4">
-                {/* 隐藏的 input */}
+                {/* hidded input */}
                 <input
                   type="file"
                   id="cover-upload"
@@ -288,19 +368,26 @@ const [tagsInput, setTagsInput] = useState("");
                   Upload Image
                 </Button>
 
-                {/* preview */}
+                {/* preview cover*/}
                 {form.coverFile && (
                   <img
-                    src={URL.createObjectURL(form.coverFile)}
+                    src={
+                      form.coverFile.url
+                        ? form.coverFile.url
+                        : form.coverFile.file
+                          ? URL.createObjectURL(form.coverFile.file)
+                          : ""
+                    }
                     alt="Preview"
                     className="h-20 w-16 object-cover rounded border"
                   />
                 )}
+
               </div>
             </div>
           </div>
 
-          {/* right：成色 / 交易设置 / 配送 */}
+          {/* right */}
           <div className="lg:w-1/2 lg:pl-8 space-y-6">
 
             {/* Description */}
@@ -340,10 +427,10 @@ const [tagsInput, setTagsInput] = useState("");
             {/* Condition Photos */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Condition Photos
+                Condition Photos (max. 2MB)
               </label>
 
-              {/* 隐藏的 input */}
+              {/* hidded input */}
               <input
                 type="file"
                 id="condition-upload"
@@ -363,17 +450,27 @@ const [tagsInput, setTagsInput] = useState("");
                 Upload Images
               </Button>
 
-              {/* preview */}
+              {/* preview condition imgs*/}
               <div className="flex gap-2 mt-2 flex-wrap">
-                {form.conditionFiles.map((file, index) => (
-                  <img
-                    key={index}
-                    src={URL.createObjectURL(file)}
-                    alt={`Condition ${index + 1}`}
-                    className="h-20 w-16 object-cover rounded border"
-                  />
+                {form.conditionFiles.map((f, i) => (
+                  <div key={i} className="relative">
+                    <img
+                      src={f.url || (f.file ? URL.createObjectURL(f.file) : "")}
+                      alt={`Condition ${i + 1}`}
+                      className="h-20 w-16 object-cover rounded border"
+                    />
+                    {/* delete */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveConditionFile(i)}
+                      className="absolute top-0 right-0 bg-red-600 text-white text-xs rounded-full px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ))}
               </div>
+
             </div>
 
             <hr className="my-6 border-gray-300" />
