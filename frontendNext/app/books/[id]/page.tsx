@@ -1,30 +1,20 @@
 // app/books/[id]/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Star, MapPin, Clock, Share2, MessageCircle, Package, Shield, ShoppingBag, Book as BookIcon, Languages } from "lucide-react";
+import Card from "@/app/components/ui/Card";
+import Button from "@/app/components/ui/Button";
+import Modal from "@/app/components/ui/Modal";
 import {
-  Star,
-  MapPin,
-  Clock,
-  ArrowLeft,
-  Share2,
-  MessageCircle,
-  Package,
-  Shield,
-  ShoppingBag,
-  Book,
-  Languages,
-} from "lucide-react";
-import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
-import Modal from "../../components/ui/Modal";
-import {
-  mockBooks,
-  getUserById,
-  getCurrentUser,
   calculateDistance
 } from "@/app/data/mockData";
+
+import { getBookById } from "@/utils/books";
+import type { Book } from "@/app/types/book";
+import type { User } from "@/app/types/user";
+import { getUserById } from "@/utils/auth";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
@@ -37,17 +27,17 @@ export default function BookDetailPage() {
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
-  const [isFavorited, setIsFavorited] = useState(false);
 
-  const book = useMemo(() => {
-    return mockBooks.find(b => b.id === bookId);
-  }, [bookId]);
+  const [book, setBook] = useState<Book | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const owner = useMemo(() => {
-    return book ? getUserById(book.ownerId) : null;
-  }, [book]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [owner, setOwner] = useState<User | null>(null);
 
-  const currentUser = getCurrentUser();
+  const addToCart = useCartStore((state) => state.addToCart);
+  const cart = useCartStore((state) => state.cart);
+  const alreadyInCart = cart.some((item) => item.bookId === book?.id);
 
   const distance = useMemo(() => {
     if (!owner?.coordinates || !currentUser?.coordinates) return 0;
@@ -59,20 +49,41 @@ export default function BookDetailPage() {
     );
   }, [owner, currentUser]);
 
-  if (!book || !owner) {
+  useEffect(() => {
+    if (!bookId) return;
+    setLoading(true);
+    getBookById(bookId)
+      .then((data) => {
+        if (!data) return;
+        setBook(data);
+        if (data.ownerId) {
+          getUserById(data.ownerId).then((user) => {
+            console.log("Fetched owner:", user);
+
+            if (user) setOwner(user);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load book details.");
+      })
+      .finally(() => setLoading(false));
+  }, [bookId]);
+
+
+  if (loading) {
+    return <div className="flex h-full items-center justify-center">Loading...</div>;
+  }
+
+  if (error || !book) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4"></div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Book not found
+            {error || "Book not found"}
           </h3>
-          <p className="text-gray-500 mb-4">
-            The book you are looking for does not exist or has been removed.
-          </p>
-          <Button onClick={() => router.back()}>
-            Go Back
-          </Button>
+          <Button onClick={() => router.back()}>Go Back</Button>
         </div>
       </div>
     );
@@ -108,17 +119,10 @@ export default function BookDetailPage() {
   const formatKm = (km: number) =>
     km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
 
-  const addToCart = useCartStore((state) => state.addToCart);
-
-
   const handleSendRequest = () => {
     console.log("Sending request with message:", requestMessage);
     setIsRequestModalOpen(false);
     setRequestMessage("");
-  };
-
-  const handleToggleFavorite = () => {
-    setIsFavorited(!isFavorited);
   };
 
   const handleShare = () => {
@@ -133,23 +137,22 @@ export default function BookDetailPage() {
     }
   };
 
+  console.log("bookId from params:", bookId);
+
+
+  if (typeof window === "undefined") {
+    return <div className="p-6">Loading...</div>;
+  }
+
   return (
+
     <div className="flex h-full">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto p-6">
-          <div className="mb-6">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Book Lists
-            </Button>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
+              {/* cover img */}
               <Card padding={false} className="overflow-hidden">
                 <div className="aspect-[3/4] w-full">
                   {book.coverImgUrl ? (
@@ -170,34 +173,53 @@ export default function BookDetailPage() {
                   )}
                 </div>
 
+                {/* Request This Book */}
+                {/* Request This Book */}
                 <div className="p-4 space-y-3">
                   <Button
-                    onClick={() => {
-                      const ok = useCartStore.getState().addToCart(book, "borrow"); // 指定首选租赁
-                      if (ok) {
-                        toast?.success?.("Added to cart");
-                      } else {
-                        toast?.error?.("This book cannot be requested (rent not available).");
+                    onClick={async () => {
+                      if (!book) return;
+
+                      // 已在购物车
+                      if (alreadyInCart) {
+                        toast.error("This book is already in your cart");
+                        return;
+                      }
+
+                      try {
+                        const result = await addToCart(book, book.canRent ? "borrow" : "purchase");
+                        if (result) {
+                          toast.success("Added to cart");
+                        } else {
+                          toast.error("Failed to add item");
+                        }
+                      } catch (err) {
+                        console.error("Failed to add item:", err);
+                        toast.error("Failed to add item");
                       }
                     }}
                     className="w-full flex items-center justify-center space-x-2"
                     disabled={
-                      book.status !== "listed" || (!book.canRent && !book.canSell)
+                      alreadyInCart || book.status !== "listed" || (!book.canRent && !book.canSell)
                     }
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>
-                      {book.status !== "listed"
-                        ? "Unlisted"
-                        : book.canRent
-                          ? "Request This Book"
-                          : book.canSell
-                            ? "Purchase Only"
-                            : "Unavailable"}
+                      {alreadyInCart
+                        ? "Already in Cart"
+                        : book.status !== "listed"
+                          ? "Unlisted"
+                          : book.canRent
+                            ? "Request This Book"
+                            : book.canSell
+                              ? "Purchase Only"
+                              : "Unavailable"}
                     </span>
                   </Button>
 
 
+
+                  {/* Share books */}
                   <Button
                     variant="outline"
                     onClick={handleShare}
@@ -210,6 +232,7 @@ export default function BookDetailPage() {
               </Card>
             </div>
 
+            {/* book info */}
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <div className="flex items-start justify-between mb-4">
@@ -250,14 +273,14 @@ export default function BookDetailPage() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-500 flex items-center gap-1">
-                          <Book className="w-4 h-4" />
-                        Category:</span>
+                          <BookIcon className="w-4 h-4" />
+                          Category:</span>
                         <span className="font-medium">{book.category}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500 flex items-center gap-1">
                           <Languages className="w-4 h-4" />
-                        Language:</span>
+                          Language:</span>
                         <span className="font-medium">{book.originalLanguage}</span>
                       </div>
                       <div className="flex justify-between">
@@ -302,60 +325,64 @@ export default function BookDetailPage() {
                 </div>
               </Card>
 
-              <Card>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Book Owner</h3>
-                <div className="flex items-center space-x-4">
-                  <Avatar user={owner} size={64} />
+              {/* owner info */}
+              {owner && (
+                <Card>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Book Owner</h3>
+                  <div className="flex items-center space-x-4">
+                    <Avatar user={owner} size={64} />
 
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">{owner.name}</h4>
-                    <div className="flex items-center text-gray-600 text-sm mt-1">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <p>
-                        {[
-                          owner.city,
-                          owner.state,
-                          owner.zipCode,
-                        ].filter(Boolean).join(", ")}
-                      </p>
-                      <div>
-                        {distance > 0 ? ` • ${formatKm(distance)} away from you` : ""}
-                      </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">{owner.name}</h4>
+                      <div className="flex items-center text-gray-600 text-sm mt-1">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        <p>
+                          {[
+                            owner.city,
+                            owner.state,
+                            owner.zipCode,
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                        <div>
+                          {distance > 0 ? ` • ${formatKm(distance)} away from you` : ""}
+                        </div>
 
-                    </div>
-                    <div className="flex items-center mt-2">
-                      <div className="flex items-center mr-3">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`w-4 h-4 ${star <= Math.floor(owner.rating)
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-300"
-                              }`}
-                          />
-                        ))}
                       </div>
-                      <span className="text-sm text-gray-600">
-                        {owner.rating}
-                      </span>
+                      <div className="flex items-center mt-2">
+                        <div className="flex items-center mr-3">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-4 h-4 ${star <= Math.floor(owner.rating)
+                                ? "text-yellow-400 fill-current"
+                                : "text-gray-300"
+                                }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {owner.rating}
+                        </span>
+                      </div>
                     </div>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      onClick={() => setIsRequestModalOpen(true)}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Message
+                    </Button>
+
                   </div>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2"
-                    onClick={() => setIsRequestModalOpen(true)}
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Message
-                  </Button>
-
-                </div>
-              </Card>
+                </Card>
+              )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* message owner */}
       <Modal
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
@@ -364,7 +391,7 @@ export default function BookDetailPage() {
         <div className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              Send a message to {owner.name} to request borrowing "{book.titleOr}".
+              Send a message to owner to request borrowing "{book.titleOr}".
             </p>
             <textarea
               value={requestMessage}

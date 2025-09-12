@@ -48,7 +48,7 @@ app.include_router(books_router)
 
 
 # cart router
-app.include_router(cart_router)
+app.include_router(cart_router, prefix="/api/v1")
 
 # complaints router
 app.include_router(complaints_router)
