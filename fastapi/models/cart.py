@@ -72,3 +72,8 @@ class CartResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+class CartItemUpdate(BaseModel):
+    actionType: Optional[str] = None
+    price: Optional[float] = None
+    deposit: Optional[float] = None
