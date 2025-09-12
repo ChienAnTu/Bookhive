@@ -19,6 +19,7 @@ export default function BooksPage() {
 
 const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
 
   // get books
   useEffect(() => {
@@ -34,6 +35,17 @@ const [books, setBooks] = useState<Book[]>([]);
     })();
   }, []);
 
+    useEffect(() => {
+    async function loadOwners() {
+      const uniqueOwnerIds = Array.from(new Set(books.map(b => b.ownerId)));
+      const results = await Promise.all(uniqueOwnerIds.map(id => getUserById(id)));
+      const map: Record<string, User> = {};
+      results.forEach(u => { if (u) map[u.id] = u; });
+      setOwnersMap(map);
+    }
+    if (books.length) loadOwners();
+  }, [books]);
+
   const handleFilterChange = (key: keyof BookFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -45,7 +57,7 @@ const [books, setBooks] = useState<Book[]>([]);
       deliveryMethod: "",
     });
   };
-
+  
   // Only get listed books for filtering and display
   const availableBooks = useMemo(() => {
     return books.filter((book) => book.status === "listed");
@@ -109,12 +121,11 @@ const [books, setBooks] = useState<Book[]>([]);
           {filteredBooks.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredBooks.map((book) => {
-                const owner = getUserById(book.ownerId);
+                const owner = ownersMap[book.ownerId]
                 return (
                   <BookCard
                     key={book.id}
                     book={book}
-                    owner={owner}
                     onViewDetails={handleViewDetails}
                   />
                 );
