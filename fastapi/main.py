@@ -9,6 +9,7 @@ from routes.upload import router as upload_router
 from routes.books import router as books_router
 from routes.cart import router as cart_router
 from routes.complaints import router as complaints_router  # routes/complaints
+from routes.shipping import router as shipping_router  # Import shipping router
 
 # Create FastAPI app
 app = FastAPI(
@@ -26,6 +27,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+
+# shipping router
+app.include_router(shipping_router)
 
 # media root directory: /media is mounted to the app/media folder
 MEDIA_ROOT = Path(__file__).parent / "media"
@@ -48,6 +53,7 @@ app.include_router(cart_router, prefix="/api/v1")
 
 # complaints router
 app.include_router(complaints_router)
+
 
 @app.get("/")
 async def root():
