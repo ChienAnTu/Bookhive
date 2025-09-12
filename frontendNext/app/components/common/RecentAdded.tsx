@@ -1,28 +1,55 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 // 引入类型
 import type { Book } from "@/app/types/book";
 
-// 引入数据
-import { mockBooks } from "@/app/data/mockData";
+// 接口取数据
+import { getBooks } from "@/utils/books";
 
 import Button from "../ui/Button";
 import Link from "next/link";
 import SimpleBookCard from "../ui/SimpleBookCard";
 
 // sorted by dateAdd
-const getNewReleases = (): Book[] => {
-  return mockBooks
-    .filter((book) => book.status === "listed")
-    .sort(
-      (a, b) =>
-        new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
-    )
-    .slice(0, 10);
-};
-
-// Recent Added
 export default function NewReleases() {
-  const newBooks = getNewReleases();
+  const [newBooks, setNewBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const books = await getBooks(); // 拉全部书
+        const listedBooks = books
+          .filter((book) => book.status === "listed")
+          .sort(
+            (a, b) =>
+              new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+          )
+          .slice(0, 10);
+        setNewBooks(listedBooks);
+      } catch (err) {
+        console.error("Failed to fetch books:", err);
+        setError("Failed to load books");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return <div className="py-6">Loading recent books...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="py-6 text-red-600">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="py-6">
