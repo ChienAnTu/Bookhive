@@ -64,7 +64,6 @@ class UserUpdate(BaseModel):
 
 # ------------Helper: Covert ORM to UserResponse--------------------
 def _to_user_response(u: User) -> UserResponse:
-    # date_of_birth 與 created_at 做安全轉字串
     dob = getattr(u, "date_of_birth", None)
     if isinstance(dob, (date, datetime)):
         dob_out = dob.isoformat()
@@ -99,54 +98,25 @@ def _to_user_response(u: User) -> UserResponse:
         createdAt=created_out,
     )
 
-# TODO: Refactor /me to implement _to_user_response helper
+
 @router.get("/me", response_model=UserResponse, response_model_exclude_none=True)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
-    dob = getattr(current_user, "date_of_birth", None)
-    if isinstance(dob, (date, datetime)):
-        dob_out = dob.isoformat()
-    elif isinstance(dob, str) and dob.strip():
-        dob_out = dob
-    else:
-        dob_out = None
-
-    return UserResponse(
-        id=str(getattr(current_user, "user_id", "")),
-        name=getattr(current_user, "name", ""),
-        email=getattr(current_user, "email", ""),
-        location=getattr(current_user, "location", None),
-        avatar=getattr(current_user, "avatar", None),
-        profilePicture=getattr(current_user, "profile_picture", None),
-
-        firstName=getattr(current_user, "first_name", None),
-        lastName=getattr(current_user, "last_name", None),
-        phoneNumber=getattr(current_user, "phone_number", None),
-        dateOfBirth=dob_out,
-
-        country=getattr(current_user, "country", None),
-        streetAddress=getattr(current_user, "street_address", None),
-        city=getattr(current_user, "city", None),
-        state=getattr(current_user, "state", None),
-        zipCode=(str(getattr(current_user, "zip_code", None))
-                 if getattr(current_user, "zip_code", None) is not None else None),
-
-        createdAt=(getattr(current_user, "created_at").isoformat()
-                   if isinstance(getattr(current_user, "created_at", None), (date, datetime))
-                   else getattr(current_user, "created_at", None)),
-    )
+    return _to_user_response(current_user)
 
 
-# === 新增：GET /user/{user_id} 透過 id 查別的使用者 ===
+# ===NEW: GET /user/{user_id} ===
 @router.get("/{user_id}", response_model=UserResponse, response_model_exclude_none=True)
-def get_user_by_id(
+def get_user_by_id_login_only(
     user_id: str,
     db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_user),  # Allow authenticated users only
 ):
     """
-    Get a user's public profile by ID (GET /user/{user_id}).
+    Get a user's profile by ID (requires login).
 
-    - 不需要是本人；任何人都可查（若要改成登入後才能查，加入 Depends(get_current_user) 即可）。
-    - 僅回傳我們定義為可公開的欄位（由 UserResponse 控制）。
+    Raises:
+    - 403: If actor is not authenticated.
+    - 404: If the user does not exist. (Wrong ID)
     """
     u = db.query(UserModel).filter(UserModel.user_id == user_id).first()
     if not u:
