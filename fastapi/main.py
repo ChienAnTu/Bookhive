@@ -10,6 +10,7 @@ from routes.books import router as books_router
 from routes.cart import router as cart_router
 from routes.complaints import router as complaints_router  # routes/complaints
 from routes.shipping import router as shipping_router  # Import shipping router
+from routes.service_fee import router as service_fee_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -28,6 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#serviec fee router
+app.include_router(service_fee_router, prefix="/api/v1")
 
 # shipping router
 app.include_router(shipping_router)
