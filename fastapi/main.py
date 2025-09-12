@@ -43,10 +43,6 @@ app.include_router(user_router, prefix="/api/v1")
 # books router
 app.include_router(books_router)
 
-# books router
-app.include_router(books_router)
-
-
 # cart router
 app.include_router(cart_router, prefix="/api/v1")
 
