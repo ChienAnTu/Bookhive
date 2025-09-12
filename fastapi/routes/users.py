@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import date, datetime
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Union
 
 from core.dependencies import get_db,get_current_user
 from models.user import User
@@ -62,6 +62,44 @@ class UserUpdate(BaseModel):
         allow_population_by_field_name = True
 
 
+# ------------Helper: Covert ORM to UserResponse--------------------
+def _to_user_response(u: User) -> UserResponse:
+    # date_of_birth 與 created_at 做安全轉字串
+    dob = getattr(u, "date_of_birth", None)
+    if isinstance(dob, (date, datetime)):
+        dob_out = dob.isoformat()
+    elif isinstance(dob, str) and dob.strip():
+        dob_out = dob
+    else:
+        dob_out = None
+
+    created = getattr(u, "created_at", None)
+    created_out = created.isoformat() if isinstance(created, (date, datetime)) else created
+
+    return UserResponse(
+        id=str(getattr(u, "user_id", "")),
+        name=getattr(u, "name", ""),
+        email=getattr(u, "email", ""),
+        location=getattr(u, "location", None),
+        avatar=getattr(u, "avatar", None),
+        profilePicture=getattr(u, "profile_picture", None),
+
+        firstName=getattr(u, "first_name", None),
+        lastName=getattr(u, "last_name", None),
+        phoneNumber=getattr(u, "phone_number", None),
+        dateOfBirth=dob_out,
+
+        country=getattr(u, "country", None),
+        streetAddress=getattr(u, "street_address", None),
+        city=getattr(u, "city", None),
+        state=getattr(u, "state", None),
+        zipCode=(str(getattr(u, "zip_code", None))
+                 if getattr(u, "zip_code", None) is not None else None),
+
+        createdAt=created_out,
+    )
+
+# TODO: Refactor /me to implement _to_user_response helper
 @router.get("/me", response_model=UserResponse, response_model_exclude_none=True)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
     dob = getattr(current_user, "date_of_birth", None)
@@ -96,6 +134,24 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
                    if isinstance(getattr(current_user, "created_at", None), (date, datetime))
                    else getattr(current_user, "created_at", None)),
     )
+
+
+# === 新增：GET /user/{user_id} 透過 id 查別的使用者 ===
+@router.get("/{user_id}", response_model=UserResponse, response_model_exclude_none=True)
+def get_user_by_id(
+    user_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a user's public profile by ID (GET /user/{user_id}).
+
+    - 不需要是本人；任何人都可查（若要改成登入後才能查，加入 Depends(get_current_user) 即可）。
+    - 僅回傳我們定義為可公開的欄位（由 UserResponse 控制）。
+    """
+    u = db.query(UserModel).filter(UserModel.user_id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _to_user_response(u)
 
 
 @router.put("/{user_id}")
