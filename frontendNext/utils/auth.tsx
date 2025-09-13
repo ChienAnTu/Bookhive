@@ -241,7 +241,7 @@ export const getUserById = async (id: string): Promise<User | null> => {
 
   try {
     const API_URL = getApiUrl();
-    const response = await axios.get(`${API_URL}/api/v1/users/${id}`, {
+    const response = await axios.get(`${API_URL}/api/v1/user/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
