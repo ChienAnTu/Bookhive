@@ -4,9 +4,10 @@ import os
 
 router = APIRouter(prefix="/shipping", tags=["Shipping"])
 
-AUSPOST_CALCULATE_API_KEY = os.getenv("AUSPOST_CALCULATE_API_KEY");
+AUSPOST_CALCULATE_API_KEY = os.getenv("AUSPOST_CALCULATE_API_KEY")
 
 BASE_URL = "https://digitalapi.auspost.com.au/postage/parcel/domestic/calculate.json"
+
 
 @router.get("/domestic/postage/calculate")
 async def calculate_domestic_postage(
@@ -18,34 +19,37 @@ async def calculate_domestic_postage(
     weight: float = Query(..., description="Parcel weight in kg")
 ):
     """
-    Calculate domestic parcel postage cost using Australia Post PAC API.
+    Calculate domestic parcel postage cost for both Regular and Express services.
     """
     headers = {"AUTH-KEY": AUSPOST_CALCULATE_API_KEY}
-    params = {
-        "from_postcode": from_postcode,
-        "to_postcode": to_postcode,
-        "length": length,
-        "width": width,
-        "height": height,
-        "weight": weight,
-        "service_code": "AUS_PARCEL_REGULAR"  # default to regular parcel
-    }
+    service_codes = ["AUS_PARCEL_REGULAR", "AUS_PARCEL_EXPRESS"]
+    results = {}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(BASE_URL, headers=headers, params=params)
+            for code in service_codes:
+                params = {
+                    "from_postcode": from_postcode,
+                    "to_postcode": to_postcode,
+                    "length": length,
+                    "width": width,
+                    "height": height,
+                    "weight": weight,
+                    "service_code": code
+                }
+                response = await client.get(BASE_URL, headers=headers, params=params)
 
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+                if response.status_code == 200:
+                    data = response.json().get("postage_result", {})
+                    results[code] = {
+                        "service": data.get("service"),
+                        "total_cost": data.get("total_cost"),
+                        "delivery_time": data.get("delivery_time"),
+                    }
+                else:
+                    results[code] = {"error": response.text}
 
-        data = response.json()
-        postage_result = data.get("postage_result", {})
-
-        return {
-            "service": postage_result.get("service"),
-            "total_cost": postage_result.get("total_cost"),
-            "delivery_time": postage_result.get("delivery_time")
-        }
+        return results
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=502, detail=f"Request error: {str(e)}")
