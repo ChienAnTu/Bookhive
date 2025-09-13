@@ -1,26 +1,9 @@
 // mockData.tsx
 import { User } from "@/app/types/user";
 import { Book } from "@/app/types/book";
+import { Order } from "@/app/types/order";
 
-// export interface User {
-//   id: string;
-//   name: string;
-//   email: string;
-//   location: string;
-//   address?: string; // Full address for postal delivery
-//   coordinates: {
-//     lat: number;
-//     lng: number;
-//   };
-//   rating: number;
-//   booksLent: number;
-//   booksBorrowed: number;
-//   joinDate: string;
-//   bio: string;
-//   avatar: string;
-//   preferredLanguages: string[];
-//   maxDistance: number; // kilometers willing to travel
-// }
+import { Comment, RatingStats } from "@/app/types";
 
 export interface LendingRequest {
   id: string;
@@ -32,35 +15,6 @@ export interface LendingRequest {
   createdAt: string;
 }
 
-export interface Order {
-  id: string;
-  bookId: string;
-  bookTitle: string;
-  bookAuthor: string;
-  bookImageUrl: string;
-  lenderId: string;
-  lenderName: string;
-  lenderAvatar: string;
-  borrowerId: string;
-  borrowerName: string;
-  borrowerAvatar: string;
-  status: "completed" | "ongoing" | "overdue" | "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
-  startDate: string;
-  dueDate: string;
-  returnedDate?: string;
-  rating?: number; // Rating given by the user after transaction
-  review?: string; // Review left by the user
-  deliveryMethod: "post" | "self-help" | "both";
-  location: string; // Location where the transaction took place
-  conversationId: string; // Link to the conversation for this order
-  createdAt: string; // When the order was created
-  shippingInfo?: {
-    trackingNumber: string;
-    carrier: string;
-    estimatedDelivery: string;
-    address: string;
-  };
-}
 
 export interface Conversation {
   id: string;
@@ -107,6 +61,7 @@ export const mockUsers: User[] = [
     id: "user1",
     firstName: "Alice",
     lastName: "Wang",
+    name: "Alice Wang",
     email: "alice@example.com",
     phoneNumber: "+61 400 123 456",
     dateOfBirth: { month: "03", day: "12", year: "1995" },
@@ -117,7 +72,7 @@ export const mockUsers: User[] = [
     zipCode: "2000",
     coordinates: { lat: -33.8688, lng: 151.2093 },
     maxDistance: 10,
-    avatar: "/images/users/alice.jpg",
+    avatar: "",
     bio: "Avid reader who loves fiction and sharing books with the community.",
     preferredLanguages: ["English", "Mandarin"],
     createdAt: new Date("2023-01-10"),
@@ -126,6 +81,7 @@ export const mockUsers: User[] = [
     id: "user2",
     firstName: "David",
     lastName: "Chen",
+    name: "David Chen",
     email: "david@example.com",
     phoneNumber: "+61 433 987 654",
     dateOfBirth: { month: "07", day: "24", year: "1990" },
@@ -136,7 +92,7 @@ export const mockUsers: User[] = [
     zipCode: "3000",
     coordinates: { lat: -37.8136, lng: 144.9631 },
     maxDistance: 20,
-    avatar: "/images/users/david.jpg",
+    avatar: "",
     bio: "Collector of classic literature. Always open to lend and borrow.",
     preferredLanguages: ["English"],
     createdAt: new Date("2023-02-05"),
@@ -145,6 +101,7 @@ export const mockUsers: User[] = [
     id: "user3",
     firstName: "Sophia",
     lastName: "Li",
+    name: "Sophia Li",
     email: "sophia@example.com",
     phoneNumber: "+61 422 765 321",
     dateOfBirth: { month: "11", day: "05", year: "1998" },
@@ -155,7 +112,7 @@ export const mockUsers: User[] = [
     zipCode: "4000",
     coordinates: { lat: -27.4698, lng: 153.0251 },
     maxDistance: 15,
-    avatar: "/images/users/sophia.jpg",
+    avatar: "",
     bio: "Passionate about fantasy novels and community sharing.",
     preferredLanguages: ["English", "Japanese"],
     createdAt: new Date("2023-03-12"),
@@ -536,119 +493,128 @@ export const mockBooks: Book[] = [
 ];
 
 
-
-
-
 export const mockOrders: Order[] = [
   {
     id: "order1",
-    bookId: "book11",
-    bookTitle: "The Martian",
-    bookAuthor: "Andy Weir",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300&h=400&fit=crop",
-    lenderId: "user2",
-    lenderName: "Sarah Johnson",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user1",
-    borrowerName: "Zhenyi Su",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "delivered",
-    startDate: "2023-12-01",
-    dueDate: "2023-12-21",
-    returnedDate: "2023-12-20",
-    rating: 5,
-    review:
-      "Amazing book! Sarah was super helpful and the book was in perfect condition.",
-    deliveryMethod: "post",
-    location: "Fremantle, WA",
-    conversationId: "conv_completed1",
+    bookIds: ["book11"], // Where the Crawdads Sing (owner=user2)
+    ownerId: "user2",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "COMPLETED",
+    startAt: "2023-12-01T00:00:00Z",
+    dueAt: "2023-12-22T00:00:00Z", // 21 days
+    returnedAt: "2023-12-20T00:00:00Z",
+    completedAt: "2023-12-21T08:00:00Z",
+
     createdAt: "2023-11-28T10:30:00Z",
-    shippingInfo: {
+    updatedAt: "2023-12-21T08:00:00Z",
+
+    deliveryMethod: "post",
+    shippingOut: {
+      carrier: "AUSPOST",
       trackingNumber: "AU123456789",
-      carrier: "Australia Post",
-      estimatedDelivery: "2023-12-03",
-      address: "123 Main St, Fremantle WA 6160"
+      trackingUrl: "https://auspost.com.au/mypost/track/#/details/AU123456789",
     },
+
+    // Pricing（book11.deposit=15 → 1500 cents）
+    deposit: { amount: 1500 },
+    serviceFee: { amount: 200 },     // $2
+    shippingOutFee: { amount: 800 }, // $8
+    totalPaid: { amount: 2500 },     // 1500 + 200 + 800
+    totalRefunded: { amount: 1500 }, // full deposit
+    notes: "Returned early, great condition.",
   },
+
   {
     id: "order2",
-    bookId: "book12",
-    bookTitle: "Educated",
-    bookAuthor: "Tara Westover",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
-    lenderId: "user1",
-    lenderName: "Zhenyi Su",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user3",
-    borrowerName: "Marcus Davis",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    status: "shipped",
-    startDate: "2024-01-15",
-    dueDate: "2024-02-15",
-    deliveryMethod: "self-help",
-    location: "Perth, WA",
-    conversationId: "conv_ongoing1",
+    bookIds: ["book12"], // The Alchemist (owner=user3)
+    ownerId: "user3",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "PENDING_SHIPMENT",
     createdAt: "2024-01-10T14:20:00Z",
+    updatedAt: "2024-01-10T14:20:00Z",
+
+    deliveryMethod: "pickup", // book12 supports both → choose pickup
+
+    deposit: { amount: 1200 }, // 12 → 1200 cents
+    serviceFee: { amount: 200 },
+    totalPaid: { amount: 1400 },
+    notes: "Pickup to be arranged at UWA library.",
   },
+
   {
     id: "order3",
-    bookId: "book3",
-    bookTitle: "Dune",
-    bookAuthor: "Frank Herbert",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop",
-    lenderId: "user1",
-    lenderName: "Zhenyi Su",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user2",
-    borrowerName: "Sarah Johnson",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-    status: "in-transit",
-    startDate: "2024-01-15",
-    dueDate: "2024-02-15",
-    deliveryMethod: "post",
-    location: "Perth, WA",
-    conversationId: "conv_ongoing2",
+    bookIds: ["book3"], // Dune (owner=user1)
+    ownerId: "user1",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "BORROWING",
+    startAt: "2024-01-15T00:00:00Z",
+    dueAt: "2024-02-14T00:00:00Z", // 30 days
+
     createdAt: "2024-01-12T09:15:00Z",
-    shippingInfo: {
-      trackingNumber: "AU987654321",
-      carrier: "FedEx",
-      estimatedDelivery: "2024-01-18",
-      address: "456 Ocean Dr, Perth WA 6000"
-    },
+    updatedAt: "2024-01-15T00:00:00Z",
+
+    deliveryMethod: "pickup",
+
+    deposit: { amount: 1800 }, // 18 → 1800 cents
+    serviceFee: { amount: 200 },
+    totalPaid: { amount: 2000 },
+    notes: "In-person handover completed.",
   },
+
   {
     id: "order4",
-    bookId: "book13",
-    bookTitle: "Becoming",
-    bookAuthor: "Michelle Obama",
-    bookImageUrl:
-      "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=400&fit=crop",
-    lenderId: "user3",
-    lenderName: "Marcus Davis",
-    lenderAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-    borrowerId: "user1",
-    borrowerName: "Zhenyi Su",
-    borrowerAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face",
-    status: "pending",
-    startDate: "2024-01-20",
-    dueDate: "2024-02-10",
-    deliveryMethod: "post",
-    location: "Subiaco, WA",
-    conversationId: "conv_ongoing3",
+    bookIds: ["book6"], // Sapiens (owner=user2)
+    ownerId: "user2",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "PENDING_PAYMENT",
     createdAt: "2024-01-18T16:45:00Z",
+    updatedAt: "2024-01-18T16:45:00Z",
+
+    deliveryMethod: "post",
+
+    // unpaid
+    deposit: { amount: 1600 }, // 16 → 1600 cents
+    serviceFee: { amount: 200 },
+    totalPaid: { amount: 0 },
+    notes: "Awaiting payment to confirm the order.",
+  },
+
+  // Multiple books ordered at same time（owner=user2；delivery=post）
+  {
+    id: "order5_multi",
+    bookIds: ["book11", "book1", "book6"], // owners all = user2
+    ownerId: "user2",
+    borrowerId: "f261c2c6-4853-47b3-9e5c-3",
+
+    status: "BORROWING",
+    createdAt: "2024-02-01T02:00:00Z",
+    startAt: "2024-02-01T04:00:00Z",
+    // dueAt 统一：max(maxLendingDays) = max(21, 21, 28) = 28
+    dueAt: "2024-02-29T04:00:00Z",
+
+    updatedAt: "2024-02-01T04:00:00Z",
+
+    deliveryMethod: "post",
+    shippingOut: {
+      carrier: "AUSPOST",
+      trackingNumber: "AU555666777",
+      trackingUrl: "https://auspost.com.au/mypost/track/#/details/AU555666777",
+    },
+
+    // 押金合计：book11(15) + book1(15) + book6(16) = 46 → 4600 cents
+    deposit: { amount: 4600 },
+    serviceFee: { amount: 200 },
+    shippingOutFee: { amount: 900 },
+    totalPaid: { amount: 4600 + 200 + 900 }, // 5700
+    notes: "Multi-book order; all shipped together via AusPost.",
   },
 ];
+
+
 
 // Helper function to get user data by ID
 export const getUserById = (userId: string): User | undefined => {
@@ -667,7 +633,7 @@ export function getBookById(id: string) {
 
 // Helper function to get user's lending orders
 export const getUserLendingOrders = (userId: string): Order[] => {
-  return mockOrders.filter((order) => order.lenderId === userId);
+  return mockOrders.filter((order) => order.ownerId === userId);
 };
 
 // Helper function to get user's borrowing orders
@@ -762,3 +728,146 @@ export const mockComplaints: Complaint[] = [
     createdAt: "2024-01-20T11:00:00Z"
   }
 ];
+
+// 评论和评分数据
+export const mockComments: Comment[] = [
+  {
+    id: "comment1",
+    orderId: "order1",
+    reviewerId: "user1",
+    revieweeId: "user2",
+    bookId: "book1",
+    rating: 5,
+    content: "Sarah was an excellent lender! The book was in perfect condition and she was very responsive to messages. Highly recommend!",
+    tags: ["friendly", "responsive", "good condition"],
+    type: "lender",
+    createdAt: "2024-01-22T10:30:00Z",
+    isAnonymous: false,
+    helpfulCount: 3
+  },
+  {
+    id: "comment2", 
+    orderId: "order1",
+    reviewerId: "user2",
+    revieweeId: "user1",
+    bookId: "book1",
+    rating: 5,
+    content: "Zhenyi was a great borrower. Returned the book on time and in the same condition. Would definitely lend to again!",
+    tags: ["punctual", "careful", "trustworthy"],
+    type: "borrower",
+    createdAt: "2024-01-23T14:20:00Z",
+    isAnonymous: false,
+    helpfulCount: 2
+  },
+  {
+    id: "comment3",
+    orderId: "order2",
+    reviewerId: "user3",
+    revieweeId: "user1",
+    bookId: "book2",
+    rating: 4,
+    content: "Good experience overall. The book arrived as described and Zhenyi was helpful with pickup arrangements.",
+    tags: ["helpful", "organized"],
+    type: "lender",
+    createdAt: "2024-02-05T16:45:00Z",
+    isAnonymous: false,
+    helpfulCount: 1
+  },
+  {
+    id: "comment4",
+    orderId: "order3",
+    reviewerId: "user4",
+    revieweeId: "user3",
+    bookId: "book3",
+    rating: 3,
+    content: "Book was okay but had some minor wear that wasn't mentioned. Communication could have been better.",
+    tags: ["average condition"],
+    type: "lender",
+    createdAt: "2024-01-28T09:10:00Z",
+    isAnonymous: true,
+    helpfulCount: 0
+  },
+  {
+    id: "comment5",
+    orderId: "order4",
+    reviewerId: "user1",
+    revieweeId: "user4",
+    bookId: "book4",
+    rating: 4,
+    content: "Elena was great to work with. Professional and the book handover was smooth.",
+    tags: ["professional", "smooth transaction"],
+    type: "lender",
+    createdAt: "2024-02-10T11:25:00Z",
+    isAnonymous: false,
+    helpfulCount: 2
+  }
+];
+
+// 获取用户的评分统计
+export const getUserRatingStats = (userId: string): RatingStats => {
+  const userComments = mockComments.filter(comment => comment.revieweeId === userId);
+  
+  if (userComments.length === 0) {
+    return {
+      averageRating: 0,
+      totalReviews: 0,
+      ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      recentComments: []
+    };
+  }
+
+  const totalRating = userComments.reduce((sum, comment) => sum + comment.rating, 0);
+  const averageRating = totalRating / userComments.length;
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  userComments.forEach(comment => {
+    distribution[comment.rating as keyof typeof distribution]++;
+  });
+
+  return {
+    averageRating: Math.round(averageRating * 10) / 10,
+    totalReviews: userComments.length,
+    ratingDistribution: distribution,
+    recentComments: userComments
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+  };
+};
+
+// 获取订单的评论
+export const getOrderComments = (orderId: string): Comment[] => {
+  return mockComments.filter(comment => comment.orderId === orderId);
+};
+
+// 获取用户给出的评论
+export const getUserGivenComments = (userId: string): Comment[] => {
+  return mockComments.filter(comment => comment.reviewerId === userId);
+};
+
+// 获取用户收到的评论  
+export const getUserReceivedComments = (userId: string): Comment[] => {
+  return mockComments.filter(comment => comment.revieweeId === userId);
+};
+
+// Complaint Types for Xinyu's complain page
+export const complaintTypes = [
+  "book-condition",
+  "delivery", 
+  "user-behavior",
+  "other"
+] as const;
+
+// Review Tags for comment/review functionality
+export const reviewTags = [
+  "friendly",
+  "responsive", 
+  "good condition",
+  "punctual",
+  "careful",
+  "trustworthy",
+  "helpful",
+  "organized",
+  "professional",
+  "smooth transaction",
+  "average condition"
+] as const;

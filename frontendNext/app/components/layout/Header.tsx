@@ -5,15 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
-import {
-  logoutUser,
-  isAuthenticated,
-  getCurrentUser,
-} from "../../../utils/auth";
+import { User as UserIcon, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
+import { logoutUser, isAuthenticated, getCurrentUser } from "@/utils/auth";
 
 import Avatar from "@/app/components/ui/Avatar";
-
+import { useCartStore } from "@/app/store/cartStore";
+import type { User } from "@/app/types/user";
 
 
 const Header: React.FC = () => {
@@ -21,14 +18,10 @@ const Header: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{
-    id: string;
-    name: string;
-    email: string;
-    location: string;
-    avatar: string;
-    createdAt: string;
-  } | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const cartCount = useCartStore((state) => state.cart.length);
+  const fetchCart = useCartStore((state) => state.fetchCart);
 
   // Check authentication status on component mount and when auth changes
   useEffect(() => {
@@ -39,7 +32,10 @@ const Header: React.FC = () => {
       if (authenticated) {
         // Fetch user data from API if logged in
         const user = await getCurrentUser();
+        console.log("Current user:", user?.name);
+
         setCurrentUser(user);
+        fetchCart();// shipping bag
       } else {
         setCurrentUser(null);
       }
@@ -60,7 +56,7 @@ const Header: React.FC = () => {
       window.removeEventListener("auth-changed", handleAuthChange);
       window.removeEventListener("storage", checkAuthStatus);
     };
-  }, []);
+  }, [fetchCart]);
 
   // Handle user logout
   const handleLogout = async () => {
@@ -89,22 +85,6 @@ const Header: React.FC = () => {
     router.push("/register");
   };
 
-  // Navigate to Shopping Cart
-  const HeaderCart = () => {
-    const cartCount = useCartStore((state) => state.cart.length);
-
-    return (
-      <Link href="/cart" className="relative inline-block">
-        <ShoppingBag className="w-6 h-6 text-gray-700" />
-        {cartCount > 0 && (
-          <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-            {cartCount}
-          </span>
-        )}
-      </Link>
-    );
-  };
-
 
   return (
     <header className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 transform-none">
@@ -112,14 +92,15 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center h-16 gap-2">
           {/* Logo section */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center">
+            <Link href={isLoggedIn ? "/home" : "/"} className="flex items-center">
               <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-2">
-                <span className="text-white font-bold text-sm">B</span>
+                <span className="text-white font-bold text-sm">BB</span>
               </div>
               <span className="text-xl font-bold text-gray-900 hidden sm:block">
-                BookHive
+                Book Borrow
               </span>
             </Link>
+
           </div>
 
           {/* Search box */}
@@ -146,7 +127,7 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-2">
             {/* Lend Books button - visible when user is logged in (desktop) */}
             {isLoggedIn && (
-              <Link href="/lend/add">
+              <Link href="/lending/add">
                 <Button
                   variant="outline"
                   size="sm"
@@ -166,31 +147,19 @@ const Header: React.FC = () => {
             )}
 
             {/* Shopping Cart button - count items */}
-            <div className="flex items-center space-x-4">
-              <HeaderCart />
-              {/* 这里可以继续放 User / Login 按钮 */}
-              {/* Messages button */}
-              <Link
-                href="/messages"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-5 h-5 mr-2 text-gray-700"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8L3 20l1.8-3.6A7.968 7.968 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
-                </svg>
-                Messages
+            {isLoggedIn && (
+              <Link href="/cart">
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-black transition-colors duration-200">
+                  <ShoppingBag className="w-5 h-5 text-black hover:text-white" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {cartCount}
+                    </span>
+                  )}
+                </div>
               </Link>
-            </div>
+            )}
+
 
             {/* User profile section - shown when logged in */}
             {isLoggedIn && currentUser ? (
@@ -204,7 +173,8 @@ const Header: React.FC = () => {
 
                   {/* User name - only visible on large screens */}
                   <span className="hidden lg:block text-sm font-medium text-gray-700 max-w-20 truncate">
-                    {currentUser.name}
+                    {/* {currentUser.name} */}
+                    G'day!
                   </span>
                 </button>
 
@@ -216,7 +186,7 @@ const Header: React.FC = () => {
                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setShowProfileMenu(false)}
                     >
-                      <User className="w-4 h-4 mr-3" />
+                      <UserIcon className="w-4 h-4 mr-3" />
                       View Profile
                     </Link>
 
