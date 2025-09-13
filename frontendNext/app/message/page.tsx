@@ -1,53 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getCurrentUser } from "@/utils/auth";
 import type { ChatThread, Message, SendMessageData } from "@/app/types/message";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
-
-// Mock data
-const mockChatThreads: ChatThread[] = [
-  {
-    id: "1",
-    user: {
-      id: "user1",
-      name: "Sarah Johnson",
-      avatar: "/avatars/sarah.jpg",
-    },
-    lastMessage: {
-      id: "msg3",
-      senderId: "currentUser",
-      receiverId: "user1",
-      content: "Yes, it’s still available! Do you want to pick it up tomorrow?",
-      timestamp: new Date().toISOString(),
-      bookTitle: "The Midnight Library",
-      read: true,
-    },
-    unreadCount: 1,
-    messages: [
-      {
-        id: "msg1",
-        senderId: "user1",
-        receiverId: "currentUser",
-        content: "Hi, is this book available?",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // 1h ago
-        bookTitle: "The Midnight Library",
-        read: false,
-      },
-      {
-        id: "msg2",
-        senderId: "currentUser",
-        receiverId: "user1",
-        content: "Yes, it’s still available! Do you want to pick it up tomorrow?",
-        timestamp: new Date(Date.now() - 1000 * 30).toISOString(), // 30s ago
-        bookTitle: "The Midnight Library",
-        read: true,
-      },
-    ],
-  },
-];
-
 
 export default function MessagesPage() {
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(null);
@@ -64,9 +22,9 @@ export default function MessagesPage() {
   }, []);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-[calc(100vh-4rem)] pt-2 bg-white">
       {/* Chat List */}
-      <div className="w-1/3 border-r border-gray-200">
+      <div className="w-1/3 border-r border-gray-200 bg-white">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
         </div>
@@ -126,7 +84,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-white">
         {selectedThread ? (
           <>
             {/* Chat Header */}
@@ -144,15 +102,18 @@ export default function MessagesPage() {
                 <h3 className="font-medium text-gray-900">
                   {selectedThread.user.name}
                 </h3>
-                {selectedThread.lastMessage.bookTitle && (
-                  <p className="text-sm text-blue-600">
+                {selectedThread.lastMessage.bookTitle && selectedThread.lastMessage.bookId && (
+                  <Link
+                    href={`/books/${selectedThread.lastMessage.bookId}`}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
                     &lt;&lt; {selectedThread.lastMessage.bookTitle} &gt;&gt;
-                  </p>
+                  </Link>
                 )}
               </div>
             </div>
 
-                        {/* Messages Area */}
+            {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {selectedThread.messages?.map((msg) => {
                 const isOwn = msg.senderId === currentUser?.id;
