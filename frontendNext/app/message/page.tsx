@@ -17,17 +17,38 @@ const mockChatThreads: ChatThread[] = [
       avatar: "/avatars/sarah.jpg",
     },
     lastMessage: {
-      id: "msg1",
-      senderId: "user1",
-      receiverId: "currentUser",
-      content: "Hi, is this book available?",
+      id: "msg3",
+      senderId: "currentUser",
+      receiverId: "user1",
+      content: "Yes, it’s still available! Do you want to pick it up tomorrow?",
       timestamp: new Date().toISOString(),
       bookTitle: "The Midnight Library",
-      read: false,
+      read: true,
     },
     unreadCount: 1,
+    messages: [
+      {
+        id: "msg1",
+        senderId: "user1",
+        receiverId: "currentUser",
+        content: "Hi, is this book available?",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // 1h ago
+        bookTitle: "The Midnight Library",
+        read: false,
+      },
+      {
+        id: "msg2",
+        senderId: "currentUser",
+        receiverId: "user1",
+        content: "Yes, it’s still available! Do you want to pick it up tomorrow?",
+        timestamp: new Date(Date.now() - 1000 * 30).toISOString(), // 30s ago
+        bookTitle: "The Midnight Library",
+        read: true,
+      },
+    ],
   },
 ];
+
 
 export default function MessagesPage() {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
@@ -132,22 +153,65 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* Message bubbles would go here */}
+                        {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {selectedThread.messages?.map((msg) => {
+                const isOwn = msg.senderId === currentUser?.id;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${
+                        isOwn
+                          ? "bg-black text-white rounded-br-none"
+                          : "bg-gray-200 text-gray-900 rounded-bl-none"
+                      }`}
+                    >
+                      {msg.content}
+                      <div className="text-xs text-gray-400 mt-1">
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Input Area */}
             <div className="p-4 border-t border-gray-200">
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                {/* Upload Button*/}
+                <label className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-md cursor-pointer hover:bg-gray-800 transition">
+                  +
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        console.log("File selected:", file.name);
+                        // TODO: upload logic here
+                      }
+                    }}
+                  />
+                </label>
+
+                {/* Message Input */}
                 <Input
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   placeholder="Type your message..."
                   className="flex-1"
                 />
+
+                {/* Send Button */}
                 <button
-                  className="px-4 py-2  bg-black text-white rounded-md hover:bg-black text-white transition"
+                  className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 transition"
                   onClick={() => {
                     // Handle send message
                     setMessageInput("");
@@ -157,6 +221,7 @@ export default function MessagesPage() {
                 </button>
               </div>
             </div>
+
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-500">

@@ -20,6 +20,7 @@ export interface ChatThread {
   };
   lastMessage: Message;
   unreadCount: number;
+  messages: Message[];
 }
 
 export interface SendMessageData {
