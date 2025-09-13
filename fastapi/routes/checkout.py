@@ -6,10 +6,14 @@ from typing import List
 from core.dependencies import get_db
 from models.checkout import Checkout, CheckoutCreate, CheckoutItem
 from services import checkout_service
+from core.dependencies import get_current_user
+from models.user import User as UserModel
 
 router = APIRouter(prefix="/checkouts", tags=["Checkouts"])
 
 # -------- Helper: manual response builders --------
+
+
 def _checkout_item_to_dict(item: CheckoutItem) -> dict:
     return {
         "itemId": item.item_id,
@@ -21,6 +25,7 @@ def _checkout_item_to_dict(item: CheckoutItem) -> dict:
         "shippingMethod": item.shipping_method,
         "shippingQuote": float(item.shipping_quote) if item.shipping_quote is not None else None,
     }
+
 
 def _checkout_to_dict(checkout: Checkout) -> dict:
     return {
@@ -42,38 +47,31 @@ def _checkout_to_dict(checkout: Checkout) -> dict:
         "items": [_checkout_item_to_dict(item) for item in checkout.items],
     }
 
-# -------- Routes --------
 
-@router.get("/", status_code=status.HTTP_200_OK)
-def list_checkouts(db: Session = Depends(get_db)):
-    """List all checkouts"""
-    checkouts = checkout_service.get_all_checkouts(db)
+@router.get("/list", status_code=status.HTTP_200_OK)
+def list_my_checkouts(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """List all checkouts for the current logged-in user"""
+    checkouts = checkout_service.get_pending_checkouts_by_user_id(
+        db, current_user.user_id)
+    if not checkouts:
+        raise HTTPException(
+            status_code=404, detail="No checkouts found for this user")
     return [_checkout_to_dict(c) for c in checkouts]
 
 
-@router.get("/{checkout_id}", status_code=status.HTTP_200_OK)
-def get_checkout(checkout_id: str, db: Session = Depends(get_db)):
-    """Get a checkout by ID"""
-    checkout = checkout_service.get_checkout(db, checkout_id)
-    if not checkout:
-        raise HTTPException(status_code=404, detail="Checkout not found")
-    return _checkout_to_dict(checkout)
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def create_checkout(checkout_in: CheckoutCreate, db: Session = Depends(get_db)):
+@router.post("/create", status_code=status.HTTP_201_CREATED)
+async def create_checkout(
+    checkout_in: CheckoutCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
     """Create a new checkout with items"""
-    checkout = checkout_service.create_checkout(db, checkout_in)
+    checkout_in.userId = current_user.user_id
+    checkout = await checkout_service.create_checkout(db, checkout_in)
     return _checkout_to_dict(checkout)
-
-
-@router.put("/{checkout_id}", status_code=status.HTTP_200_OK)
-def update_checkout(checkout_id: str, checkout_in: CheckoutCreate, db: Session = Depends(get_db)):
-    """Update an existing checkout (not items)"""
-    updated = checkout_service.update_checkout(db, checkout_id, checkout_in)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Checkout not found")
-    return _checkout_to_dict(updated)
 
 
 @router.delete("/{checkout_id}", status_code=status.HTTP_200_OK)

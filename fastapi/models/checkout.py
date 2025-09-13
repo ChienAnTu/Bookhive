@@ -45,61 +45,68 @@ class CheckoutItem(Base):
     book_id = Column(String(36), nullable=False)
     owner_id = Column(String(36), nullable=False)
 
-    action_type = Column(String(20), nullable=False)  # BORROW / BUY
+    action_type = Column(String(20), nullable=False)  # BORROW / PURCHASE
     price = Column(Numeric(10, 2), nullable=True)
     deposit = Column(Numeric(10, 2), nullable=True)
 
     shipping_method = Column(String(50), nullable=True)   # Delivery / Pickup
     shipping_quote = Column(Numeric(10, 2), nullable=True)
+    service_code = Column(String(50), nullable=True, default="AUS_PARCEL_REGULAR")  # New field
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     checkout = relationship("Checkout", back_populates="items")
 
+
 # -------- Pydantic Schemas --------
 class CheckoutItemBase(BaseModel):
-    book_id: str
-    owner_id: str
-    action_type: str
+    bookId: str
+    ownerId: str
+    actionType: str
     price: Optional[float] = None
     deposit: Optional[float] = None
-    shipping_method: Optional[str] = None
-    shipping_quote: Optional[float] = None
+    shippingMethod: Optional[str] = None
+    shippingQuote: Optional[float] = None
+    serviceCode: Optional[str] = "AUS_PARCEL_REGULAR"   # New field
+
 
 class CheckoutItemCreate(CheckoutItemBase):
     pass
 
+
 class CheckoutItemResponse(CheckoutItemBase):
-    item_id: str
-    created_at: str
-    updated_at: str
+    itemId: str
+    createdAt: str
+    updatedAt: str
 
     class Config:
         orm_mode = True
 
 
 class CheckoutBase(BaseModel):
-    user_id: str
-    contact_name: str
+    userId: str
+    contactName: str
     phone: str
     street: str
     city: str
     postcode: str
     country: str
     deposit: Optional[float] = 0.00
-    service_fee: Optional[float] = 0.00
-    shipping_fee: Optional[float] = 0.00
-    total_due: Optional[float] = 0.00
+    serviceFee: Optional[float] = 0.00
+    shippingFee: Optional[float] = 0.00
+    totalDue: Optional[float] = 0.00
     status: Optional[str] = "PENDING"
+
 
 class CheckoutCreate(CheckoutBase):
     items: List[CheckoutItemCreate]
 
+
 class CheckoutResponse(CheckoutBase):
-    checkout_id: str
-    created_at: str
-    updated_at: str
+    checkoutId: str
+    createdAt: str
+    updatedAt: str
     items: List[CheckoutItemResponse] = []
 
     class Config:
