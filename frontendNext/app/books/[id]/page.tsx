@@ -7,9 +7,7 @@ import { Star, MapPin, Clock, Share2, MessageCircle, Package, Shield, ShoppingBa
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
-import {
-  calculateDistance
-} from "@/app/data/mockData";
+import { calculateDistance } from "@/app/data/mockData";
 
 import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
@@ -35,9 +33,8 @@ export default function BookDetailPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [owner, setOwner] = useState<User | null>(null);
 
-  const addToCart = useCartStore((state) => state.addToCart);
-  const cart = useCartStore((state) => state.cart);
-  const alreadyInCart = cart.some((item) => item.bookId === book?.id);
+  const { cart, fetchCart, addToCart } = useCartStore();
+  const alreadyInCart = cart.some((item) => item.id === book?.id);
 
   const distance = useMemo(() => {
     if (!owner?.coordinates || !currentUser?.coordinates) return 0;
@@ -49,27 +46,37 @@ export default function BookDetailPage() {
     );
   }, [owner, currentUser]);
 
+  // pull cart firt
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+  console.log("cart info:", cart)
+
+  // pull book and owner
   useEffect(() => {
     if (!bookId) return;
     setLoading(true);
-    getBookById(bookId)
-      .then((data) => {
-        if (!data) return;
-        setBook(data);
-        if (data.ownerId) {
-          getUserById(data.ownerId).then((user) => {
-            console.log("Fetched owner:", user);
 
-            if (user) setOwner(user);
-          });
+    (async () => {
+      try {
+        const b = await getBookById(bookId);
+        if (!b) return;
+        setBook(b);
+
+        // parallel
+        if (b.ownerId) {
+          const [u] = await Promise.all([getUserById(b.ownerId)]);
+          setOwner(u);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
         setError("Failed to load book details.");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [bookId]);
+
 
 
   if (loading) {
