@@ -1,5 +1,3 @@
-import { UserData } from '../../utils/auth';
-
 export interface Message {
   id: string;
   senderId: string;

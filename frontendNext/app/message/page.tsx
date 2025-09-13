@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { getCurrentUser } from "@/utils/auth";
-import type { UserData } from "@/utils/auth";
 import type { ChatThread, Message, SendMessageData } from "@/app/types/message";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
@@ -51,7 +50,7 @@ const mockChatThreads: ChatThread[] = [
 
 
 export default function MessagesPage() {
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(null);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [threads, setThreads] = useState<ChatThread[]>([]);
