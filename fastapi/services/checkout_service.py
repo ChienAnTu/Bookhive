@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from models.checkout import Checkout, CheckoutItem, CheckoutCreate
 from models.service_fee import ServiceFee
-from models.user import User  # ensure you have user model imported
+from models.user import User 
 
 BASE_URL = "https://digitalapi.auspost.com.au/postage/parcel/domestic/calculate.json"
 AUSPOST_API_KEY = os.getenv("AUSPOST_CALCULATE_API_KEY")
@@ -15,7 +15,7 @@ AUSPOST_API_KEY = os.getenv("AUSPOST_CALCULATE_API_KEY")
 async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
     """
     Calculate shipping fee by grouping items by owner.
-    Return dict {ownerId: {"totalFee": float, "perItemFee": float}}
+    Return dict {ownerId: {"totalFee": float}}
     """
     results = {}
 
@@ -31,15 +31,21 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
             serviceCode = ownerData[ownerId]["serviceCode"]
 
             # Default parcel dimensions per book
-            length, width, height, weight = 30, 30, 5, 0.5  # cm, cm, cm, kg
-            totalWeight = weight * len(ownerItems)
+            baseLength, baseWidth, baseHeight, baseWeight = 30, 30, 5, 0.5  # cm, cm, cm, kg
+            numBooks = len(ownerItems)
+
+            # Calculate total parcel size & weight
+            totalLength = baseLength
+            totalWidth = baseWidth
+            totalHeight = baseHeight * numBooks
+            totalWeight = baseWeight * numBooks
 
             params = {
                 "from_postcode": fromPostcode,
                 "to_postcode": toPostcode,
-                "length": length,
-                "width": width,
-                "height": height,
+                "length": totalLength,
+                "width": totalWidth,
+                "height": totalHeight,
                 "weight": totalWeight,
                 "service_code": serviceCode,
             }
@@ -53,7 +59,7 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
                 totalFee = float(postage_result.get("total_cost", 0.0))
 
                 results[ownerId] = {
-                    "totalFee": totalFee,
+                    "totalFee": totalFee
                 }
             else:
                 raise HTTPException(
@@ -121,7 +127,7 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
     shippingFees = await calculate_shipping_fee(checkoutIn.items, checkoutIn.postcode, ownerData)
 
     
-    # Step 5: 更新每个 item 的 shipping_quote
+    # Step 5: update item 的 shipping_quote
     shippingFeeTotal = 0.0
     processedOwners = set()
     for item in checkout.items:
@@ -130,7 +136,7 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
             if item.owner_id not in processedOwners:
                 shippingFeeTotal += float(item.shipping_quote)
                 processedOwners.add(item.owner_id)
-                
+
     # Step 6: Get service fee percentage from service_fee table
     serviceFeeRate = (
         db.query(ServiceFee)
