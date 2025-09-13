@@ -11,7 +11,7 @@ import { logoutUser, isAuthenticated, getCurrentUser } from "@/utils/auth";
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
 import type { User } from "@/app/types/user";
-
+import type { ChatThread } from "@/app/types/message";
 
 const Header: React.FC = () => {
   const router = useRouter();
@@ -19,9 +19,11 @@ const Header: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [threads, setThreads] = useState<ChatThread[]>([]);
 
   const cartCount = useCartStore((state) => state.cart.length);
   const fetchCart = useCartStore((state) => state.fetchCart);
+
 
   // Check authentication status on component mount and when auth changes
   useEffect(() => {
@@ -146,6 +148,22 @@ const Header: React.FC = () => {
               </Button>
             )}
 
+            {/* message button - count items */}
+            {isLoggedIn && (
+              <Link href="/message">
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-black transition-colors duration-200">
+                  <Mail className="w-5 h-5 text-black hover:text-white" />
+                  
+                  {/* Badge */}
+                  {threads.some(thread => thread.unreadCount > 0) && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {threads.reduce((total, thread) => total + thread.unreadCount, 0)}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            )}
+
             {/* Shopping Cart button - count items */}
             {isLoggedIn && (
               <Link href="/cart">
@@ -197,15 +215,6 @@ const Header: React.FC = () => {
                       onClick={() => setShowProfileMenu(false)}
                     >
                       <Truck className="w-4 h-4 mr-3" />Shipping
-                    </Link>
-
-                    {/* New mesaage entry */}
-                    <Link
-                      href="/message"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={() => setShowProfileMenu(false)}
-                    >
-                      <Mail className="w-4 h-4 mr-3" />Message
                     </Link>
 
                     {/* New Support entry */}
