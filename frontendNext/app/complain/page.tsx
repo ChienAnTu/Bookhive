@@ -21,7 +21,8 @@ import {
   getCurrentUser,
   mockComplaints,
   mockBooks,
-  getUserById 
+  getUserById,
+  complaintTypes
 } from "@/app/data/mockData";
 
 type ComplaintStatus = "pending" | "investigating" | "resolved" | "closed";
@@ -124,14 +125,14 @@ export default function ComplainPage() {
   };
 
   const filterOptions = [
-    { value: "all", label: "All Complaints", count: userComplaints.length },
+    { value: "all", label: "All", count: userComplaints.length },
     { value: "pending", label: "Pending", count: userComplaints.filter(c => c.status === "pending").length },
     { value: "investigating", label: "Investigating", count: userComplaints.filter(c => c.status === "investigating").length },
     { value: "resolved", label: "Resolved", count: userComplaints.filter(c => c.status === "resolved").length },
     { value: "closed", label: "Closed", count: userComplaints.filter(c => c.status === "closed").length }
   ];
 
-  const complaintTypes: { value: ComplaintType; label: string }[] = [
+  const complaintTypeOptions: { value: ComplaintType; label: string }[] = [
     { value: "book-condition", label: "Book Condition" },
     { value: "delivery", label: "Delivery Issue" },
     { value: "user-behavior", label: "User Behavior" },
@@ -144,15 +145,15 @@ export default function ComplainPage() {
         <div className="max-w-6xl mx-auto p-6">
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Complaints & Support</h1>
-              <p className="text-gray-600">Submit and track your complaints and support requests</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Support</h1>
+              <p className="text-gray-600">Submit and track your complaints or support requests</p>
             </div>
             <Button
               onClick={() => setIsNewComplaintModalOpen(true)}
               className="flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              New Complaint
+              New Support
             </Button>
           </div>
 
@@ -298,7 +299,7 @@ export default function ComplainPage() {
               onChange={(e) => setNewComplaint({...newComplaint, type: e.target.value as ComplaintType})}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              {complaintTypes.map((type) => (
+              {complaintTypeOptions.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>

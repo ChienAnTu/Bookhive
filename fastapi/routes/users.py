@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Union
 
 from core.dependencies import get_db,get_current_user
 from models.user import User
@@ -62,36 +62,66 @@ class UserUpdate(BaseModel):
         allow_population_by_field_name = True
 
 
-@router.get("/me", response_model=UserResponse)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """
-    Get current user profile (GET /user/me).
+# ------------Helper: Covert ORM to UserResponse--------------------
+def _to_user_response(u: User) -> UserResponse:
+    dob = getattr(u, "date_of_birth", None)
+    if isinstance(dob, (date, datetime)):
+        dob_out = dob.isoformat()
+    elif isinstance(dob, str) and dob.strip():
+        dob_out = dob
+    else:
+        dob_out = None
 
-    - Returns the authenticated user's information.
-    - Includes id, name, email, location, avatar, and createdAt timestamp.
-    """
+    created = getattr(u, "created_at", None)
+    created_out = created.isoformat() if isinstance(created, (date, datetime)) else created
+
     return UserResponse(
-        id=current_user.user_id,
-        name=current_user.name,
-        email=current_user.email,
-        location=current_user.location,
-        avatar=current_user.avatar,
-        profilePicture=current_user.profile_picture,
+        id=str(getattr(u, "user_id", "")),
+        name=getattr(u, "name", ""),
+        email=getattr(u, "email", ""),
+        location=getattr(u, "location", None),
+        avatar=getattr(u, "avatar", None),
+        profilePicture=getattr(u, "profile_picture", None),
 
-        firstName=current_user.first_name,
-        lastName=current_user.last_name,
-        phoneNumber=current_user.phone_number,
-        dateOfBirth=(current_user.date_of_birth.isoformat() if current_user.date_of_birth else None),
+        firstName=getattr(u, "first_name", None),
+        lastName=getattr(u, "last_name", None),
+        phoneNumber=getattr(u, "phone_number", None),
+        dateOfBirth=dob_out,
 
-        country=current_user.country,
-        streetAddress=current_user.street_address,
-        city=current_user.city,
-        state=current_user.state,
-        zipCode=current_user.zip_code,
+        country=getattr(u, "country", None),
+        streetAddress=getattr(u, "street_address", None),
+        city=getattr(u, "city", None),
+        state=getattr(u, "state", None),
+        zipCode=(str(getattr(u, "zip_code", None))
+                 if getattr(u, "zip_code", None) is not None else None),
 
-        createdAt=current_user.created_at.isoformat()
+        createdAt=created_out,
     )
 
+
+@router.get("/me", response_model=UserResponse, response_model_exclude_none=True)
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    return _to_user_response(current_user)
+
+
+# ===NEW: GET /user/{user_id} ===
+@router.get("/{user_id}", response_model=UserResponse, response_model_exclude_none=True)
+def get_user_by_id_login_only(
+    user_id: str,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_user),  # Allow authenticated users only
+):
+    """
+    Get a user's profile by ID (requires login).
+
+    Raises:
+    - 403: If actor is not authenticated.
+    - 404: If the user does not exist. (Wrong ID)
+    """
+    u = db.query(UserModel).filter(UserModel.user_id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _to_user_response(u)
 
 
 @router.put("/{user_id}")

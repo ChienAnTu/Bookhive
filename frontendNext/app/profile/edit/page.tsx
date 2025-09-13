@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,13 +10,14 @@ import Select from "@/app/components/ui/Select";
 import type { User } from "@/app/types/user";
 import Avatar from "@/app/components/ui/Avatar";
 import { toast } from "sonner";
-import { updateUser } from "../../../utils/auth";
+import { updateUser } from "@/utils/auth";
 
 
 const emptyUser: User = {
   id: "temp",
   firstName: "",
   lastName: "",
+  name: "",
   email: "",
   phoneNumber: "",
   dateOfBirth: { month: "", day: "", year: "" },
@@ -67,26 +67,37 @@ const handleSubmit = async (e: React.FormEvent) => {
   setIsLoading(true);
 
   try {
-    // 拼接全名
+    //dateOfBirth
+    let dateOfBirthStr: string | null = null;
+    if (profileData.dateOfBirth) {
+      const { year, month, day } = profileData.dateOfBirth;
+      if (year && month && day) {
+        dateOfBirthStr = `${year}-${month}-${day}`;
+      }
+    }
+
     const payload = {
       ...profileData,
+      // combine name
       name: `${profileData.firstName} ${profileData.lastName}`.trim(),
+      ...(dateOfBirthStr ? { dateOfBirth: dateOfBirthStr } : {}),
     };
 
     const result = await updateUser(payload);
 
-    console.log("✅ Profile updated:", result);
+    console.log("Profile updated:", result);
     toast.success("Profile updated successfully!");
 
     window.dispatchEvent(new Event("auth-changed"));
     router.push("/profile");
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Update failed");
-    console.error("❌ Failed to update profile:", error);
+    console.error("Failed to update profile:", error);
   } finally {
     setIsLoading(false);
   }
 };
+
 
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,15 +139,10 @@ const handleSubmit = async (e: React.FormEvent) => {
               </h3>
               <div className="flex flex-col items-center">
                 <div className="relative">
-                  {/* Avatar 显示：如果用户上传过新头像(profilePicture)，优先显示 */}
-                  {profileData.profilePicture ? (
-                    <img src={profileData.profilePicture} alt="Preview" className="w-24 h-24 rounded-full object-cover" />
-                  ) : (
+                  {/* Avatar */}
                     <Avatar user={profileData} size={96} />
-                  )}
-
-
-                  {/* 上传按钮 */}
+                  
+                  {/* upload */}
                   <label className="absolute bottom-0 right-0 bg-black rounded-full p-2 cursor-pointer">
                     <Camera className="w-4 h-4 text-white" />
                     <Input
