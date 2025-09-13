@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User as UserIcon, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
+import { User as UserIcon, LogOut, Plus, Truck, Mail, LifeBuoy, ShoppingBag } from "lucide-react";
 import { logoutUser, isAuthenticated, getCurrentUser } from "@/utils/auth";
 
 import Avatar from "@/app/components/ui/Avatar";
@@ -197,6 +197,15 @@ const Header: React.FC = () => {
                       onClick={() => setShowProfileMenu(false)}
                     >
                       <Truck className="w-4 h-4 mr-3" />Shipping
+                    </Link>
+
+                    {/* New mesaage entry */}
+                    <Link
+                      href="/message"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowProfileMenu(false)}
+                    >
+                      <Mail className="w-4 h-4 mr-3" />Message
                     </Link>
 
                     {/* New Support entry */}

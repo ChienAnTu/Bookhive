@@ -6,9 +6,11 @@ import { getCurrentUser } from "@/utils/auth";
 import type { ChatThread, Message, SendMessageData } from "@/app/types/message";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
+import Avatar from "@/app/components/ui/Avatar";
+import type { User } from "@/app/types/user";
 
 export default function MessagesPage() {
-  const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [threads, setThreads] = useState<ChatThread[]>([]);
@@ -41,15 +43,7 @@ export default function MessagesPage() {
             >
               <div className="p-4 flex items-start gap-3">
                 {/* Avatar */}
-                <div className="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0">
-                  {thread.user.avatar && (
-                    <img
-                      src={thread.user.avatar}
-                      alt={thread.user.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  )}
-                </div>
+                <Avatar user={thread.user} size={40} />
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -89,15 +83,7 @@ export default function MessagesPage() {
           <>
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gray-200">
-                {selectedThread.user.avatar && (
-                  <img
-                    src={selectedThread.user.avatar}
-                    alt={selectedThread.user.name}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                )}
-              </div>
+              <Avatar user={selectedThread.user} size={40} />
               <div>
                 <h3 className="font-medium text-gray-900">
                   {selectedThread.user.name}
