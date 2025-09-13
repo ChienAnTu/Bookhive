@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
-from models.order import Order, OrderService
+from models.order import Order
+from services.order_service import OrderService
 from models.user import User
 from models.book import Book
 from core.dependencies import get_db
