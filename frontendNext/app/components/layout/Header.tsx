@@ -169,6 +169,27 @@ const Header: React.FC = () => {
             <div className="flex items-center space-x-4">
               <HeaderCart />
               {/* 这里可以继续放 User / Login 按钮 */}
+              {/* Messages button */}
+              <Link
+                href="/messages"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 mr-2 text-gray-700"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8L3 20l1.8-3.6A7.968 7.968 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+                Messages
+              </Link>
             </div>
 
             {/* User profile section - shown when logged in */}
