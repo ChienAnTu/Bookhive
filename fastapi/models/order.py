@@ -57,18 +57,8 @@ class Order(Base):
     # Delivery method
     delivery_method = Column(Enum(*DELIVERY_METHOD_ENUM, name="delivery_method_enum"), 
                            nullable=False)
-    
-    # Shipping tracking - matching frontend Order.shippingOut
-    shipping_out_carrier = Column(Enum(*CARRIER_ENUM, name="shipping_out_carrier_enum"), nullable=True)
-    shipping_out_tracking_number = Column(String(100), nullable=True)
-    shipping_out_tracking_url = Column(String(500), nullable=True)
-    
-    # Return shipping tracking - matching frontend Order.shippingReturn
-    shipping_return_carrier = Column(Enum(*CARRIER_ENUM, name="shipping_return_carrier_enum"), nullable=True)
-    shipping_return_tracking_number = Column(String(100), nullable=True)
-    shipping_return_tracking_url = Column(String(500), nullable=True)
 
-    # Borrower shipping info
+    # picking up or shipping info
     contact_name = Column(String(100), nullable=False)
     phone = Column(String(20), nullable=True)
     street = Column(String(255), nullable=False)
@@ -77,9 +67,8 @@ class Order(Base):
     country = Column(String(50), nullable=False)
             
     # Pricing in cents - matching frontend Money type
-    deposit_amount = Column(Integer, nullable=False, default=0)
+    deposit_amount = Column(Integer, nullable=True, default=0)
     service_fee_amount = Column(Integer, nullable=False, default=0)
-    shipping_out_fee_amount = Column(Integer, nullable=True)
     sale_price_amount = Column(Integer, nullable=True)
     late_fee_amount = Column(Integer, nullable=True)
     damage_fee_amount = Column(Integer, nullable=True)
@@ -93,6 +82,7 @@ class Order(Base):
     books = relationship("OrderBook", back_populates="order", cascade="all, delete-orphan")
     owner = relationship("User", foreign_keys=[owner_id])
     borrower = relationship("User", foreign_keys=[borrower_id])
+    shippings = relationship("Shipping", back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderBook(Base):
@@ -101,18 +91,22 @@ class OrderBook(Base):
     """
     __tablename__ = "order_books"
     
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    order_id = Column(String(36), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
-    book_id = Column(String(36), ForeignKey("book.id", ondelete="CASCADE"), 
-                    nullable=False, index=True)
-    
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    
-    # Ensure no duplicate books in same order
-    __table_args__ = (
-        UniqueConstraint('order_id', 'book_id', name='uq_order_book'),
-    )
+    order_id = Column(String(36), ForeignKey("orders.id", ondelete="CASCADE"), primary_key=True)
+    book_id = Column(String(36), ForeignKey("book.id", ondelete="CASCADE"), primary_key=True)
     
     # Relationships
     order = relationship("Order", back_populates="books")
     book = relationship("Book")
+
+class Shipping(Base):
+    __tablename__ = "shippings"
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    order_id = Column(String(36), ForeignKey("orders.id", ondelete="CASCADE"))
+    fee = Column(Integer, nullable=True)
+    type = Column(Enum("OUT","RETURN"), nullable=False, default = "OUT")
+    carrier = Column(Enum(*CARRIER_ENUM))
+    tracking_number = Column(String(100))
+    tracking_url = Column(String(500))
+    order = relationship("Order", back_populates="shippings")
+
+# class ShippingBook(Base):
