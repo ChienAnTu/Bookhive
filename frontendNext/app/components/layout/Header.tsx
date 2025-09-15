@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import { User as UserIcon, LogOut, Plus, Truck, LifeBuoy, ShoppingBag } from "lucide-react";
+import { User as UserIcon, LogOut, Plus, Truck, Mail, LifeBuoy, ShoppingBag } from "lucide-react";
 import { logoutUser, isAuthenticated, getCurrentUser } from "@/utils/auth";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
 import type { User } from "@/app/types/user";
-
+import type { ChatThread } from "@/app/types/message";
 
 const Header: React.FC = () => {
   const router = useRouter();
@@ -19,9 +19,11 @@ const Header: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [threads, setThreads] = useState<ChatThread[]>([]);
 
   const cartCount = useCartStore((state) => state.cart.length);
   const fetchCart = useCartStore((state) => state.fetchCart);
+
 
   // Check authentication status on component mount and when auth changes
   useEffect(() => {
@@ -144,6 +146,22 @@ const Header: React.FC = () => {
               <Button variant="outline" size="sm" className="sm:hidden p-2">
                 <Plus className="w-4 h-4" />
               </Button>
+            )}
+
+            {/* message button - count items */}
+            {isLoggedIn && (
+              <Link href="/message">
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-black transition-colors duration-200">
+                  <Mail className="w-5 h-5 text-black hover:text-white" />
+                  
+                  {/* Badge */}
+                  {threads.some(thread => thread.unreadCount > 0) && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {threads.reduce((total, thread) => total + thread.unreadCount, 0)}
+                    </span>
+                  )}
+                </div>
+              </Link>
             )}
 
             {/* Shopping Cart button - count items */}

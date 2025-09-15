@@ -7,36 +7,42 @@ import { calculateDistance } from "@/app/data/mockData";
 import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
 import { getCurrentUser, getUserById } from "@/utils/auth";
-import { getBooks } from "@/utils/books";
-
 
 export interface BookCardProps {
   book: Book;
-  owner: User;
   onViewDetails?: (bookId: string) => void;
 }
 
-
-const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
+const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
   const [imgError, setImgError] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [ownerUser, setOwnerUser] = useState<User | null>(null);
 
-useEffect(() => {
+  useEffect(() => {
+  if (!book?.ownerId) return;
+
   (async () => {
-    const user = await getCurrentUser();
-    setCurrentUser(user);
+    try {
+      const [user, owner] = await Promise.all([
+        getCurrentUser(),
+        getUserById(book.ownerId),
+      ]);
+      setCurrentUser(user);
+      if (owner) setOwnerUser(owner);
+    } catch (err) {
+      console.error("Failed to load user/owner:", err);
+    }
   })();
-}, []);
+}, [book?.ownerId]);
 
-  const distance =
-    currentUser && owner?.coordinates && currentUser.coordinates
-      ? calculateDistance(
-        currentUser.coordinates.lat,
-        currentUser.coordinates.lng,
-        owner.coordinates.lat,
-        owner.coordinates.lng
-      )
-      : 0;
+
+  // const distance =
+  //   currentUser && ownerUser?.coordinates && currentUser.coordinates
+  //     ? calculateDistance(
+  //       currentUser,ownerUser
+  //     )
+  //     : 0;
+  // console.log(calculateDistance(currentUser,ownerUser))
 
   const getDeliveryLabel = (method: string) => {
     switch (method) {
@@ -130,25 +136,26 @@ useEffect(() => {
               <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
               <span className="truncate">
                 {[
-                  owner.city,
-                  owner.state,
+                  ownerUser?.city,
+                  ownerUser?.state,
+                  ownerUser?.zipCode,
                 ].filter(Boolean).join(", ")}
 
               </span>
             </div>
-            <span className="font-medium ml-2 flex-shrink-0">
+            {/* <span className="font-medium ml-2 flex-shrink-0">
               {distance}km away
-            </span>
+            </span> */}
           </div>
 
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center">
               <Star className="w-4 h-4 mr-1 text-yellow-400 fill-current flex-shrink-0" />
-              <span className="font-medium">{owner?.rating || "N/A"}</span>
+              <span className="font-medium">{ownerUser?.rating || "N/A"}</span>
             </div>
             <div className="flex items-center">
               <Clock className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span>{book.maxLendingDays} days max</span>
+              <span>Up to {book.maxLendingDays} days</span>
             </div>
           </div>
 

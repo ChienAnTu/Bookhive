@@ -9,3 +9,4 @@ python-dotenv
 pydantic
 email-validator
 PyMySQL
+httpx>=0.27.0

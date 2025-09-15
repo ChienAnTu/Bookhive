@@ -6,17 +6,43 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { useCartStore } from "@/app/store/cartStore";
 import { useRouter } from "next/navigation";
+import { getUserById } from "@/utils/auth";
+import type { User } from "@/app/types/user";
+
 
 export default function CartPage() {
   const { cart, loading, fetchCart, removeFromCart, setMode } = useCartStore();
   const [isRemoveMode, setIsRemoveMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const router = useRouter();
+  const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
 
-  // Pull the backend shopping cart when initializing the page
+
+  // Pull the backend shopping cart then owner Info
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
+
+  // useEffect：listen cart，then load owner Info
+  useEffect(() => {
+    const loadOwners = async () => {
+      const uniqueOwnerIds = Array.from(new Set(cart.map((b) => b.ownerId).filter(Boolean)));
+      const map: Record<string, User> = {};
+
+      for (const id of uniqueOwnerIds) {
+        const u = await getUserById(id);
+        if (u) map[id] = u;
+      }
+
+      setOwnersMap(map);
+    };
+
+    if (cart.length > 0) {
+      loadOwners();
+    }
+  }, [cart]);
+
+
 
   // delete confirm
   const handleConfirmRemove = async () => {
@@ -189,15 +215,14 @@ export default function CartPage() {
               groupedByOwner.orderedKeys.map((ownerId) => {
                 const books = groupedByOwner.groups[ownerId];
                 const summary = ownerSummaries.get(ownerId)!;
-                const ids = books.map((b) => b.id);
-                const groupAllSelected = ids.every((id) => selectedIds.includes(id));
+                const ownerName = ownersMap[ownerId]?.name || "Unknown Owner";
 
                 return (
                   <section key={ownerId} className="space-y-4">
                     {/* Group Header */}
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-bold text-gray-800">
-                        Owner: <span className="font-semibold">{ownerId}</span>
+                        Owner: <span className="font-semibold">{ownerName}</span>
                         <span className="ml-3 text-sm text-gray-500">
                           ({summary.count} item{summary.count > 1 ? "s" : ""})
                         </span>
