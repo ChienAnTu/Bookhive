@@ -25,7 +25,7 @@ const ProfilePage: React.FC = () => {
     const loadUserData = async () => {
       // Check if user is authenticated
       if (!isAuthenticated()) {
-        router.push("/login");
+        router.push("/auth");
         return;
       }
 
@@ -40,7 +40,7 @@ const ProfilePage: React.FC = () => {
         }
       } catch (error) {
         console.error("Failed to load user data:", error);
-        router.push("/login");
+        router.push("/auth");
       } finally {
         setIsLoading(false);
       }
@@ -73,7 +73,7 @@ const ProfilePage: React.FC = () => {
 
   // Count orders by status
   const ongoingLending = lendingOrders.filter(
-    (order) => order.status === "ongoing"
+    (book) => book.status === "listed"
   ).length;
   const ongoingBorrowing = borrowingOrders.filter(
     (order) => order.status === "ongoing"
@@ -94,8 +94,7 @@ const ProfilePage: React.FC = () => {
 
   // Use default values for rating and books if not provided by API
   const rating = currentUser.rating || 0;
-  const booksLent = currentUser.booksLent || 0;
-  const booksBorrowed = currentUser.booksBorrowed || 0;
+
 
   // Calculate star rating display
   const fullStars = Math.floor(rating);
