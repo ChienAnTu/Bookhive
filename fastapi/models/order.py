@@ -1,12 +1,12 @@
 """
-Order model - supports multi-book orders matching frontend interface
+Order model - supports multi-book orders matching frontend interface exactly
 """
 
 import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, String, DateTime, Enum, ForeignKey, 
-    Integer, Text, UniqueConstraint
+    Integer, Text
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -32,57 +32,74 @@ CARRIER_ENUM = ("AUSPOST", "OTHER")
 
 class Order(Base):
     """
-    Order table - matches frontend Order interface
+    Order table - matches frontend Order interface exactly
     """
     __tablename__ = "orders"
     
     # Core fields
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     owner_id = Column(String(25), ForeignKey("users.user_id", ondelete="CASCADE"), 
-             nullable=False, index=True)
+                     nullable=False, index=True)
     borrower_id = Column(String(25), ForeignKey("users.user_id", ondelete="CASCADE"), 
-                    nullable=False, index=True)
+                        nullable=False, index=True)
+    
     status = Column(Enum(*ORDER_STATUS_ENUM, name="order_status_enum"), 
                    nullable=False, default="PENDING_PAYMENT", index=True)
     
-    # Time fields - matching frontend Order
+    # Time tracking
     start_at = Column(DateTime, nullable=True)
     due_at = Column(DateTime, nullable=True)
     returned_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     canceled_at = Column(DateTime, nullable=True)
+    
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     
-    # Delivery method
+    # Delivery 
     delivery_method = Column(Enum(*DELIVERY_METHOD_ENUM, name="delivery_method_enum"), 
                            nullable=False)
-
-    # picking up or shipping info
+    
+    # Shipping Out info 
+    shipping_out_carrier = Column(Enum(*CARRIER_ENUM, name="shipping_out_carrier_enum"), nullable=True)
+    shipping_out_tracking_number = Column(String(100), nullable=True)
+    shipping_out_tracking_url = Column(String(500), nullable=True)
+    
+    # Shipping Return info
+    shipping_return_carrier = Column(Enum(*CARRIER_ENUM, name="shipping_return_carrier_enum"), nullable=True)
+    shipping_return_tracking_number = Column(String(100), nullable=True)
+    shipping_return_tracking_url = Column(String(500), nullable=True)
+    
+    # Pricing
+    # Core pricing
+    deposit_amount = Column(Integer, nullable=True, default=0) # Optional
+    service_fee_amount = Column(Integer, nullable=False, default=0)
+    shipping_out_fee_amount = Column(Integer, nullable=True)  # Optional
+    sale_price_amount = Column(Integer, nullable=True)        # Optional
+    
+    # Post-return adjustments
+    late_fee_amount = Column(Integer, nullable=True)
+    damage_fee_amount = Column(Integer, nullable=True)
+    
+    # Totals
+    total_paid_amount = Column(Integer, nullable=False, default=0)     # Initial payment
+    total_refunded_amount = Column(Integer, nullable=True)             # What borrower got back
+    
+    # Address info for delivery (borrower's address)
     contact_name = Column(String(100), nullable=False)
     phone = Column(String(20), nullable=True)
     street = Column(String(255), nullable=False)
     city = Column(String(50), nullable=False)
     postcode = Column(String(20), nullable=False)
-    country = Column(String(50), nullable=False)
-            
-    # Pricing in cents - matching frontend Money type
-    deposit_amount = Column(Integer, nullable=True, default=0)
-    service_fee_amount = Column(Integer, nullable=False, default=0)
-    sale_price_amount = Column(Integer, nullable=True)
-    late_fee_amount = Column(Integer, nullable=True)
-    damage_fee_amount = Column(Integer, nullable=True)
-    total_paid_amount = Column(Integer, nullable=False, default=0)
-    total_refunded_amount = Column(Integer, nullable=True)
+    country = Column(String(50), nullable=False, default="Australia")
     
-    # Notes - matching frontend Order.notes
+    # Notes
     notes = Column(Text, nullable=True)
     
     # Relationships
     books = relationship("OrderBook", back_populates="order", cascade="all, delete-orphan")
     owner = relationship("User", foreign_keys=[owner_id])
     borrower = relationship("User", foreign_keys=[borrower_id])
-    shippings = relationship("Shipping", back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderBook(Base):
@@ -97,16 +114,3 @@ class OrderBook(Base):
     # Relationships
     order = relationship("Order", back_populates="books")
     book = relationship("Book")
-
-class Shipping(Base):
-    __tablename__ = "shippings"
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    order_id = Column(String(36), ForeignKey("orders.id", ondelete="CASCADE"))
-    fee = Column(Integer, nullable=True)
-    type = Column(Enum("OUT","RETURN"), nullable=False, default = "OUT")
-    carrier = Column(Enum(*CARRIER_ENUM))
-    tracking_number = Column(String(100))
-    tracking_url = Column(String(500))
-    order = relationship("Order", back_populates="shippings")
-
-# class ShippingBook(Base):

@@ -1,16 +1,42 @@
-# ==================== Service Layer ====================
-
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from models.order import Order, OrderBook
 from models.user import User
 from models.book import Book
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Literal, Dict, Any
+from pydantic import BaseModel
+from datetime import datetime, timezone
+
+class CreateOrderRequestData(BaseModel):
+    owner_id: str
+    borrower_id: str
+    book_ids: List[str]
+
+    # delivery method
+    delivery_method: Literal["post", "pickup"]
+
+    # pricing (required fields)
+    service_fee_amount: int
+    total_paid_amount: int
+    
+    # pricing (optional fields - can be None for different business scenarios)
+    deposit_amount: Optional[int] = None  # None for purchase-only orders
+    shipping_out_fee_amount: Optional[int] = None
+    sale_price_amount: Optional[int] = None
+    notes: Optional[str] = None
+
+    # address (borrower's delivery address)
+    contact_name: str
+    phone: Optional[str] = None
+    street: str
+    city: str
+    postcode: str
+    country: str = "Australia"
 
 
 class OrderBusinessService:
     """
-    Order business logic service - handles validation and business rules
+    Order business logic service - handles validation, business rules, and complex operations
     """
     
     def __init__(self, db: Session):
@@ -36,7 +62,7 @@ class OrderBusinessService:
         # Validate users exist
         owner = self.db.query(User).filter(User.user_id == owner_id).first()
         borrower = self.db.query(User).filter(User.user_id == borrower_id).first()
-        
+
         if not owner:
             raise HTTPException(status_code=404, detail="The owner doesn't exist")
         if not borrower:
@@ -87,13 +113,12 @@ class OrderBusinessService:
         
         return books
     
-    
-    def create_order_with_validation(self, order_data, current_user: User) -> Order:
+    def create_order_with_validation(self, order_data: CreateOrderRequestData, current_user: User) -> Order:
         """
         Create order with full business validation
         
         Args:
-            order_data: CreateOrderRequest data
+            order_data: CreateOrderRequestData
             current_user: Current authenticated user
             
         Returns:
@@ -113,31 +138,7 @@ class OrderBusinessService:
         books = self.validate_books(order_data.book_ids, order_data.owner_id)
         
         # Create order using OrderService
-        order = OrderService.create_order(
-            owner_id=order_data.owner_id,
-            borrower_id=order_data.borrower_id,
-            book_ids=order_data.book_ids,
-            delivery_method=order_data.delivery_method,
-            deposit_amount=order_data.deposit_amount,
-            service_fee_amount=order_data.service_fee_amount,
-            shipping_out_fee_amount=order_data.shipping_out_fee_amount,
-            sale_price_amount=order_data.sale_price_amount,
-            notes=order_data.notes,
-            # Address fields
-            borrower_contact_name=order_data.borrower_contact_name,
-            borrower_phone=getattr(order_data, 'borrower_phone', None),
-            borrower_street=order_data.borrower_street,
-            borrower_city=order_data.borrower_city,
-            borrower_postcode=order_data.borrower_postcode,
-            borrower_country=order_data.borrower_country,
-            # Optional owner address fields
-            owner_contact_name=getattr(order_data, 'owner_contact_name', None),
-            owner_phone=getattr(order_data, 'owner_phone', None),
-            owner_street=getattr(order_data, 'owner_street', None),
-            owner_city=getattr(order_data, 'owner_city', None),
-            owner_postcode=getattr(order_data, 'owner_postcode', None),
-            owner_country=getattr(order_data, 'owner_country', None),
-        )
+        order = OrderService.create_order(order_data)
         
         # Save to database
         self.db.add(order)
@@ -145,6 +146,160 @@ class OrderBusinessService:
         self.db.refresh(order)
         
         return order
+
+    def get_user_orders_paginated(
+        self, 
+        current_user: User, 
+        page: int = 1, 
+        page_size: int = 20, 
+        status_filter: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get paginated orders for current user with business logic
+        """
+        # Build base query - users can only see orders they're involved in
+        query = self.db.query(Order).filter(
+            (Order.owner_id == current_user.user_id) | 
+            (Order.borrower_id == current_user.user_id)
+        )
+        
+        # Apply filters
+        if status_filter:
+            query = query.filter(Order.status == status_filter)
+        
+        # Get pagination data
+        total = query.count()
+        offset = (page - 1) * page_size
+        orders = query.offset(offset).limit(page_size).all()
+        
+        # Convert to frontend format
+        order_dicts = [OrderService.to_frontend_dict(order) for order in orders]
+        
+        return {
+            "orders": order_dicts,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size
+        }
+
+    def get_order_by_id(self, order_id: str, current_user: User) -> Order:
+        """
+        Get order by ID with permission check
+        """
+        order = self.db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Check permission - user must be owner or borrower
+        if order.owner_id != current_user.user_id and order.borrower_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return order
+
+    def set_order_status(self, order: Order, new_status: str) -> Order:
+        """
+        Common method: Update status and timestamps
+        """
+        order.status = new_status
+        now = datetime.now(timezone.utc)
+        
+        if new_status == "BORROWING":
+            order.start_at = now
+            # TODO: Calculate due_at based on book lending periods
+        elif new_status == "RETURNED":
+            order.returned_at = now
+        elif new_status == "COMPLETED":
+            order.completed_at = now
+        elif new_status == "CANCELED":
+            order.canceled_at = now
+        
+        self.db.commit()
+        self.db.refresh(order)
+        return order
+
+    def update_order_status(self, order_id: str, new_status: str, current_user: User) -> Order:
+        """
+        Update order status with business logic validation
+        """
+        order = self.get_order_by_id(order_id, current_user)
+        # TODO: Add status transition validation logic here
+        return self.set_order_status(order, new_status)
+
+    def cancel_order(self, order_id: str, current_user: User) -> Order:
+        """
+        Cancel order with business validation
+        """
+        order = self.get_order_by_id(order_id, current_user)
+        
+        # Only borrower can cancel
+        if order.borrower_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Only borrower can cancel order")
+        
+        # Check if order can be canceled
+        if order.status not in ["PENDING_PAYMENT", "PENDING_SHIPMENT"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot cancel order with status {order.status}"
+            )
+        
+        return self.set_order_status(order, "CANCELED")
+
+    def get_user_borrowing_orders(self, current_user: User) -> List[Dict[str, Any]]:
+        """
+        Get user's borrowing orders (where user is borrower)
+        """
+        orders = self.db.query(Order).filter(
+            Order.borrower_id == current_user.user_id
+        ).order_by(Order.created_at.desc()).all()
+        
+        return [OrderService.to_frontend_dict(order) for order in orders]
+
+    def get_user_lending_orders(self, current_user: User) -> List[Dict[str, Any]]:
+        """
+        Get user's lending orders (where user is owner)
+        """
+        orders = self.db.query(Order).filter(
+            Order.owner_id == current_user.user_id
+        ).order_by(Order.created_at.desc()).all()
+        
+        return [OrderService.to_frontend_dict(order) for order in orders]
+    
+    def get_orders_by_book_id(self, book_id: str, current_user: User) -> List[Dict[str, Any]]:
+        """
+        Get all historical and current orders for a certain book
+        """
+        # Query all orders including this book
+        orders = self.db.query(Order).join(OrderBook).filter(
+            OrderBook.book_id == book_id
+        ).order_by(Order.created_at.desc()).all()
+        
+        # Users can only view orders related to themselves
+        user_orders = [
+            order for order in orders 
+            if order.owner_id == current_user.user_id or order.borrower_id == current_user.user_id
+        ]
+        
+        return [OrderService.to_frontend_dict(order) for order in user_orders]
+
+    def get_active_orders_by_book_id(self, book_id: str, current_user: User) -> List[Dict[str, Any]]:
+        """
+        Get the ongoing order for a certain book
+        """
+        active_statuses = ["PENDING_PAYMENT", "PENDING_SHIPMENT", "BORROWING", "OVERDUE"]
+        
+        orders = self.db.query(Order).join(OrderBook).filter(
+            OrderBook.book_id == book_id,
+            Order.status.in_(active_statuses)
+        ).order_by(Order.created_at.desc()).all()
+        
+        user_orders = [
+            order for order in orders 
+            if order.owner_id == current_user.user_id or order.borrower_id == current_user.user_id
+        ]
+        
+        return [OrderService.to_frontend_dict(order) for order in user_orders]
 
 
 class OrderService:
@@ -155,7 +310,7 @@ class OrderService:
     @staticmethod
     def to_frontend_dict(order: Order) -> dict:
         """
-        Convert Order to frontend format
+        Convert Order to frontend format matching Order interface exactly
         """
         # Build ShippingRef objects
         shipping_out = None
@@ -178,7 +333,7 @@ class OrderService:
         def to_iso_string(dt):
             return dt.isoformat() + 'Z' if dt else None
         
-        # Build result matching frontend Order interface
+        # Build result matching frontend Order interface exactly
         result = {
             "id": str(order.id),
             "ownerId": str(order.owner_id),
@@ -188,12 +343,14 @@ class OrderService:
             "createdAt": to_iso_string(order.created_at),
             "updatedAt": to_iso_string(order.updated_at),
             "deliveryMethod": order.delivery_method,
-            "deposit": {"amount": order.deposit_amount},
+            
+            # Required Money fields - handle None values appropriately
+            "deposit": {"amount": order.deposit_amount or 0},  # Handle None case for purchase-only orders
             "serviceFee": {"amount": order.service_fee_amount},
             "totalPaid": {"amount": order.total_paid_amount},
         }
         
-        # Add optional fields
+        # Add optional time fields
         if order.start_at:
             result["startAt"] = to_iso_string(order.start_at)
         if order.due_at:
@@ -205,11 +362,13 @@ class OrderService:
         if order.canceled_at:
             result["canceledAt"] = to_iso_string(order.canceled_at)
             
+        # Add optional shipping fields
         if shipping_out:
             result["shippingOut"] = shipping_out
         if shipping_return:
             result["shippingReturn"] = shipping_return
             
+        # Add optional Money fields
         if order.shipping_out_fee_amount:
             result["shippingOutFee"] = {"amount": order.shipping_out_fee_amount}
         if order.sale_price_amount:
@@ -221,110 +380,56 @@ class OrderService:
         if order.total_refunded_amount:
             result["totalRefunded"] = {"amount": order.total_refunded_amount}
             
+        # Add optional notes
         if order.notes:
             result["notes"] = order.notes
             
         return result
     
     @staticmethod
-    def create_order(owner_id: str, borrower_id: str, book_ids: List[str], 
-                    delivery_method: str, **kwargs) -> Order:
+    def create_order(order_data: CreateOrderRequestData) -> Order:
         """
-        Create new order with books using separated pricing logic
+        Create new order from validated CreateOrderRequestData
+        
+        Args:
+            order_data: CreateOrderRequestData object containing all order information
+            
+        Returns:
+            Order: Created order instance
+            
+        Raises:
+            ValueError: If validation fails
         """
-        if not book_ids:
+        if not order_data.book_ids:
             raise ValueError("At least one book_id must be provided")
         
-        # Extract pricing parameters
-        sale_price_amount = kwargs.get('sale_price_amount')
-        custom_deposit = kwargs.get('deposit_amount')
-        custom_service_fee = kwargs.get('service_fee_amount')
-        shipping_out_fee_amount = kwargs.get('shipping_out_fee_amount')
-        
-        # Calculate pricing using OrderPricing class
-        deposit_amount = OrderPricing.calculate_deposit_amount(
-            sale_price_amount=sale_price_amount,
-            custom_deposit=custom_deposit
-        )
-        
-        service_fee_amount = OrderPricing.calculate_service_fee(
-            custom_service_fee=custom_service_fee
-        )
-        
-        # Create order with calculated pricing
+        # Create order matching your model structure exactly
         order = Order(
-            owner_id=owner_id,
-            borrower_id=borrower_id,
-            delivery_method=delivery_method,
-            deposit_amount=deposit_amount,
-            service_fee_amount=service_fee_amount,
-            shipping_out_fee_amount=shipping_out_fee_amount,
-            sale_price_amount=sale_price_amount,
-            notes=kwargs.get('notes'),
-            # Borrower address (required)
-            borrower_contact_name=kwargs['borrower_contact_name'],
-            borrower_phone=kwargs.get('borrower_phone'),
-            borrower_street=kwargs['borrower_street'],
-            borrower_city=kwargs['borrower_city'],
-            borrower_postcode=kwargs['borrower_postcode'],
-            borrower_country=kwargs['borrower_country'],
-            # Owner address (optional)
-            owner_contact_name=kwargs.get('owner_contact_name'),
-            owner_phone=kwargs.get('owner_phone'),
-            owner_street=kwargs.get('owner_street'),
-            owner_city=kwargs.get('owner_city'),
-            owner_postcode=kwargs.get('owner_postcode'),
-            owner_country=kwargs.get('owner_country'),
+            owner_id=order_data.owner_id,
+            borrower_id=order_data.borrower_id,
+            delivery_method=order_data.delivery_method,
+            
+            # Required pricing fields
+            service_fee_amount=order_data.service_fee_amount,
+            total_paid_amount=order_data.total_paid_amount,
+            
+            # Optional pricing fields (can be None)
+            deposit_amount=order_data.deposit_amount,  # Can be None for purchase-only
+            shipping_out_fee_amount=order_data.shipping_out_fee_amount,
+            sale_price_amount=order_data.sale_price_amount,
+            notes=order_data.notes,
+
+            # Address fields (borrower's delivery address)
+            contact_name=order_data.contact_name,
+            phone=order_data.phone,
+            street=order_data.street,
+            city=order_data.city,
+            postcode=order_data.postcode,
+            country=order_data.country,
         )
-        
-        # Add books to order
-        for book_id in book_ids:
-            order_book = OrderBook(book_id=book_id)
-            order.books.append(order_book)
-        
-        # Calculate total paid amount
-        order.total_paid_amount = OrderService.calculate_total(order)
-        
-        return order
-    
-    @staticmethod
-    def calculate_total(order: Order) -> int:
-        """
-        Calculate the total amount paid for an order
-        """
-        total = order.service_fee_amount or 0
 
-        if order.delivery_method != "pickup":
-            if order.sale_price_amount:
-                # Purchase order
-                total += order.sale_price_amount
-            else:
-                # Lending order
-                total += order.deposit_amount or 0
-
-            if order.shipping_out_fee_amount:
-                total += order.shipping_out_fee_amount
-
-        # If pickup method, only return service fee
-        return total
-    
-    @staticmethod
-    def update_order_pricing(order: Order, **pricing_updates) -> Order:
-        """
-        Update order pricing with new fees or adjustments
-        """
-        # Update individual pricing fields
-        for field, value in pricing_updates.items():
-            if hasattr(order, field):
-                setattr(order, field, value)
-        
-        # Recalculate total if any pricing fields were updated
-        pricing_fields = {
-            'deposit_amount', 'service_fee_amount', 'shipping_out_fee_amount',
-            'sale_price_amount', 'late_fee_amount', 'damage_fee_amount'
-        }
-        
-        if pricing_fields.intersection(pricing_updates.keys()):
-            order.total_paid_amount = OrderService.calculate_total(order)
+        # Add books to the order
+        for book_id in order_data.book_ids:
+            order.books.append(OrderBook(order_id=order.id, book_id=book_id))
         
         return order
