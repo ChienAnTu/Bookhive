@@ -94,7 +94,7 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center h-16 gap-2">
           {/* Logo section */}
           <div className="flex-shrink-0">
-            <Link href={isLoggedIn ? "/home" : "/"} className="flex items-center">
+            <Link href={isLoggedIn ? "/" : "/"} className="flex items-center">
               <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-2">
                 <span className="text-white font-bold text-sm">BB</span>
               </div>
@@ -131,7 +131,7 @@ const Header: React.FC = () => {
             {isLoggedIn && (
               <Link href="/lending/add">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   leftIcon={<Plus className="w-4 h-4" />}
                   className="hidden sm:flex"
@@ -151,9 +151,11 @@ const Header: React.FC = () => {
             {/* message button - count items */}
             {isLoggedIn && (
               <Link href="/message">
-                <div className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-black transition-colors duration-200">
-                  <Mail className="w-5 h-5 text-black hover:text-white" />
-                  
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-full">
+                  <Button variant="ghost" size="sm">
+                    <Mail className="w-5 h-5" />
+                  </Button>
+
                   {/* Badge */}
                   {threads.some(thread => thread.unreadCount > 0) && (
                     <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
@@ -167,8 +169,10 @@ const Header: React.FC = () => {
             {/* Shopping Cart button - count items */}
             {isLoggedIn && (
               <Link href="/cart">
-                <div className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-black transition-colors duration-200">
-                  <ShoppingBag className="w-5 h-5 text-black hover:text-white" />
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-full">
+                  <Button variant="ghost" size="sm">
+                    <ShoppingBag className="w-5 h-5" />
+                  </Button>
                   {cartCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
                       {cartCount}

@@ -36,13 +36,14 @@ export const getBooks = async (params?: {
 }): Promise<Book[]> => {
   const API_URL = getApiUrl();
   const token = getToken();
-  if (!token) return [];
 
   try {
     const response = await axios.get(`${API_URL}/api/v1/books`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      // Attach token only if it exists
+      // If user is logged in -> send Authorization header
+      // If not logged in -> request without token (guest access)
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+
       params: {
         owner_id: params?.ownerId,
         status: params?.status,
@@ -72,11 +73,10 @@ export const getBooks = async (params?: {
 export const getBookById = async (bookId: string): Promise<Book | null> => {
   const API_URL = getApiUrl();
   const token = getToken();
-  if (!token) return null;
 
   try {
     const res = await axios.get(`${API_URL}/api/v1/books/${bookId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
       console.log("Response status:", res.status);
 
