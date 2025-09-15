@@ -3,18 +3,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Package, Clock, AlertTriangle } from "lucide-react";
+import { Search, Filter, Package, Clock, AlertTriangle, MessageSquare, FileText } from "lucide-react";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import Modal from "../components/ui/Modal";
 
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
-import { mockOrders, mockBooks, mockUsers } from "@/app/data/mockData";
+import { mockOrders, mockBooks, mockUsers, getCurrentUser } from "@/app/data/mockData";
 
-import { getCurrentUser } from "@/utils/auth";
 //import { getOrders, updateOrder, cancelOrder } from "@/utils/orders";
 import { getBookById } from "@/utils/books";
+
+type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "other";
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -33,7 +35,16 @@ export default function OrderListPage() {
   const [err, setErr] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [search, setSearch] = useState("");
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [complaintForm, setComplaintForm] = useState({
+    type: "book-condition" as ComplaintType,
+    subject: "",
+    description: ""
+  });
   const router = useRouter();
+
+  const currentUser = getCurrentUser();
 
   // // get borrowing orders & related books
   //  useEffect(() => {
@@ -288,6 +299,27 @@ export default function OrderListPage() {
                             </Button>
                           )}
 
+                          {/* Report Issue - Available for active orders */}
+                          {(o.status === "BORROWING" || o.status === "OVERDUE" || o.status === "RETURNED") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-500 text-red-600 hover:bg-red-500 hover:text-white"
+                              onClick={() => {
+                                setSelectedOrder(o);
+                                setComplaintForm({
+                                  type: "book-condition",
+                                  subject: "",
+                                  description: ""
+                                });
+                                setIsComplaintModalOpen(true);
+                              }}
+                            >
+                              <MessageSquare className="w-4 h-4 mr-1" />
+                              Report Issue
+                            </Button>
+                          )}
+
                         </div>
                       </div>
                     </Card>
@@ -301,6 +333,130 @@ export default function OrderListPage() {
           )}
         </div>
       </div>
+
+      {/* Complaint Modal */}
+      <Modal
+        isOpen={isComplaintModalOpen}
+        onClose={() => setIsComplaintModalOpen(false)}
+        title="Report an Issue"
+      >
+        <div className="space-y-4">
+          {selectedOrder && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">Order Information</h4>
+              <div className="text-sm text-blue-800">
+                <p>Order ID: {selectedOrder.id}</p>
+                <p>Status: {STATUS_META[selectedOrder.status].label}</p>
+                {(() => {
+                  const book = selectedOrder.bookIds.map(id => booksMap[id]).filter(Boolean)[0];
+                  return book ? <p>Book: {book.titleOr}</p> : null;
+                })()}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Issue Type
+            </label>
+            <select
+              value={complaintForm.type}
+              onChange={(e) => setComplaintForm({...complaintForm, type: e.target.value as ComplaintType})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="book-condition">Book Damaged</option>
+              <option value="delivery">Wrong Book Received</option>
+              <option value="user-behavior">Poor Book Condition</option>
+              <option value="other">Other Issue</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subject
+            </label>
+            <input
+              type="text"
+              value={complaintForm.subject}
+              onChange={(e) => setComplaintForm({...complaintForm, subject: e.target.value})}
+              placeholder="Brief description of the issue"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Detailed Description
+            </label>
+            <textarea
+              value={complaintForm.description}
+              onChange={(e) => setComplaintForm({...complaintForm, description: e.target.value})}
+              placeholder="Please provide detailed information about the issue. Include any relevant details that will help us resolve the problem."
+              rows={5}
+              className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-yellow-900 mb-1">Important Note</h4>
+                <p className="text-yellow-800 text-sm">
+                  This complaint will be reviewed by our admin team. Please provide accurate information 
+                  as false reports may result in account restrictions.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsComplaintModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitComplaint}
+              disabled={!complaintForm.subject.trim() || !complaintForm.description.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Submit Report
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
+
+  function handleSubmitComplaint() {
+    if (!selectedOrder || !complaintForm.subject.trim() || !complaintForm.description.trim()) {
+      return;
+    }
+
+    // Here you would typically send the complaint to your backend
+    console.log("Submitting order complaint:", {
+      orderId: selectedOrder.id,
+      type: complaintForm.type,
+      subject: complaintForm.subject,
+      description: complaintForm.description,
+      source: "order"
+    });
+
+    // Show success message
+    alert("Your complaint has been submitted successfully! You can track its progress in the Complaints page.");
+
+    // Reset and close
+    setComplaintForm({
+      type: "book-condition",
+      subject: "",
+      description: ""
+    });
+    setSelectedOrder(null);
+    setIsComplaintModalOpen(false);
+
+    // Optionally redirect to complaints page
+    router.push("/complain");
+  }
 }

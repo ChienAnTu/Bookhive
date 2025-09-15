@@ -108,12 +108,12 @@ export default function EnhancedComplainPage() {
 
   const getTypeLabel = (type: ComplaintType) => {
     switch (type) {
-      case "book-condition": return "Book Condition";
-      case "delivery": return "Delivery Issue";
-      case "user-behavior": return "User Behavior";
-      case "overdue": return "Overdue";
-      case "other": return "Other";
-      default: return "Other";
+      case "book-condition": return "Book Damaged";
+      case "delivery": return "Wrong Book Received";
+      case "user-behavior": return "Poor Book Condition";
+      case "overdue": return "Overdue Issue";
+      case "other": return "Other Issue";
+      default: return "Other Issue";
     }
   };
 
@@ -227,11 +227,11 @@ export default function EnhancedComplainPage() {
   ];
 
   const complaintTypeOptions: { value: ComplaintType; label: string }[] = [
-    { value: "book-condition", label: "Book Condition" },
-    { value: "delivery", label: "Delivery Issue" },
-    { value: "user-behavior", label: "User Behavior" },
-    { value: "overdue", label: "Overdue" },
-    { value: "other", label: "Other" }
+    { value: "book-condition", label: "Book Damaged" },
+    { value: "delivery", label: "Wrong Book Received" },
+    { value: "user-behavior", label: "Poor Book Condition" },
+    { value: "overdue", label: "Overdue Issue" },
+    { value: "other", label: "Other Issue" }
   ];
 
   // Get available orders for dropdown
@@ -569,6 +569,42 @@ export default function EnhancedComplainPage() {
               rows={5}
               className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Upload Evidence (Optional)
+            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+              <div className="flex flex-col items-center">
+                <FileText className="w-8 h-8 text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 mb-2">
+                  Upload photos or documents to support your complaint
+                </p>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx"
+                  className="hidden"
+                  id="evidence-upload"
+                  onChange={(e) => {
+                    // Handle file upload logic here
+                    console.log("Files selected:", e.target.files);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('evidence-upload')?.click()}
+                >
+                  Choose Files
+                </Button>
+                <p className="text-xs text-gray-500 mt-2">
+                  Supported: JPG, PNG, PDF, DOC (Max 5MB each)
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3">
