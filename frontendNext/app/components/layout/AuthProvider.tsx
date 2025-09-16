@@ -19,7 +19,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
 
   // routes need to login 
   const protectedRoutes = ["/profile", "/orders", "/lending", "/borrowing", 
-    "cart", "checkout",
+    "/cart", "/checkout",
     "/message","/shipping", "/complain"
   ];
 
