@@ -1,6 +1,5 @@
 import axios from "axios";
 import type { User } from "@/app/types/user";
-import { Book } from "@/app/types/book";
 
 
 // API Configuration
@@ -212,18 +211,22 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
 
 // Update user profile
-export const updateUser = async (user: User) => {
+export const updateUser = async (user: Partial<User> & { id: string }) => {
   const API_URL = getApiUrl();
 
   try {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      throw new Error("No access token found in localStorage");
+    }
+
     const response = await axios.put(
       `${API_URL}/api/v1/user/${user.id}`,
       user,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${token}`,
         },
-        withCredentials: true,
       }
     );
 

@@ -339,10 +339,10 @@ export default function CartPage() {
                                       ? book.status
                                       : "Unlisted"}
                                 </div>
-                                <div>
+                                {/* <div>
                                   <span className="font-medium">Shipping Method:&nbsp;</span>
                                   {book.deliveryMethod || "N/A"}
-                                </div>
+                                </div> */}
 
                               </div>
 

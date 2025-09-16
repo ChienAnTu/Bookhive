@@ -7,21 +7,21 @@ import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 
-// ------- Types (adapt to your real shapes) -------
-// Assuming your cart items still look like books with an ownerId and fees
-// If you already switched to CartLine with priceSnapshot, you can swap in that type instead
+import { getCurrentUser, updateUser, getUserById } from "@/utils/auth";
+import type { User } from "@/app/types/user";
+
+import { getMyCheckouts, deleteCheckout, createCheckout } from "@/utils/checkout";
+import { listServiceFees } from "@/utils/serviceFee";
+import { getShippingQuotes } from "@/utils/shipping";
+
+
+
+// 页面进入时 → 查 checkout，没有就新建
+// 金额全用后端返回的计算结果
+// 修改地址 或 修改运输方式 → 重建 checkout（删除+新建）
+// 点击下单 → 提交 checkout
 
 type DeliveryChoice = "delivery" | "pickup"; // delivery == post
-
-type Address = {
-  country: string;
-  state?: string;
-  city: string;
-  postcode: string;
-  street: string;
-  contactName: string;
-  phone?: string;
-};
 
 type ShippingQuote = {
   id: string;
@@ -31,52 +31,167 @@ type ShippingQuote = {
   serviceLevel?: string; // Standard/Express
   cost: number; // AUD dollars
   currency: "AUD";
-  etaDays?: number;
+  etaDays?: string;
   expiresAt: string; // ISO
 };
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart } = useCartStore() as {
-    cart: Array<{
-      id: string;
-      titleOr: string;
-      author?: string;
-      ownerId: string;
-      deliveryMethod?: "post" | "self-help" | "both";
-      fees?: { deposit: number; serviceFee: number };
-    }>;
-  };
-
-  // ---------- UI State ----------
-  const [address, setAddress] = useState<Address>({
-    country: "Australia",
-    city: "",
-    postcode: "",
-    street: "",
-    contactName: "",
-    phone: "",
-  });
+  const [globalShippingChoice, setGlobalShippingChoice] = useState<"standard" | "express" | null>(null);
+  const { cart } = useCartStore();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [checkouts, setCheckouts] = useState<any[]>([]);
+  const [ownersMap, setOwnersMap] = useState<Record<string, { name: string; zipCode: string }>>({});
+  const [serviceRate, setServiceRate] = useState<number>(0);
+const [address, setAddress] = useState({
+  name: "",
+  phone: "",
+  street: "",
+  city: "",
+  state: "",
+  postcode: "",
+});
 
   // Per-item shipping choice (default by book capability)
-  const [itemShipping, setItemShipping] = useState<Record<string, DeliveryChoice>>({});
+  const [itemShipping, setItemShipping] = useState<Record<string, "delivery" | "pickup" | "">>({});
 
   // Quotes per owner for DELIVERY (post)
   const [quotesByOwner, setQuotesByOwner] = useState<Record<string, ShippingQuote[]>>({});
   const [selectedQuoteByOwner, setSelectedQuoteByOwner] = useState<Record<string, ShippingQuote>>({});
 
-  // ---------- Helpers ----------
-  const normalizeDefaultChoice = (m?: "post" | "self-help" | "both"): DeliveryChoice => {
-    if (m === "post" || m === "both" || !m) return "delivery";
-    return "pickup"; // self-help → pickup
+  // 1. 拉取当前用户，预填地址
+  useEffect(() => {
+    async function loadUser() {
+      const user = await getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+      }
+    }
+    loadUser();
+  }, []);
+
+  // 2. 拉取 owner 信息
+  useEffect(() => {
+    async function loadOwners() {
+      const uniqueOwnerIds = Array.from(new Set(cart.map((b) => b.ownerId)));
+      const map: Record<string, { name: string; zipCode: string }> = {};
+
+      for (const id of uniqueOwnerIds) {
+        try {
+          const u = await getUserById(id);
+          map[id] = {
+            name: u?.name || "Unknown Owner",
+            zipCode: u?.zipCode || "6000", // a fallback
+          };
+        } catch {
+          map[id] = { name: id, zipCode: "0000" };
+        }
+      }
+
+      setOwnersMap(map);
+    }
+
+    if (cart.length > 0) loadOwners();
+  }, [cart]);
+
+const currentCheckout = checkouts.length > 0 ? checkouts[0] : null;
+
+  // 3. 拉取 checkout，如果没有则创建
+  useEffect(() => {
+  async function initCheckout() {
+    let data = await getMyCheckouts();
+    if (!data || data.length === 0) {
+      // 构造 payload
+      const payload = buildPayload(currentUser, null, cart, {});
+      const created = await createCheckout(payload);
+      data = [created];
+    }
+    setCheckouts(data);
+  }
+
+  if (cart.length > 0 && currentUser) initCheckout();
+}, [cart, currentUser]);
+
+  //4. 获取service fee
+  useEffect(() => {
+    async function loadFee() {
+      try {
+        const fees = await listServiceFees();
+        const activePercent = fees.find((f: any) => f.feeType === "PERCENT" && f.status);
+        if (activePercent) {
+          setServiceRate(Number(activePercent.value)); // 比如 5 (%)
+        }
+      } catch (err) {
+        console.error("Failed to load service fee:", err);
+      }
+    }
+    loadFee();
+  }, []);
+
+  function buildPayload(
+  user: User | null,
+  checkout: any | null,
+  cart: any[],
+  shipping: Record<string, "delivery" | "pickup">
+) {
+  return {
+    userId: user?.id,
+    contactName: checkout?.contactName ?? user?.name ?? "",
+    phone: checkout?.phone ?? user?.phoneNumber ?? "",
+    street: checkout?.street ?? user?.streetAddress ?? "",
+    city: checkout?.city ?? user?.city ?? "",
+    postcode: checkout?.postcode ?? user?.zipCode ?? "",
+    country: "Australia",
+    items: cart.map((it) => ({
+      bookId: it.id,
+      ownerId: it.ownerId,
+      actionType: it.mode.toUpperCase(),
+      price: it.mode === "purchase" ? it.salePrice : undefined,
+      deposit: it.mode === "borrow" ? it.deposit : undefined,
+      shippingMethod: shipping[it.id] || "",
+      serviceCode: "AUS_PARCEL_REGULAR",
+    })),
   };
+}
+
+
+  // 封装：根据当前页面信息改动，重建 checkout （删除+新建）
+  const rebuildCheckout = async (newItemShipping: Record<string, "delivery" | "pickup">) => {
+    try {
+      // 如果已有 checkout，先删掉
+      if (checkouts.length > 0) {
+        await deleteCheckout(checkouts[0].checkoutId);
+        setCheckouts([]);
+      }
+
+      // 构造 payload
+      const cleaned: Record<string, "delivery" | "pickup"> = Object.fromEntries(
+  Object.entries(itemShipping).filter(
+    ([, v]) => v === "delivery" || v === "pickup"
+  )
+) as Record<string, "delivery" | "pickup">;
+
+const payload = buildPayload(currentUser, currentCheckout, cart, cleaned);
+
+
+      // 调用后端创建 checkout
+      const newCheckout = await createCheckout(payload);
+      setCheckouts([newCheckout]);
+      console.error("Rebuild checkout:", newCheckout);
+
+    } catch (err) {
+      console.error("Failed to rebuild checkout:", err);
+      alert("Failed to update checkout, please try again.");
+    }
+  };
+
 
   useEffect(() => {
     // initialize defaults once cart loads/changes
-    const next: Record<string, DeliveryChoice> = {};
+    const next: Record<string, "delivery" | "pickup" | ""> = {};
     for (const b of cart) {
-      if (!itemShipping[b.id]) next[b.id] = normalizeDefaultChoice(b.deliveryMethod);
-      else next[b.id] = itemShipping[b.id];
+      // ✅ 每次进入页面都清空
+      next[b.id] = "";
     }
     setItemShipping(next);
     // reset quotes when cart or choices change
@@ -89,7 +204,7 @@ export default function CheckoutPage() {
     const delivery: Record<string, typeof cart> = {};
     const pickup: Record<string, typeof cart> = {};
     for (const b of cart) {
-      const choice = itemShipping[b.id] ?? normalizeDefaultChoice(b.deliveryMethod);
+      const choice = itemShipping[b.id];
       const bucket = choice === "delivery" ? delivery : pickup;
       (bucket[b.ownerId] ||= []).push(b);
     }
@@ -102,89 +217,114 @@ export default function CheckoutPage() {
     };
   }, [cart, itemShipping]);
 
-  // Compute totals (core = deposit + serviceFee for demo; replace with your snapshot calc if available)
-  const coreTotals = useMemo(() => {
-    let deposit = 0;
-    let service = 0;
-    for (const b of cart) {
-      deposit += Number(b.fees?.deposit || 0);
-      service += Number(b.fees?.serviceFee || 0);
-    }
-    return { deposit, service, core: +(deposit + service).toFixed(2) };
-  }, [cart]);
-
-  const shippingTotal = useMemo(() => {
-    return Object.values(selectedQuoteByOwner).reduce((sum, q) => sum + (q?.cost || 0), 0);
-  }, [selectedQuoteByOwner]);
-
-  const grandTotal = useMemo(() => +(coreTotals.core + shippingTotal).toFixed(2), [coreTotals.core, shippingTotal]);
-
-  // ---------- Mock: get quotes per owner for DELIVERY items ----------
+  // ---------- Get quotes per owner for DELIVERY items ----------
   async function requestQuotes() {
-    // Normally POST /api/shipping/quote with address + delivery groups
-    // Here we mock it deterministically
     const now = Date.now();
     const expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
     const result: Record<string, ShippingQuote[]> = {};
 
     for (const ownerId of groups.deliveryOwners) {
       const items = groups.delivery[ownerId];
-      const base = 6.9; // base per shipment
-      const perItem = 2.0 * items.length; // simplistic scaler
-      result[ownerId] = [
-        {
-          id: `${ownerId}-STD`,
-          ownerId,
-          method: "post",
-          carrier: "AusPost",
-          serviceLevel: "Standard",
-          cost: +(base + perItem).toFixed(2),
-          currency: "AUD",
-          etaDays: 3,
-          expiresAt,
-        },
-        {
-          id: `${ownerId}-EXP`,
-          ownerId,
-          method: "post",
-          carrier: "AusPost",
-          serviceLevel: "Express",
-          cost: +(base + perItem + 4).toFixed(2),
-          currency: "AUD",
-          etaDays: 1,
-          expiresAt,
-        },
-      ];
+
+      // 假设每本书 30x20x5 cm, 0.5kg
+      const length = 30;
+      const width = 20;
+      const height = 5 * items.length;
+      const weight = 0.5 * items.length;
+
+      try {
+        const data = await getShippingQuotes(
+          ownersMap[ownerId]?.zipCode || "2000", // 发货人邮编（书主）
+          String(checkouts[0]?.postcode || ""),                     // 收货人邮编（当前用户）
+          length,
+          width,
+          height,
+          weight
+        );
+
+        result[ownerId] = [
+          {
+            id: `${ownerId}-STD`,
+            ownerId,
+            method: "post",
+            carrier: "AusPost",
+            serviceLevel: "Standard",
+            cost: parseFloat(String(data.AUS_PARCEL_REGULAR?.total_cost ?? "0")),
+            currency: "AUD",
+            etaDays: data.AUS_PARCEL_REGULAR?.delivery_time || "-",
+            expiresAt,
+          },
+          {
+            id: `${ownerId}-EXP`,
+            ownerId,
+            method: "post",
+            carrier: "AusPost",
+            serviceLevel: "Express",
+            cost: parseFloat(String(data.AUS_PARCEL_EXPRESS?.total_cost || "0")),
+            currency: "AUD",
+            etaDays: data.AUS_PARCEL_EXPRESS?.delivery_time || "-",
+            expiresAt,
+          },
+        ];
+      } catch (err) {
+        console.error(`Failed to fetch shipping quotes for owner ${ownerId}:`, err);
+        result[ownerId] = [];
+      }
     }
+
     setQuotesByOwner(result);
 
-    // default select first quote per owner
-    const sel: Record<string, ShippingQuote> = {};
-    for (const k of Object.keys(result)) sel[k] = result[k][0];
-    setSelectedQuoteByOwner(sel);
+// 默认选择每个 owner 的 Standard 报价
+const sel: Record<string, ShippingQuote> = {};
+for (const k of Object.keys(result)) {
+  if (result[k]?.length) {
+    // 找 Standard 报价
+    const std = result[k].find((q) => q.serviceLevel === "Standard");
+    sel[k] = std || result[k][0]; // 找不到 Standard，就 fallback 第一个
+  }
+}
+setSelectedQuoteByOwner(sel);
+
   }
 
   // ---------- Handlers ----------
   const setChoice = (bookId: string, value: DeliveryChoice) => {
-    setItemShipping((prev) => ({ ...prev, [bookId]: value }));
-  };
-
-  const placeOrder = async () => {
-    // Submit one order with mixed shipments
-    const shipments = Object.values(selectedQuoteByOwner).map((q) => ({ ownerId: q.ownerId, quoteId: q.id }));
-    console.log("PLACE ORDER", {
-      address,
-      shipments,
-      choices: itemShipping,
-      grandTotal,
+    setItemShipping(prev => {
+      const next = { ...prev, [bookId]: value };
+      return next;
     });
-    // const res = await fetch("/api/orders", { method: "POST", body: JSON.stringify({...}) });
-    // const data = await res.json();
-    // router.push(`/orders/${data.id}`)
-    alert("Order created (mock). Check console.");
   };
 
-  // ---------- UI ----------
+
+  // 下单
+  const placeOrder = async () => {
+    if (checkouts.length === 0) {
+      alert("No checkout found, please refresh.");
+      return;
+    }
+
+    const checkout = checkouts[0];
+
+    // 校验地址
+    if (!checkout.contactName || !checkout.phone || !checkout.street || !checkout.city || !checkout.postcode) {
+      alert("Please complete your delivery address before placing the order.");
+      return;
+    }
+
+    // 校验金额
+    if (!checkout.totalDue || checkout.totalDue <= 0) {
+      alert("Order total is invalid. Please refresh.");
+      return;
+    }
+
+    // ✅ 一切正常，可以提交
+    console.log("Placing order with checkout:", checkout);
+    alert(`Order placed! Total due: $${checkout.totalDue}`);
+    router.push(`/orders/${checkout.checkoutId}`);
+  };
+
+
+  // ---------- When Empty ----------
   if (cart.length === 0) {
     return (
       <div className="p-6 text-center">
@@ -201,113 +341,234 @@ export default function CheckoutPage() {
       {/* Address */}
       <Card>
         <div className="p-4 space-y-3">
-          <h2 className="text-lg font-semibold">Delivery Address</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Contact Name" value={address.contactName} onChange={(e)=>setAddress({...address, contactName: e.target.value})} name="contactName" />
-            <Input label="Phone" value={address.phone||""} onChange={(e)=>setAddress({...address, phone: e.target.value})} name="phone" />
-            <Input label="Street" value={address.street} onChange={(e)=>setAddress({...address, street: e.target.value})} name="street" />
-            <Input label="City" value={address.city} onChange={(e)=>setAddress({...address, city: e.target.value})} name="city" />
-            <Input label="Postcode" value={address.postcode} onChange={(e)=>setAddress({...address, postcode: e.target.value})} name="postcode" />
-            <Input label="Country" value={address.country} onChange={(e)=>setAddress({...address, country: e.target.value})} name="country" />
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Delivery Address</h2>
+            <Button
+  variant="outline"
+  onClick={async () => {
+    if (!currentUser || checkouts.length === 0) return;
+    const checkout = checkouts[0];
+
+    // 更新用户 Profile
+    await updateUser({
+      id: currentUser.id,
+      state: checkout.state,
+      city: checkout.city,
+      zipCode: checkout.postcode,
+      streetAddress: checkout.street,
+      name: checkout.contactName,
+      phoneNumber: checkout.phone,
+    });
+
+    // 重建 checkout
+    const cleaned: Record<string, "delivery" | "pickup"> = Object.fromEntries(
+      checkout.items.map((it: any) => [it.bookId, it.shippingMethod])
+    ) as Record<string, "delivery" | "pickup">;
+
+    await rebuildCheckout(cleaned);
+
+    alert("Address saved!");
+  }}
+  className="text-sm"
+>
+  Save Address
+</Button>
+
+
           </div>
+{checkouts.length > 0 && (
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <Input
+      label="Contact Name"
+      value={checkouts[0].contactName || ""}
+      onChange={(e) =>
+        setCheckouts(prev =>
+          prev.length ? [{ ...prev[0], contactName: e.target.value }] : prev
+        )
+      }
+    />
+    <Input
+      label="Phone"
+      value={checkouts[0].phone || ""}
+      onChange={(e) =>
+        setCheckouts(prev =>
+          prev.length ? [{ ...prev[0], phone: e.target.value }] : prev
+        )
+      }
+    />
+    <Input
+      label="Street"
+      value={checkouts[0].street || ""}
+      onChange={(e) =>
+        setCheckouts(prev =>
+          prev.length ? [{ ...prev[0], street: e.target.value }] : prev
+        )
+      }
+    />
+    <Input
+      label="City"
+      value={checkouts[0].city || ""}
+      onChange={(e) =>
+        setCheckouts(prev =>
+          prev.length ? [{ ...prev[0], city: e.target.value }] : prev
+        )
+      }
+    />
+    <Input
+      label="State"
+      value={checkouts[0].state || ""}
+      onChange={(e) =>
+        setCheckouts(prev =>
+          prev.length ? [{ ...prev[0], state: e.target.value }] : prev
+        )
+      }
+    />
+    <Input
+      label="Postcode"
+      value={checkouts[0].postcode || ""}
+      onChange={(e) =>
+        setCheckouts(prev =>
+          prev.length ? [{ ...prev[0], postcode: e.target.value }] : prev
+        )
+      }
+    />
+  </div>
+)}
+
+
         </div>
       </Card>
 
-      {/* Item shipping choices */}
+      {/* Items & Delivery */}
       <Card>
         <div className="p-4 space-y-3">
-          <h2 className="text-lg font-semibold">Items & Delivery Method</h2>
-          <div className="space-y-3">
-            {cart.map((b) => (
-              <div key={b.id} className="flex items-center justify-between border rounded-md p-3">
-                <div>
-                  <div className="font-medium">《{b.titleOr}》</div>
-                  <div className="text-sm text-gray-600">Owner: {b.ownerId}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-sm">Method:</label>
-                  <select
-                    className="border rounded px-2 py-1"
-                    value={itemShipping[b.id] ?? normalizeDefaultChoice(b.deliveryMethod)}
-                    onChange={(e) => setChoice(b.id, e.target.value as DeliveryChoice)}
-                  >
-                    {/* options reflect book capability */}
-                    {(b.deliveryMethod === "post" || b.deliveryMethod === "both" || !b.deliveryMethod) && (
-                      <option value="delivery">Delivery</option>
-                    )}
-                    {(b.deliveryMethod === "self-help" || b.deliveryMethod === "both" || !b.deliveryMethod) && (
-                      <option value="pickup">Pickup</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-            ))}
+
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Items & Delivery</h2>
+            <Button
+  variant="outline"
+  onClick={async () => {
+    // 校验所有 item 是否选择了配送方式
+    const unselected = cart.filter((b) => !itemShipping[b.id]);
+    if (unselected.length > 0) {
+      alert("Please select delivery method for all items before saving.");
+      return;
+    }
+
+    // 清理掉空值，只保留 "delivery" | "pickup"
+    const cleaned: Record<string, "delivery" | "pickup"> = Object.fromEntries(
+      Object.entries(itemShipping).filter(
+        ([, v]) => v === "delivery" || v === "pickup"
+      )
+    ) as Record<string, "delivery" | "pickup">;
+
+    await rebuildCheckout(cleaned);
+    await requestQuotes();
+
+    alert("Delivery methods saved!");
+  }}
+  className="text-sm"
+>
+  Save Delivery Method
+</Button>
+
           </div>
-        </div>
-      </Card>
 
-      {/* Delivery groups (POST) */}
-      {groups.deliveryOwners.length > 0 && (
-        <Card>
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Shipments – Delivery</h2>
-              <Button variant="outline" onClick={requestQuotes}>Get Shipping Quotes</Button>
-            </div>
+          {/* Items 分组 */}
+          <div className="space-y-4">
+            {Object.entries(
+              cart.reduce<Record<string, typeof cart>>((acc, item) => {
+                (acc[item.ownerId] ||= []).push(item);
+                return acc;
+              }, {})
+            ).map(([ownerId, items]) => (
+              <div key={ownerId} className="border rounded-md p-4 space-y-3 bg-gray-100">
+                <div className="font-semibold">
+                  📚 Owner: {ownersMap[ownerId]?.name}
+                </div>
+                <div className="divide-y space-y-2">
+                  {items.map((b) => (
+                    <div key={b.id} className="py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">《{b.titleOr}》
+                            <span className="text-sm text-blue-600">
+                              Trading Way: {b.mode === "borrow" ? "Borrow" : "Purchase"}
+                            </span>
+                          </div>
+                        </div>
 
-            {groups.deliveryOwners.map((ownerId) => (
-              <div key={ownerId} className="border rounded-md p-3 space-y-2">
-                <div className="font-medium">Owner: {ownerId}</div>
-                <ul className="text-sm text-gray-600 list-disc pl-5">
-                  {groups.delivery[ownerId].map((b) => (
-                    <li key={b.id}>《{b.titleOr}》</li>
+                        {/* Delivery / Pickup select */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-700">Delivery Method:</span>
+                          {b.deliveryMethod === "post" && (
+                            <span className="px-4 py-1 rounded bg-black text-white text-sm">Delivery</span>
+                          )}
+                          {b.deliveryMethod === "pickup" && (
+                            <span className="px-4 py-1 rounded bg-black text-white text-sm">Pickup</span>
+                          )}
+                          {b.deliveryMethod === "both" && (
+                            <select
+                              value={itemShipping[b.id]}
+                              onChange={(e) => setChoice(b.id, e.target.value as "delivery" | "pickup")}
+                              className="px-3 py-1 border rounded bg-white text-sm"
+
+                            >
+                              <option value="" disabled>
+                                -- Select option --
+                              </option>
+                              <option value="delivery">Delivery</option>
+                              <option value="pickup">Pickup</option>
+                            </select>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pickup hint */}
+                      {itemShipping[b.id] === "pickup" && (
+                        <p className="text-sm text-green-700 mt-2">
+                          Pickup is free. Details will be shared after order.
+                        </p>
+                      )}
+                    </div>
                   ))}
-                </ul>
+                </div>
 
-                {/* Quotes chooser */}
-                {quotesByOwner[ownerId]?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {quotesByOwner[ownerId].map((q) => (
-                      <button
-                        key={q.id}
-                        type="button"
-                        onClick={() => setSelectedQuoteByOwner((prev) => ({ ...prev, [ownerId]: q }))}
-                        className={`px-3 py-2 rounded border text-sm ${
-                          selectedQuoteByOwner[ownerId]?.id === q.id ? "bg-black text-white" : "bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        {q.carrier} {q.serviceLevel || ""} • ${q.cost} • ETA {q.etaDays || "-"}d
-                      </button>
-                    ))}
+                {/* Shipping Quotes（if chose delivery, display under this owner） */}
+                {items.some((b) => itemShipping[b.id] === "delivery") && quotesByOwner[ownerId]?.length && (
+                  <div className="mt-4 p-4 rounded-md border bg-white">
+                    <h4 className="text-sm font-semibold mb-2 text-gray-800">AusPost Shipping Quotes</h4>
+                    <div className="flex gap-2">
+                      {quotesByOwner[ownerId].map((q) => {
+                        const choiceKey = q.serviceLevel === "Standard" ? "standard" : "express";
+
+                        // 默认选中 Standard
+                        if (!globalShippingChoice && choiceKey === "standard") {
+                          setGlobalShippingChoice("standard");
+                        }
+
+                        return (
+                          <button
+                            key={q.id}
+                            type="button"
+                            onClick={() => setGlobalShippingChoice(choiceKey)}
+                            className={`px-3 py-2 rounded border text-sm ${globalShippingChoice === choiceKey
+                              ? "bg-black text-white"
+                              : "bg-white hover:bg-gray-50"
+                              }`}
+                          >
+                            {q.carrier} {q.serviceLevel} • ${q.cost} • ETA {q.etaDays || "-"}d
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Quotes pending. Click "Get Shipping Quotes".</p>
                 )}
               </div>
             ))}
           </div>
-        </Card>
-      )}
-
-      {/* Pickup groups */}
-      {groups.pickupOwners.length > 0 && (
-        <Card>
-          <div className="p-4 space-y-3">
-            <h2 className="text-lg font-semibold">Shipments – Pickup</h2>
-            {groups.pickupOwners.map((ownerId) => (
-              <div key={ownerId} className="border rounded-md p-3 space-y-2">
-                <div className="font-medium">Owner: {ownerId}</div>
-                <ul className="text-sm text-gray-600 list-disc pl-5">
-                  {groups.pickup[ownerId].map((b) => (
-                    <li key={b.id}>《{b.titleOr}》</li>
-                  ))}
-                </ul>
-                <p className="text-sm text-green-700">Pickup is free. Details will be shared after order.</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+        </div>
+      </Card>
 
       {/* Summary */}
       <Card>
@@ -315,21 +576,23 @@ export default function CheckoutPage() {
           <h2 className="text-lg font-semibold">Order Summary</h2>
           <div className="flex justify-between text-sm">
             <span>Deposits</span>
-            <span>${coreTotals.deposit.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span>Platform Service Fees</span>
-            <span>${coreTotals.service.toFixed(2)}</span>
+            <span>${checkouts[0]?.deposit?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Shipping (selected)</span>
-            <span>${shippingTotal.toFixed(2)}</span>
+            <span>${checkouts[0]?.shippingFee?.toFixed(2) || "0.00"}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Platform Service Fees</span>
+            <span>${checkouts[0]?.serviceFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-lg font-bold border-t pt-2">
             <span>Total Due</span>
-            <span>${grandTotal.toFixed(2)}</span>
+            <span>${checkouts[0]?.totalDue?.toFixed(2) || "0.00"}</span>
           </div>
-          <p className="text-xs text-gray-500">Deposits may be refundable upon return. Shipping is charged per owner based on your selected quote.</p>
+          <p className="text-xs text-gray-500">
+            Deposits may be refundable upon return. Shipping is charged per owner based on your selected quote.
+          </p>
         </div>
       </Card>
 
