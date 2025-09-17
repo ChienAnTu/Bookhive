@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, String, DateTime, Enum, ForeignKey, 
-    Integer, Text
+    Text, DECIMAL
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -24,11 +24,12 @@ ORDER_STATUS_ENUM = (
 )
 
 # Delivery method enum - matches frontend DeliveryMethod
-DELIVERY_METHOD_ENUM = ("post", "pickup")
+SHIPPING_METHOD_ENUM = ("post", "pickup")
 
 # Carrier options enum - matches frontend ShippingRef.carrier
 CARRIER_ENUM = ("AUSPOST", "OTHER")
 
+ORDER_TYPE_ENUM = ("borrow", "purchase")
 
 class Order(Base):
     """
@@ -46,6 +47,8 @@ class Order(Base):
     status = Column(Enum(*ORDER_STATUS_ENUM, name="order_status_enum"), 
                    nullable=False, default="PENDING_PAYMENT", index=True)
     
+    action_type = Column(Enum(*ORDER_TYPE_ENUM, name="order_type_enum"), nullable=False)
+
     # Time tracking
     start_at = Column(DateTime, nullable=True)
     due_at = Column(DateTime, nullable=True)
@@ -56,8 +59,8 @@ class Order(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     
-    # Delivery 
-    delivery_method = Column(Enum(*DELIVERY_METHOD_ENUM, name="delivery_method_enum"), 
+    # Delivery or pickup 
+    shipping_method = Column(Enum(*SHIPPING_METHOD_ENUM, name="delivery_method_enum"), 
                            nullable=False)
     
     # Shipping Out info 
@@ -72,18 +75,19 @@ class Order(Base):
     
     # Pricing
     # Core pricing
-    deposit_amount = Column(Integer, nullable=True, default=0) # Optional
-    service_fee_amount = Column(Integer, nullable=False, default=0)
-    shipping_out_fee_amount = Column(Integer, nullable=True)  # Optional
-    sale_price_amount = Column(Integer, nullable=True)        # Optional
-    
-    # Post-return adjustments
-    late_fee_amount = Column(Integer, nullable=True)
-    damage_fee_amount = Column(Integer, nullable=True)
+    deposit_or_sale_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00) 
+    service_fee_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00)
+    shipping_out_fee_amount = Column(DECIMAL(10, 2), nullable=True)  # Optional
     
     # Totals
-    total_paid_amount = Column(Integer, nullable=False, default=0)     # Initial payment
-    total_refunded_amount = Column(Integer, nullable=True)             # What borrower got back
+    total_paid_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00)     # Initial payment
+    total_refunded_amount = Column(DECIMAL(10, 2), nullable=True)             # What borrower got back
+
+    # Post-return adjustments
+    late_fee_amount = Column(DECIMAL(10, 2), nullable=True)
+    damage_fee_amount = Column(DECIMAL(10, 2), nullable=True)
+    
+
     
     # Address info for delivery (borrower's address)
     contact_name = Column(String(100), nullable=False)
