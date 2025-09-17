@@ -18,9 +18,9 @@ const Footer: React.FC = () => {
             <Link href="/about" className="hover:text-orange-500">
               About Us
             </Link>
-            <Link href="/contact" className="hover:text-orange-500">
+            {/* <Link href="/contact" className="hover:text-orange-500">
               Contact
-            </Link>
+            </Link> */}
           </div>
         </div>
       </div>
