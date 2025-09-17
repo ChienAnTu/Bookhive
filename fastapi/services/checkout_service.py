@@ -80,6 +80,7 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
         street=checkoutIn.street,
         city=checkoutIn.city,
         postcode=checkoutIn.postcode,
+        state=checkoutIn.state,
         country=checkoutIn.country,
         status="PENDING",
     )
