@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import List
 
 from core.dependencies import get_db, get_current_user
 from models.user import User as UserModel
 from services import cart_service
-from models.cart import CartItemCreate, CartItem, Cart
+from models.cart import CartItemCreate, CartItem, Cart, CartItemUpdate
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
@@ -62,9 +62,31 @@ def add_item_to_cart(
 
 @router.delete("/items", status_code=status.HTTP_200_OK)
 def remove_items_from_cart(
-    cart_item_ids: List[str],
+    cart_item_ids: List[str] = Body(...),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     deleted_count = cart_service.remove_cart_items(db, current_user.user_id, cart_item_ids)
     return {"deletedCount": deleted_count}
+
+@router.put("/items/{cart_item_id}", status_code=status.HTTP_200_OK)
+def update_cart_item(
+    cart_item_id: str,
+    item: CartItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    Update an existing cart item (e.g., change action type, price, or deposit).
+    """
+    updated_item = cart_service.update_cart_item(
+        db=db,
+        user_id=current_user.user_id,
+        cart_item_id=cart_item_id,
+        action_type=item.actionType,
+        price=item.price,
+        deposit=item.deposit,
+    )
+    if not updated_item:
+        raise HTTPException(status_code=404, detail="Item not found or not owned by user")
+    return _cart_item_to_dict(updated_item)

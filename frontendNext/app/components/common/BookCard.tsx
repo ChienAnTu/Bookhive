@@ -1,33 +1,48 @@
 import React from "react";
 import Card from "../ui/Card";
 import { MapPin, Star, Clock, Calendar } from "lucide-react";
-import { Book } from "@/app/types/book";
+import { useState, useEffect } from "react";
 
-// import Link from "next/link";
-import {
-  User,
-  calculateDistance,
-  getCurrentUser,
-} from "@/app/data/mockData";
+import { calculateDistance } from "@/app/data/mockData";
+import type { Book } from "@/app/types/book";
+import type { User } from "@/app/types/user";
+import { getCurrentUser, getUserById } from "@/utils/auth";
 
 export interface BookCardProps {
   book: Book;
-  owner?: User;
   onViewDetails?: (bookId: string) => void;
 }
 
-const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
-  const currentUser = getCurrentUser();
+const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
+  const [imgError, setImgError] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [ownerUser, setOwnerUser] = useState<User | null>(null);
 
-  const distance =
-    owner && owner.coordinates
-      ? calculateDistance(
-          currentUser.coordinates.lat,
-          currentUser.coordinates.lng,
-          owner.coordinates.lat,
-          owner.coordinates.lng
-        )
-      : 0;
+  useEffect(() => {
+  if (!book?.ownerId) return;
+
+  (async () => {
+    try {
+      const [user, owner] = await Promise.all([
+        getCurrentUser(),
+        getUserById(book.ownerId),
+      ]);
+      setCurrentUser(user);
+      if (owner) setOwnerUser(owner);
+    } catch (err) {
+      console.error("Failed to load user/owner:", err);
+    }
+  })();
+}, [book?.ownerId]);
+
+
+  // const distance =
+  //   currentUser && ownerUser?.coordinates && currentUser.coordinates
+  //     ? calculateDistance(
+  //       currentUser,ownerUser
+  //     )
+  //     : 0;
+  // console.log(calculateDistance(currentUser,ownerUser))
 
   const getDeliveryLabel = (method: string) => {
     switch (method) {
@@ -42,26 +57,12 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
     }
   };
 
-  const getConditionColor = (condition: string) => {
-    switch (condition) {
-      case "new":
-      case "like-new":
-        return "text-green-600 bg-green-50";
-      case "good":
-        return "text-blue-600 bg-blue-50";
-      case "fair":
-        return "text-yellow-600 bg-yellow-50";
-      default:
-        return "text-gray-600 bg-gray-50";
-    }
-  };
-
   const formatDateAdded = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
+
 
     if (diffDays === 0) return "today";
     if (diffDays === 1) return "yesterday";
@@ -77,7 +78,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
       className="w-full overflow-hidden h-full flex flex-col transform-none"
       onClick={() => onViewDetails?.(book.id)}
     >
-      {/* 封面图片区域 */}
+      {/* cover img */}
       <div className="relative w-full">
         {/* delivery method */}
         <div className="absolute top-3 left-3 z-10">
@@ -87,26 +88,24 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
         </div>
 
         <div className="aspect-[4/5] w-full">
-          {book.coverImgUrl ? (
+          {book.coverImgUrl && !imgError ? (
             <img
               src={book.coverImgUrl}
               alt={book.titleOr}
               className="w-full h-full object-cover block"
+              onError={() => setImgError(true)}   // when loading fail
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-6xl mb-2">📚</div>
-                <div className="text-sm text-gray-500 font-medium">
-                  {book.titleOr.slice(0, 20)}...
-                </div>
-              </div>
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-lg font-semibold text-gray-600 text-center px-2 line-clamp-2">
+                {book.titleOr || "Untitled"}
+              </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* 信息区域 */}
+      {/* Info section*/}
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex-1">
           {/* title and author */}
@@ -136,22 +135,27 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
             <div className="flex items-center min-w-0 flex-1">
               <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
               <span className="truncate">
-                {owner?.location || "Unknown location"}
+                {[
+                  ownerUser?.city,
+                  ownerUser?.state,
+                  ownerUser?.zipCode,
+                ].filter(Boolean).join(", ")}
+
               </span>
             </div>
-            <span className="font-medium ml-2 flex-shrink-0">
+            {/* <span className="font-medium ml-2 flex-shrink-0">
               {distance}km away
-            </span>
+            </span> */}
           </div>
 
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center">
               <Star className="w-4 h-4 mr-1 text-yellow-400 fill-current flex-shrink-0" />
-              <span className="font-medium">{owner?.rating || "N/A"}</span>
+              <span className="font-medium">{ownerUser?.rating || "N/A"}</span>
             </div>
             <div className="flex items-center">
               <Clock className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span>{book.maxLendingDays} days max</span>
+              <span>Up to {book.maxLendingDays} days</span>
             </div>
           </div>
 
@@ -159,8 +163,6 @@ const BookCard: React.FC<BookCardProps> = ({ book, owner, onViewDetails }) => {
             <Calendar className="w-4 h-4 mr-1 flex-shrink-0" />
             <span>Added {formatDateAdded(book.dateAdded)}</span>
           </div>
-
-         
         </div>
       </div>
     </Card>
