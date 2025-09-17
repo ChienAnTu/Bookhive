@@ -1,12 +1,14 @@
 // app/books/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import BookCard from "../components/common/BookCard";
 import { BookFilter, type BookFilters } from "../components/filters";
-import { mockBooks, getUserById } from "@/app/data/mockData";
 import { useRouter } from "next/navigation";
-
+import type { Book } from "@/app/types/book";
+import type { User } from "@/app/types/user";
+import { getUserById } from "@/utils/auth";
+import { getBooks } from "@/utils/books";
 
 export default function BooksPage() {
   const [filters, setFilters] = useState<BookFilters>({
@@ -14,6 +16,35 @@ export default function BooksPage() {
     originalLanguage: "",
     deliveryMethod: "",
   });
+
+const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
+
+  // get books
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getBooks(); // recall api
+        setBooks(data || []);
+      } catch (err) {
+        console.error("Failed to fetch books:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+    useEffect(() => {
+    async function loadOwners() {
+      const uniqueOwnerIds = Array.from(new Set(books.map(b => b.ownerId)));
+      const results = await Promise.all(uniqueOwnerIds.map(id => getUserById(id)));
+      const map: Record<string, User> = {};
+      results.forEach(u => { if (u) map[u.id] = u; });
+      setOwnersMap(map);
+    }
+    if (books.length) loadOwners();
+  }, [books]);
 
   const handleFilterChange = (key: keyof BookFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -26,11 +57,11 @@ export default function BooksPage() {
       deliveryMethod: "",
     });
   };
-
-  // Only get available books for filtering and display
+  
+  // Only get listed books for filtering and display
   const availableBooks = useMemo(() => {
-    return mockBooks.filter((book) => book.status === "listed");
-  }, []);
+    return books.filter((book) => book.status === "listed");
+  }, [books]);
 
   // Filter logic
   const filteredBooks = useMemo(() => {
@@ -59,14 +90,14 @@ export default function BooksPage() {
 
   const router = useRouter();
 
-  // 点击跳转详情
+  // go to detail page
   const handleViewDetails = (bookId: string) => {
     router.push(`/books/${bookId}`);
   };
 
   return (
     <div className="flex h-full">
-      {/* Filter Sidebar - 使用flex比例布局 */}
+      {/* Filter Sidebar */}
       <div className="hidden lg:flex lg:w-1/5 lg:min-w-48 lg:max-w-64">
         <BookFilter
           filters={filters}
@@ -76,7 +107,7 @@ export default function BooksPage() {
         />
       </div>
 
-      {/* Main content area - 自动占用剩余空间 */}
+      {/* Main content area */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
           {/* Simple header showing results count */}
@@ -90,12 +121,11 @@ export default function BooksPage() {
           {filteredBooks.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredBooks.map((book) => {
-                const owner = getUserById(book.ownerId);
+                const owner = ownersMap[book.ownerId]
                 return (
                   <BookCard
                     key={book.id}
                     book={book}
-                    owner={owner}
                     onViewDetails={handleViewDetails}
                   />
                 );
@@ -121,7 +151,7 @@ export default function BooksPage() {
         </div>
       </div>
 
-      {/* Mobile Filter - 移动端显示 */}
+      {/* Mobile Filter */}
       <div className="lg:hidden">
         <BookFilter
           filters={filters}
