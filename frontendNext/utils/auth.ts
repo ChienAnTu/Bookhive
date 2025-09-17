@@ -153,7 +153,30 @@ export const initAuth = () => {
   if (token) {
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   }
+
+  // a global response interceptor
+  if (!(axios as any)._hasAuthInterceptor) {
+    axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          console.warn("Session expired, logging out...");
+          // Clear the local login status
+          localStorage.removeItem("access_token");
+          delete axios.defaults.headers.common["Authorization"];
+
+          // Notify the global refresh
+          window.dispatchEvent(new Event("auth-changed"));
+
+          window.location.href = "/auth";
+        }
+        return Promise.reject(error);
+      }
+    );
+    (axios as any)._hasAuthInterceptor = true;
+  }
 };
+
 
 // Get current user information from API
 export const getCurrentUser = async (): Promise<User | null> => {
@@ -250,7 +273,7 @@ export const getUserById = async (id: string): Promise<User | null> => {
       },
     });
 
-        console.log("fetch owner response:", response.status, response.data);
+    console.log("fetch owner response:", response.status, response.data);
 
 
     const userData = response.data;

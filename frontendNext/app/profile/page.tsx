@@ -120,7 +120,7 @@ const ProfilePage: React.FC = () => {
             {/* User name */}
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {currentUser.name}
+                {currentUser.firstName} {currentUser.lastName}
               </h1>
 
               {/* Email */}

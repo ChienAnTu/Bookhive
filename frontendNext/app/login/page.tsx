@@ -49,7 +49,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             Welcome Back
           </h1>
-          <p className="text-gray-600">Sign in to your BookHive account</p>
+          <p className="text-gray-600">Sign in to your BookBorrow account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

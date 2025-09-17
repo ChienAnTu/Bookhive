@@ -6,8 +6,9 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { useCartStore } from "@/app/store/cartStore";
 import { useRouter } from "next/navigation";
-import { getUserById } from "@/utils/auth";
+import { getUserById, getCurrentUser } from "@/utils/auth";
 import type { User } from "@/app/types/user";
+import { createCheckout } from "@/utils/checkout";
 
 
 export default function CartPage() {
@@ -16,7 +17,6 @@ export default function CartPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const router = useRouter();
   const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
-
 
   // Pull the backend shopping cart then owner Info
   useEffect(() => {
@@ -126,24 +126,21 @@ export default function CartPage() {
   }, [groupedByOwner]);
 
   // totals
-  const { totalCount, totalPrice } = useMemo(() => {
-    const totalCount = cart.length;
-    const totalPrice = cart.reduce((sum, it) => sum + lineSubtotal(it), 0);
-    return { totalCount, totalPrice };
-  }, [cart]);
-
-  const { selectedCount, selectedPrice } = useMemo(() => {
-    const set = new Set(selectedIds);
-    let count = 0;
-    let sum = 0;
-    for (const it of cart) {
-      if (set.has(it.id)) {
-        count += 1;
-        sum += lineSubtotal(it);
+const selectedPrice = useMemo(() => {
+  return cart
+    .filter((item) => selectedIds.includes(item.cartItemId)) // selected
+    .reduce((sum, item) => {
+      if (item.mode === "purchase") {
+        return sum + (item.salePrice || 0);
       }
-    }
-    return { selectedCount: count, selectedPrice: sum };
-  }, [selectedIds, cart]);
+      if (item.mode === "borrow") {
+        return sum + (item.deposit || 0);
+      }
+      return sum;
+    }, 0);
+}, [cart, selectedIds]);
+
+console.log("selectedIds:", selectedIds, "selectedPrice:", selectedPrice);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center">Loading cart...</div>;
@@ -215,45 +212,43 @@ export default function CartPage() {
               groupedByOwner.orderedKeys.map((ownerId) => {
                 const books = groupedByOwner.groups[ownerId];
                 const summary = ownerSummaries.get(ownerId)!;
-                const ownerName = ownersMap[ownerId]?.name || "Unknown Owner";
+                const ownerName =
+                  [ownersMap[ownerId]?.firstName, ownersMap[ownerId]?.lastName]
+                    .filter(Boolean)
+                    .join(" ") || "Unknown Owner";
 
                 return (
                   <section key={ownerId} className="space-y-4">
                     {/* Group Header */}
                     <div className="flex items-center justify-between">
-                      <h2 className="text-xl font-bold text-gray-800">
-                        Owner: <span className="font-semibold">{ownerName}</span>
-                        <span className="ml-3 text-sm text-gray-500">
-                          ({summary.count} item{summary.count > 1 ? "s" : ""})
-                        </span>
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        {/* checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={(groupedByOwner.groups[ownerId] || [])
+                            .map((b) => b.cartItemId)
+                            .every((id) => selectedIds.includes(id))}
+                          onChange={() => toggleSelectGroup(ownerId)}
+                          className="w-4 h-4"
+                        />
+
+                        {/* Owner */}
+                        <h2 className="text-xl font-bold text-gray-800">
+                          Owner: <span className="font-semibold">{ownerName}</span>
+                          <span className="ml-3 text-sm text-gray-500">
+                            ({summary.count} item{summary.count > 1 ? "s" : ""})
+                          </span>
+                        </h2>
+                      </div>
+
 
                       <div className="flex items-center gap-2">
                         <div className="text-sm text-gray-700">
                           <span className="font-medium">Subtotal: </span>
                           <span style={{ color: "#FF6801" }}>${summary.subtotal.toFixed(2)}</span>
                         </div>
-                        {isRemoveMode && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleSelectGroup(ownerId)}
-                            className="flex items-center gap-2"
-                          >
-                            {(groupedByOwner.groups[ownerId] || [])
-                              .map((b) => b.cartItemId)
-                              .every((id) => selectedIds.includes(id)) ? (
-                              <CheckSquare className="w-4 h-4" />
-                            ) : (
-                              <Square className="w-4 h-4" />
-                            )}
-                            {(groupedByOwner.groups[ownerId] || [])
-                              .map((b) => b.cartItemId)
-                              .every((id) => selectedIds.includes(id))
-                              ? "Unselect"
-                              : "Select"}
-                          </Button>
-                        )}
+
+
                       </div>
 
                     </div>
@@ -262,14 +257,14 @@ export default function CartPage() {
                       <Card key={book.cartItemId}>
                         <div className="space-y-3 relative">
                           {/* multiple select box */}
-                          {isRemoveMode && (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(book.cartItemId)}
-                              onChange={() => toggleSelect(book.cartItemId)}
-                              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                            />
-                          )}
+
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(book.cartItemId)}
+                            onChange={() => toggleSelect(book.cartItemId)}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                          />
+
 
                           {/* Title + Toggle */}
                           <div className="flex justify-between items-start pl-6">
@@ -369,28 +364,76 @@ export default function CartPage() {
             <div className="w-full mt-12">
               <div className="max-w-6xl mx-auto p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  {/* Info */}
+                  {/* Total Info */}
+                  
                   <div className="text-sm text-gray-700 flex items-center gap-2">
                     <span className="text-lg font-semibold text-gray-900">Total</span>
-                    <span>({isRemoveMode ? selectedCount : totalCount} items)</span>
+                    <span>({selectedIds.length} items)</span>
                     <span className="font-medium">:</span>
                     <span className="text-xl font-bold" style={{ color: "#FF6801" }}>
-                      ${(isRemoveMode ? selectedPrice : totalPrice).toFixed(2)}
+                      ${selectedPrice.toFixed(2)}
                     </span>
-                    {isRemoveMode && <span className="ml-2 text-gray-500">(selected)</span>}
                   </div>
-
-
 
                   {/* Buttons */}
                   <div className="flex gap-2">
                     {!isRemoveMode ? (
                       <Button
                         variant="outline"
-                        onClick={() => router.push("/checkout")}
+                        onClick={async () => {
+                          try {
+                            // 拉取当前用户
+                            const user = await getCurrentUser();
+                            if (!user) {
+                              alert("Please login first");
+                              router.push("/auth");
+                              return;
+                            }
+
+                            const selectedItems = cart.filter(it => selectedIds.includes(it.cartItemId));
+                            if (selectedItems.length === 0) {
+                              alert("Please select at least one item to checkout");
+                              return;
+                            }
+                            // 构造 checkout payload
+                            const payload = {
+                              userId: user.id,
+                              contactName: user.name || "",
+                              phone: user.phoneNumber || "",
+                              street: user.streetAddress || "",
+                              city: user.city || "",
+                              state: user?.state || "",
+                              postcode: user.zipCode || "",
+                              country: "Australia",
+                              items: selectedItems.map((it) => ({
+                                bookId: it.id,
+                                ownerId: it.ownerId,
+                                ownerZipCode: ownersMap[it.ownerId]?.zipCode || "6000",
+                                actionType: it.mode.toUpperCase(), // BORROW / PURCHASE
+                                price: it.mode === "purchase" ? it.salePrice : undefined,
+                                deposit: it.mode === "borrow" ? it.deposit : undefined,
+                                shippingMethod: "",
+                                serviceCode: "AUS_PARCEL_REGULAR",
+                              })),
+                            };
+
+                            // create checkout settlement
+                            const checkout = await createCheckout(payload);
+                            console.log("Checkout created:", checkout);
+
+                            // go to checkout page
+                            router.push(`/checkout?checkoutId=${checkout.checkoutId}`);
+                            console.log("selected items to checkout:", selectedItems)
+                          } catch (err) {
+                            console.error("Failed to create checkout:", err);
+                            alert("Failed to proceed to checkout. Please try again.");
+                          }
+                        }}
                       >
                         Proceed to Checkout
+                        
                       </Button>
+
                     ) : (
                       <Button
                         variant="outline"
