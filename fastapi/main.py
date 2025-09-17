@@ -9,6 +9,7 @@ from routes.upload import router as upload_router
 from routes.books import router as books_router
 from routes.cart import router as cart_router
 from routes.complaints import router as complaints_router  # routes/complaints
+from routes.mail import router as mail_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -46,12 +47,14 @@ app.include_router(books_router)
 # books router
 app.include_router(books_router)
 
-
 # cart router
 app.include_router(cart_router)
 
 # complaints router
 app.include_router(complaints_router)
+
+# mail router
+app.include_router(mail_router) 
 
 @app.get("/")
 async def root():
