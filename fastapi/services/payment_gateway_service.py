@@ -142,7 +142,6 @@ def initiate_payment(data: dict, *, db: Session):
 
 
     try:
-
         # 1. Create Stripe PaymentIntent
         intent = stripe.PaymentIntent.create(
             amount=amount,
@@ -200,7 +199,7 @@ def initiate_payment(data: dict, *, db: Session):
             "payment_id": intent.id,
             "client_secret": client_secret,
             "status": intent.status,
-            "amount": total_amount,
+            "amount": amount,
             "currency": currency,
         }
 
@@ -228,6 +227,70 @@ def get_payment_status_service(payment_id: str):
     except stripe.error.StripeError as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+def payout_settlement(payment_id: str, *, db: Session):
+    """
+    Settle payments for a given PaymentIntent by creating separate Stripe transfers
+    for each record in the Payment table with action_type = 'PURCHASE'.
+    """
+    try:
+        # 1️⃣ Retrieve the PaymentIntent from Stripe
+        intent = stripe.PaymentIntent.retrieve(payment_id)
+        if not intent:
+            raise HTTPException(status_code=404, detail="PaymentIntent not found")
+
+        # 2️⃣ Capture the PaymentIntent if it uses manual capture
+        if intent.get("capture_method") == "manual" and intent["status"] == "requires_capture":
+            stripe.PaymentIntent.capture(payment_id)
+
+        # 3️⃣ Fetch all payment records in the database linked to this PaymentIntent
+        payments = db.query(Payment).filter_by(payment_id=payment_id).all()
+        if not payments:
+            raise HTTPException(status_code=400, detail="No payment records found for this PaymentIntent")
+
+        results = []
+
+        # 4️⃣ Iterate through payment records and process only PURCHASE type
+        for pay in payments:
+            if pay.action_type.upper() != "PURCHASE":
+                continue
+            if not pay.destination:
+                continue
+            if not pay.amount or pay.amount <= 0:
+                continue
+
+            # 5️⃣ Create a Stripe transfer to the corresponding connected account
+            transfer = stripe.Transfer.create(
+                amount=int(pay.amount),           # Stripe requires the amount in the smallest currency unit (e.g. cents)
+                currency=pay.currency or intent["currency"],
+                destination=pay.destination,      # The connected account ID to receive the funds
+                description=f"Settlement for payment {pay.id} ({pay.action_type})",
+            )
+
+            # 6️⃣ Store transfer result for reporting
+            results.append({
+                "payment_db_id": pay.id,
+                "destination": pay.destination,
+                "action_type": pay.action_type,
+                "amount": pay.amount,
+                "transfer_id": transfer.id
+            })
+
+        # 7️⃣ Return settlement summary
+        return {
+            "payment_id": payment_id,
+            "status": "settlement_completed",
+            "transfers": results
+        }
+
+    except stripe.error.StripeError as e:
+        # Handle Stripe API errors gracefully
+        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
+    except Exception as e:
+        # Catch any unexpected exceptions
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
 
 
 @audit("capture_initiated")
