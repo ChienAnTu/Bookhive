@@ -12,7 +12,9 @@ import { calculateDistance } from "@/app/data/mockData";
 import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
-import { getUserById } from "@/utils/auth";
+import { getUserById, getCurrentUser } from "@/utils/auth";
+import { isProfileComplete } from "@/utils/profileValidation";
+import ProfileIncompleteModal from "@/app/components/ui/ProfileIncompleteModal";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
@@ -23,6 +25,7 @@ export default function BookDetailPage() {
   const router = useRouter();
   const bookId = params.id as string;
 
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
 
@@ -46,7 +49,7 @@ export default function BookDetailPage() {
     );
   }, [owner, currentUser]);
 
-  // pull cart firt
+  // pull cart first
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
@@ -77,7 +80,13 @@ export default function BookDetailPage() {
     })();
   }, [bookId]);
 
-
+  // 拉取当前用户
+  useEffect(() => {
+    (async () => {
+      const u = await getCurrentUser();
+      setCurrentUser(u);
+    })();
+  }, []);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center">Loading...</div>;
@@ -136,7 +145,7 @@ export default function BookDetailPage() {
     if (navigator.share) {
       navigator.share({
         title: book.titleOr,
-        text: `Check out "${book.titleOr}" by ${book.author} on BookHive`,
+        text: `Check out "${book.titleOr}" by ${book.author} on BookBorrow`,
         url: window.location.href,
       });
     } else {
@@ -181,13 +190,18 @@ export default function BookDetailPage() {
                 </div>
 
                 {/* Request This Book */}
-                {/* Request This Book */}
                 <div className="p-4 space-y-3">
                   <Button
                     onClick={async () => {
                       if (!book) return;
 
-                      // 已在购物车
+                      // check current user profile if is complete
+                      if (!currentUser || !isProfileComplete(currentUser)) {
+                        setIsProfileModalOpen(true);
+                        return;
+                      }
+
+                      // Already in cart
                       if (alreadyInCart) {
                         toast.error("This book is already in your cart");
                         return;
@@ -340,7 +354,7 @@ export default function BookDetailPage() {
                     <Avatar user={owner} size={64} />
 
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{owner.name}</h4>
+                      <h4 className="font-semibold text-gray-900">{owner.firstName} {owner.lastName}</h4>
                       <div className="flex items-center text-gray-600 text-sm mt-1">
                         <MapPin className="w-4 h-4 mr-1" />
                         <p>
@@ -423,6 +437,11 @@ export default function BookDetailPage() {
           </div>
         </div>
       </Modal>
+
+      <ProfileIncompleteModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </div>
   );
 }

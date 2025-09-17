@@ -34,7 +34,7 @@ export default function HomePage() {
             {greeting}! Welcome back
           </h1>
           <p className="text-lg text-gray-200 mb-8">
-            BookHive — where every book finds a new friend.
+            BookBorrow — where every book finds a new friend.
           </p>
 
           <div className="relative w-full max-w-2xl">
