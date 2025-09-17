@@ -50,6 +50,7 @@ class CheckoutItem(Base):
     action_type = Column(String(20), nullable=False)  # BORROW / PURCHASE
     price = Column(Numeric(10, 2), nullable=True)
     deposit = Column(Numeric(10, 2), nullable=True)
+    destination = Column(String(100), default="destination")
 
     shipping_method = Column(String(50), nullable=True)   # Delivery / Pickup
     shipping_quote = Column(Numeric(10, 2), nullable=True)

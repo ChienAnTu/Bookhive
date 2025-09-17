@@ -29,6 +29,7 @@ class Payment(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
  
     destination = Column(String(100), default="destination")
+    action_type = Column(String(20), nullable=False)  # BORROW / PURCHASE
 
     # Relationship to refunds
     refunds = relationship("Refund", back_populates="payment")
@@ -112,6 +113,7 @@ class PaymentInitiateRequest(BaseModel):
     amount: int = Field(..., description="Total amount in cents")
     currency: str = Field(..., example="usd", description="Currency code (e.g., usd, aud)")
     deposit: Optional[int] = Field(0, description="Security deposit in cents")
+    purchase: Optional[int] = Field(0, description="Purchase fee")
     shipping_fee: Optional[int] = Field(0, description="Shipping fee in cents")
     service_fee: Optional[int] = Field(0, description="Platform service fee in cents")
     lender_account_id: str = Field(..., description="Stripe connected account ID of the lender (e.g., acct_123...)")

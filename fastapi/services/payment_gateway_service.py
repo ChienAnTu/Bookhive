@@ -15,8 +15,8 @@ from models.checkout import Checkout
 from models.order import Order
 from models.payment_split import PaymentSplit
 from models.checkout import Checkout
-from services.order_service import confirm_payment, create_orders_data_with_validation
-
+from models.checkout import CheckoutItem
+from services.order_service import OrderService
 
 logger = logging.getLogger(__name__)
 
@@ -135,18 +135,17 @@ def initiate_payment(data: dict, *, db: Session):
     amount = data.get("amount")
     currency = data.get("currency", "usd")
     deposit = data.get("deposit", 0)
+    purchase = data.get("purchase", 0)
     shipping_fee = data.get("shipping_fee", 0)
     service_fee = data.get("service_fee", 0)
-    lender_account_id = data.get("lender_account_id")
     checkout_id = data.get("checkout_id")
 
-    deposit = amount
-    total_amount = amount + shipping_fee + service_fee
 
     try:
+
         # 1. Create Stripe PaymentIntent
         intent = stripe.PaymentIntent.create(
-            amount=total_amount,
+            amount=amount,
             currency=currency,
             capture_method="automatic",
             automatic_payment_methods={"enabled": True},
@@ -155,6 +154,7 @@ def initiate_payment(data: dict, *, db: Session):
             metadata={
                 "user_id": user_id,
                 "deposit": deposit,
+                "puchase": purchase,
                 "shipping_fee": shipping_fee,
                 "service_fee": service_fee,
             },
@@ -163,22 +163,34 @@ def initiate_payment(data: dict, *, db: Session):
         # 2. Extract client_secret
         client_secret = intent.client_secret
 
-        # 3. Save payment record in DB
-        payment = Payment(
-            payment_id=intent.id,
-            user_id=user_id,
-            amount=total_amount,
-            currency=currency,
-            status=intent.status,
-            deposit=deposit,
-            shipping_fee=shipping_fee,
-            service_fee=service_fee,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            destination=lender_account_id
-        )
 
-        db.add(payment)
+        checkoutItem = db.query(CheckoutItem).filter_by(checkout_id=checkout_id).all()
+
+        for owner in checkoutItem:
+            
+            if owner.action_type == "BORROW":
+                value = owner.deposit
+            elif owner.action_type == "PURCHASE":
+                value = owner.price
+
+            # 3. Save payment record in DB
+            payment = Payment(
+                payment_id=intent.id,
+                user_id=user_id,
+                amount=value,
+                currency=currency,
+                status=intent.status,
+                deposit=deposit,
+                shipping_fee=owner.shipping_quote,
+                service_fee=service_fee,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+                action_type = owner.action_type,
+                destination= owner.destination
+            )
+
+            db.add(payment)
+        
         db.commit()
         db.refresh(payment)
 
@@ -608,6 +620,7 @@ async def stripe_webhook(event: dict, db: Session):
         order = db.query(Order).filter_by(payment_id=payment_id).first()
         checkout = db.query(Checkout).filter_by(payment_id=payment_id).first()
 
+
         if intent_type == "donation":
             donation = db.query(Donation).filter_by(donation_id=payment_id).first()
             if donation:
@@ -620,8 +633,8 @@ async def stripe_webhook(event: dict, db: Session):
             if payment:
                 payment.status = "succeeded"
                 db.commit()
-                confirm_payment(db, order.id)
-                create_orders_data_with_validation
+                Order.confirm_payment(db, order.id)
+                Order.create_orders_data_with_validation(db, checkout.checkout_id, order.borrower_id, payment_id)
 
             log_event(db, "payment_succeeded", reference_id=payment_id, actor="system")
 
