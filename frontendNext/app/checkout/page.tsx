@@ -13,6 +13,7 @@ import { getBookById } from "@/utils/books";
 import { getMyCheckouts, rebuildCheckout } from "@/utils/checkout";
 import { listServiceFees } from "@/utils/serviceFee";
 import { getShippingQuotes } from "@/utils/shipping";
+import { X } from "lucide-react";
 
 // When the page loads → Check if checkout exists, create a new one if not
 // The total amount is based on the calculation result returned by the backend
@@ -31,6 +32,7 @@ type ShippingQuote = {
   currency: "AUD";
   etaDays?: string;
   expiresAt: string; // ISO
+  serviceCode?: string;
 };
 
 interface CheckoutItem {
@@ -48,7 +50,7 @@ interface CheckoutItem {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const [globalShippingChoice, setGlobalShippingChoice] = useState<"standard" | "express" | null>(null);
+  const [globalShippingChoice, setGlobalShippingChoice] = useState<"standard" | "express" | null>("standard");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [checkouts, setCheckouts] = useState<any[]>([]);
   const [ownersMap, setOwnersMap] = useState<Record<string, { name: string; zipCode: string }>>({});
@@ -198,6 +200,8 @@ export default function CheckoutPage() {
   // ---------- Get quotes per owner for DELIVERY items ----------
   async function requestQuotes() {
     if (!currentCheckout) return;
+    console.log("[requestQuotes] start... currentCheckout:", currentCheckout);
+
     const now = Date.now();
     const expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
     const result: Record<string, ShippingQuote[]> = {};
@@ -271,7 +275,8 @@ export default function CheckoutPage() {
       const cleaned = Object.fromEntries(
         fullItems.map((it) => [it.bookId, itemShipping[it.bookId]])
       ) as Record<string, DeliveryChoice>;
-      await rebuildCheckout(currentUser!, fullItems, cleaned, defaults);
+      const newCheckout = await rebuildCheckout(currentUser!, fullItems, cleaned, defaults);
+      setCheckouts([newCheckout]);
     }
   }
 
@@ -287,15 +292,8 @@ export default function CheckoutPage() {
       Object.entries(itemShipping).filter(([, v]) => v)
     ) as Record<string, DeliveryChoice>;
 
-    const newCheckout = await rebuildCheckout(
-      currentUser!,
-      fullItems,
-      cleaned,
-      {}   // 👈 把 owner quotes 一起传
-    );
-
     setItemShipping(cleaned);
-    setCheckouts([newCheckout]);
+    console.log("[saveDeliveryMethod] calling requestQuotes...");
 
     await requestQuotes();
     alert("Delivery methods saved!");
@@ -313,41 +311,46 @@ export default function CheckoutPage() {
 
   // ---------- Place Order ----------
   const placeOrder = async () => {
-    if (!currentCheckout) {
+    const checkoutToUse = checkouts[0];
+    console.log("[placeOrder] checkouts[0]:", checkouts[0]);
+    console.log("Checkout list:", checkouts)
+
+    if (!checkoutToUse) {
       alert("No checkout found, please refresh.");
       return;
     }
+    console.log("[placeOrder] checkoutToUse:", checkoutToUse);
 
     // check address
-    const { contactName, phone, street, city, state, postcode } = currentCheckout;
+    const { contactName, phone, street, city, state, postcode } = checkoutToUse;
     if (!contactName || !phone || !street || !city || !state || !postcode) {
       alert("Please complete your delivery address before placing the order.");
       return;
     }
 
     // check item's delivery method
-    const invalidItems = currentCheckout.items.filter((it: CheckoutItem) => !it.shippingMethod);
+    const invalidItems = checkoutToUse.items.filter((it: CheckoutItem) => !it.shippingMethod);
     if (invalidItems.length > 0) {
       alert("Please select delivery/pickup for all items and save them.");
       return;
     }
 
     // if choose delivery，must get shipping quotes
-    for (const it of currentCheckout.items) {
-      if (it.shippingMethod === "delivery" && !it.serviceCode) {
-        alert("Please select a shipping quote.");
+    for (const it of checkoutToUse.items) {
+      if (it.shippingMethod === "delivery" && !it.shippingQuote) {
+        alert("Please select delivery shipping quote.");
         return;
       }
     }
 
     // check amount
-    if (!currentCheckout.totalDue || currentCheckout.totalDue <= 0) {
+    if (!checkoutToUse.totalDue || checkoutToUse.totalDue <= 0) {
       alert("Order total is invalid.");
       return;
     }
 
-    alert(`Order placed! Total due: $${currentCheckout.totalDue}`);
-    router.push(`/borrowing/${currentCheckout.checkoutId}`);
+    alert(`Order placed! Total due: $${checkoutToUse.totalDue}`);
+    router.push(`/borrowing/${checkoutToUse.checkoutId}`);
   };
 
 
@@ -461,7 +464,7 @@ export default function CheckoutPage() {
                         {/* Delivery hint */}
                         {itemShipping[b.bookId] === "delivery" && (
                           <p className="text-sm text-orange-700 mt-2">
-                            Shipping fees will be calculated after Save Delivery Dethod.
+                            Shipping fees will be calculated after Save Delivery Method.
                           </p>
                         )}
 
@@ -486,8 +489,21 @@ export default function CheckoutPage() {
                                 onClick={async () => {
                                   setGlobalShippingChoice(choiceKey);
 
-                                  // 更新 owner quote
-                                  const updated = { ...selectedQuoteByOwner, [ownerId]: q };
+                                  // 所有 owner 都选择相同 serviceLevel
+                                  const updated: Record<string, ShippingQuote> = {};
+                                  for (const [oid, quotes] of Object.entries(quotesByOwner)) {
+                                    const match = quotes.find(
+                                      (x) => x.serviceLevel?.toLowerCase() === choiceKey
+                                    );
+                                    if (match) {
+                                      updated[oid] = {
+                                        ...match,
+                                        serviceCode: choiceKey === "express"
+                                          ? "AUS_PARCEL_EXPRESS"
+                                          : "AUS_PARCEL_REGULAR",
+                                      } as any;
+                                    }
+                                  }
                                   setSelectedQuoteByOwner(updated);
 
                                   // rebuild checkout
@@ -495,12 +511,9 @@ export default function CheckoutPage() {
                                     fullItems.map((it) => [it.bookId, itemShipping[it.bookId]])
                                   ) as Record<string, DeliveryChoice>;
 
-                                  await rebuildCheckout(
-                                    currentUser!,
-                                    fullItems,
-                                    cleaned,
-                                    updated   // 👈 带上 owner quote
-                                  );
+                                  const newCheckout = await rebuildCheckout(currentUser!, fullItems, cleaned, updated);
+                                  setCheckouts([newCheckout]);
+
                                 }}
                                 className={`px-3 py-2 rounded border text-sm ${selectedQuoteByOwner[ownerId]?.id === q.id
                                   ? "bg-black text-white"
