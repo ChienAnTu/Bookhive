@@ -12,6 +12,7 @@ from routes.complaints import router as complaints_router  # routes/complaints
 from routes.shipping import router as shipping_router  # Import shipping router
 from routes.service_fee import router as service_fee_router
 from routes.checkout import router as checkout_router  # Import checkout router
+from routes.order import router as orders_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -61,6 +62,8 @@ app.include_router(cart_router, prefix="/api/v1")
 # complaints router
 app.include_router(complaints_router)
 
+# order router
+app.include_router(orders_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
