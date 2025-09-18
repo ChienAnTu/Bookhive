@@ -685,12 +685,26 @@ export interface Complaint {
   complainantId: string;
   subject: string;
   description: string;
-  type: "book-condition" | "delivery" | "user-behavior" | "other";
-  status: "pending" | "investigating" | "resolved" | "closed";
+  type: "book-condition" | "delivery" | "user-behavior" | "overdue" | "other";
+  status: "open" | "in-progress" | "resolved" | "closed";
   orderId?: string;
   adminResponse?: string;
   createdAt: string;
   updatedAt?: string;
+  // New fields for enhanced complaint system
+  createdBy: "user" | "system"; // Who created the complaint
+  source: "order" | "support" | "system"; // Where complaint was raised from
+  priority: "low" | "medium" | "high" | "urgent";
+  resolutionNotes?: string;
+  depositDeduction?: {
+    amount: number; // Amount to deduct from deposit (in cents)
+    reason: string;
+    deductedAt?: string;
+    deductedBy?: string; // Admin ID who performed deduction
+    automaticDeduction?: boolean; // For overdue complaints
+  };
+  affectedUsers: string[]; // Array of user IDs (borrower, lender)
+  escalatedTo?: string; // Admin ID if escalated
 }
 
 export const mockComplaints: Complaint[] = [
@@ -700,11 +714,16 @@ export const mockComplaints: Complaint[] = [
     subject: "Book condition not as described",
     description: "The book I received was damaged and had several missing pages. This was not mentioned in the listing.",
     type: "book-condition",
-    status: "investigating",
+    status: "in-progress",
     orderId: "order1",
     adminResponse: "We are investigating this issue with the book owner. Thank you for your patience.",
     createdAt: "2024-01-15T10:30:00Z",
-    updatedAt: "2024-01-16T14:20:00Z"
+    updatedAt: "2024-01-16T14:20:00Z",
+    createdBy: "user",
+    source: "order",
+    priority: "high",
+    affectedUsers: ["user1", "user2"],
+    escalatedTo: "admin1"
   },
   {
     id: "complaint2",
@@ -716,7 +735,12 @@ export const mockComplaints: Complaint[] = [
     orderId: "order2",
     adminResponse: "The delivery issue has been resolved with the shipping provider. You should receive your order within 24 hours.",
     createdAt: "2024-01-10T09:15:00Z",
-    updatedAt: "2024-01-12T16:45:00Z"
+    updatedAt: "2024-01-12T16:45:00Z",
+    createdBy: "user",
+    source: "support",
+    priority: "medium",
+    affectedUsers: ["user1", "user3"],
+    resolutionNotes: "Delivery completed successfully. No compensation required."
   },
   {
     id: "complaint3",
@@ -724,8 +748,35 @@ export const mockComplaints: Complaint[] = [
     subject: "Inappropriate communication",
     description: "The book owner was rude and unprofessional in our communications.",
     type: "user-behavior",
-    status: "pending",
-    createdAt: "2024-01-20T11:00:00Z"
+    status: "open",
+    createdAt: "2024-01-20T11:00:00Z",
+    createdBy: "user",
+    source: "support",
+    priority: "low",
+    affectedUsers: ["user2", "user1"]
+  },
+  {
+    id: "complaint4",
+    complainantId: "user3",
+    subject: "Book overdue - automatic complaint",
+    description: "System generated complaint: Book 'Harry Potter 1' is 7 days overdue. Automatic deposit deduction applied.",
+    type: "overdue",
+    status: "in-progress",
+    orderId: "order3",
+    createdAt: "2024-01-25T00:00:00Z",
+    updatedAt: "2024-01-25T00:00:00Z",
+    createdBy: "system",
+    source: "system",
+    priority: "urgent",
+    affectedUsers: ["user3", "user1"],
+    depositDeduction: {
+      amount: 1000, // $10.00 (20% of $50 deposit)
+      reason: "Automatic deduction for 7-day overdue period",
+      deductedAt: "2024-01-25T00:00:00Z",
+      deductedBy: "system",
+      automaticDeduction: true
+    },
+    adminResponse: "Automatic deposit deduction applied. Please return the book immediately to avoid further charges."
   }
 ];
 
@@ -854,6 +905,7 @@ export const complaintTypes = [
   "book-condition",
   "delivery", 
   "user-behavior",
+  "overdue",
   "other"
 ] as const;
 
@@ -871,3 +923,158 @@ export const reviewTags = [
   "smooth transaction",
   "average condition"
 ] as const;
+
+// Automatic Deposit Deduction for Overdue Complaints
+export const processAutomaticDepositDeduction = (orderId: string, daysOverdue: number) => {
+  const order = mockOrders.find(o => o.id === orderId);
+  if (!order || order.status !== "OVERDUE") {
+    return null;
+  }
+
+  // Calculate deduction: 20% for every 7 days overdue
+  const weeksOverdue = Math.floor(daysOverdue / 7);
+  const deductionPercentage = Math.min(weeksOverdue * 0.20, 1.0); // Max 100%
+  const deductionAmount = Math.floor(order.deposit.amount * deductionPercentage);
+
+  if (deductionAmount === 0) {
+    return null;
+  }
+
+  // Create system complaint for automatic deduction
+  const complaint: Complaint = {
+    id: `auto-complaint-${orderId}-${Date.now()}`,
+    complainantId: "system",
+    subject: `Automatic overdue penalty for Order ${orderId}`,
+    description: `Automatic deposit deduction applied due to ${daysOverdue} days overdue. Deduction: ${(deductionPercentage * 100).toFixed(0)}% of deposit.`,
+    type: "overdue",
+    status: "in-progress",
+    orderId: orderId,
+    createdAt: new Date().toISOString(),
+    createdBy: "system",
+    source: "system",
+    priority: "high",
+    affectedUsers: [order.borrowerId, order.ownerId],
+    depositDeduction: {
+      amount: deductionAmount,
+      reason: `Automatic deduction for ${daysOverdue} days overdue (${(deductionPercentage * 100).toFixed(0)}% of deposit)`,
+      deductedAt: new Date().toISOString(),
+      deductedBy: "system",
+      automaticDeduction: true
+    }
+  };
+
+  // Add to complaints list (in real app, this would be API call)
+  mockComplaints.push(complaint);
+
+  return {
+    complaint,
+    deductionAmount,
+    remainingDeposit: order.deposit.amount - deductionAmount,
+    compensationToOwner: deductionAmount
+  };
+};
+
+// Manual Deposit Deduction (Admin only)
+export const processManualDepositDeduction = (
+  complaintId: string, 
+  amount: number, 
+  reason: string, 
+  adminId: string
+) => {
+  const complaint = mockComplaints.find(c => c.id === complaintId);
+  if (!complaint || !complaint.orderId) {
+    return null;
+  }
+
+  const order = mockOrders.find(o => o.id === complaint.orderId);
+  if (!order) {
+    return null;
+  }
+
+  // Update complaint with deduction information
+  complaint.depositDeduction = {
+    amount: amount * 100, // Convert to cents
+    reason,
+    deductedAt: new Date().toISOString(),
+    deductedBy: adminId,
+    automaticDeduction: false
+  };
+
+  complaint.status = "resolved";
+  complaint.updatedAt = new Date().toISOString();
+  complaint.resolutionNotes = `Manual deposit deduction of $${amount} applied by admin. ${reason}`;
+
+  return {
+    complaint,
+    deductionAmount: amount * 100,
+    remainingDeposit: order.deposit.amount - (amount * 100),
+    compensationToOwner: amount * 100
+  };
+};
+
+// Settlement Record for tracking all financial transactions
+export interface SettlementRecord {
+  id: string;
+  orderId: string;
+  complaintId?: string;
+  type: "deposit_deduction" | "refund" | "compensation";
+  amount: number; // in cents
+  fromUserId: string;
+  toUserId: string;
+  reason: string;
+  processedAt: string;
+  processedBy: string; // "system" or admin ID
+}
+
+export const mockSettlementRecords: SettlementRecord[] = [
+  {
+    id: "settlement1",
+    orderId: "order1",
+    complaintId: "complaint1",
+    type: "deposit_deduction",
+    amount: 1000, // $10
+    fromUserId: "user1",
+    toUserId: "user2",
+    reason: "Compensation for damaged book",
+    processedAt: "2024-01-16T15:30:00Z",
+    processedBy: "admin1"
+  }
+];
+
+// Check for overdue orders and create automatic complaints
+export const checkAndCreateOverdueComplaints = () => {
+  const now = new Date();
+  const overdueOrders = mockOrders.filter(order => {
+    if (order.status !== "BORROWING" || !order.dueAt) return false;
+    
+    const dueDate = new Date(order.dueAt);
+    return now > dueDate;
+  });
+
+  const newComplaints: Complaint[] = [];
+
+  overdueOrders.forEach(order => {
+    const dueDate = new Date(order.dueAt!);
+    const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Check if we already have a system complaint for this order
+    const existingComplaint = mockComplaints.find(c => 
+      c.orderId === order.id && 
+      c.type === "overdue" && 
+      c.createdBy === "system"
+    );
+
+    if (!existingComplaint && daysOverdue > 0) {
+      const result = processAutomaticDepositDeduction(order.id, daysOverdue);
+      if (result) {
+        newComplaints.push(result.complaint);
+        
+        // Update order status to OVERDUE
+        order.status = "OVERDUE";
+        order.updatedAt = new Date().toISOString();
+      }
+    }
+  });
+
+  return newComplaints;
+};
