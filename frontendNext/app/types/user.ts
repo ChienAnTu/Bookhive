@@ -17,7 +17,7 @@ export interface User {
   // basic info
   firstName: string;
   lastName: string;
-  name: string;
+  name: string;              // Delivery contact name
   email: string;
   phoneNumber?: string;
   dateOfBirth?: DateOfBirth;

@@ -272,6 +272,7 @@ export default function AddBook() {
                   <option value="">Select</option>
                   <option value="English">English</option>
                   <option value="Chinese">Chinese</option>
+                  <option value="Hindi">Hindi</option>
                   <option value="Japanese">Japanese</option>
                 </select>
 
@@ -308,10 +309,19 @@ export default function AddBook() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 required
               >
-                <option value="">Please choose a category</option>
-                <option value="Fiction">Fiction</option>
-                <option value="Sci-Fi">Sci-Fi</option>
-                <option value="Non-Fiction">Non-Fiction</option>
+<option value="">Please choose a category</option>
+<option value="Fiction">Fiction</option>
+<option value="Non-Fiction">Non-Fiction</option>
+<option value="Sci-Fi">Sci-Fi</option>
+<option value="Fantasy">Fantasy</option>
+<option value="Biography">Biography & Memoir</option>
+<option value="History">History</option>
+<option value="Science">Science & Technology</option>
+<option value="Self-Help">Self-Help & Personal Development</option>
+<option value="Education">Education & Textbook</option>
+<option value="Children">Children & Young Adult</option>
+<option value="Comics">Comics & Graphic Novels</option>
+
               </select>
             </div>
 
