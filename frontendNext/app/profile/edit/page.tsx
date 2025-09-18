@@ -41,7 +41,7 @@ const UpdateProfilePage: React.FC = () => {
   useEffect(() => {
     const loadUserData = async () => {
       if (!isAuthenticated()) {
-        router.push("/login");
+        router.push("/auth");
         return;
       }
 
@@ -50,7 +50,7 @@ const UpdateProfilePage: React.FC = () => {
         if (userData) {
           setProfileData(userData);
         } else {
-          router.push("/login");
+          router.push("/auth");
         }
       } catch (error) {
         console.error("Failed to load user data:", error);
@@ -336,7 +336,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   }
                 />
               </div>
-              <div className="col-span-2">
+              {/* <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Bio
                 </label>
@@ -351,7 +351,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <p className="mt-1 text-xs text-gray-500">
                   Tell others a bit about yourself and your reading interests.
                 </p>
-              </div>
+              </div> */}
             </div>
 
             {/* Action Buttons */}

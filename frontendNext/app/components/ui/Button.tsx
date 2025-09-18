@@ -29,10 +29,11 @@ const buttonVariants: Record<ButtonVariant, string> = {
 
 };
 
-const buttonSizes: Record<ButtonSize, string> = {
+const buttonSizes: Record<ButtonSize | "icon", string> = {
   sm: "px-3 py-1.5 text-sm",
   md: "px-4 py-2 text-base",
   lg: "px-6 py-3 text-lg",
+  icon: "w-9 h-9 p-0",
 };
 
 const Button: React.FC<ButtonProps> = ({

@@ -1,5 +1,6 @@
 import React from "react";
 import Card from "../ui/Card";
+import CoverImg from "../ui/CoverImg";
 import { MapPin, Star, Clock, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -19,21 +20,27 @@ const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
   const [ownerUser, setOwnerUser] = useState<User | null>(null);
 
   useEffect(() => {
-  if (!book?.ownerId) return;
+    if (!book?.ownerId) return;
 
-  (async () => {
-    try {
-      const [user, owner] = await Promise.all([
-        getCurrentUser(),
-        getUserById(book.ownerId),
-      ]);
-      setCurrentUser(user);
-      if (owner) setOwnerUser(owner);
-    } catch (err) {
-      console.error("Failed to load user/owner:", err);
-    }
-  })();
-}, [book?.ownerId]);
+    const fetchData = async () => {
+      try {
+        const owner = await getUserById(book.ownerId);
+        if (owner) setOwnerUser(owner);
+      } catch (err) {
+        console.error("Failed to load owner:", err);
+      }
+
+      try {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+
+    fetchData();
+  }, [book?.ownerId]);
+
 
 
   // const distance =
@@ -88,20 +95,8 @@ const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
         </div>
 
         <div className="aspect-[4/5] w-full">
-          {book.coverImgUrl && !imgError ? (
-            <img
-              src={book.coverImgUrl}
-              alt={book.titleOr}
-              className="w-full h-full object-cover block"
-              onError={() => setImgError(true)}   // when loading fail
-            />
-          ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-lg font-semibold text-gray-600 text-center px-2 line-clamp-2">
-                {book.titleOr || "Untitled"}
-              </span>
-            </div>
-          )}
+          {/* cover img */}
+          <CoverImg src={book.coverImgUrl} title={book.titleOr} />
         </div>
       </div>
 

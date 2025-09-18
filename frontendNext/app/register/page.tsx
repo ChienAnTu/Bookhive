@@ -77,7 +77,7 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             Create Account
           </h1>
-          <p className="text-gray-600">Join BookHive and start sharing books</p>
+          <p className="text-gray-600">Join BookBorrow and start sharing books</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

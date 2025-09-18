@@ -1,6 +1,6 @@
-# BookHive – Peer-to-Peer Book Lending Platform
+# BookBorrow – Peer-to-Peer Book Lending Platform
 
-BookHive is a **community-driven web platform** that allows users to share books in a secure and trustworthy way.
+BookBorrow is a **community-driven web platform** that allows users to share books in a secure and trustworthy way.
 Users can register, list books for lending, borrow books from others, and complete transactions with accountability ensured through **deposits, reviews, and platform rules**.
 
 ---

@@ -36,6 +36,7 @@ def _checkout_to_dict(checkout: Checkout) -> dict:
         "street": checkout.street,
         "city": checkout.city,
         "postcode": checkout.postcode,
+        "state": checkout.state,
         "country": checkout.country,
         "deposit": float(checkout.deposit),
         "serviceFee": float(checkout.service_fee),

@@ -20,6 +20,7 @@ class Checkout(Base):
     street = Column(String(255), nullable=False)
     city = Column(String(100), nullable=False)
     postcode = Column(String(10), nullable=False)
+    state          = Column(String(100), nullable=True)
     country = Column(String(100), nullable=False)
 
     # Fee summary
@@ -92,6 +93,7 @@ class CheckoutBase(BaseModel):
     city: str
     postcode: str
     country: str
+    state : str
     deposit: Optional[float] = 0.00
     serviceFee: Optional[float] = 0.00
     shippingFee: Optional[float] = 0.00

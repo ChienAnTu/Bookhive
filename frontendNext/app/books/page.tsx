@@ -17,9 +17,9 @@ export default function BooksPage() {
     deliveryMethod: "",
   });
 
-const [books, setBooks] = useState<Book[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
+  const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
 
   // get books
   useEffect(() => {
@@ -35,7 +35,7 @@ const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
     })();
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     async function loadOwners() {
       const uniqueOwnerIds = Array.from(new Set(books.map(b => b.ownerId)));
       const results = await Promise.all(uniqueOwnerIds.map(id => getUserById(id)));
@@ -57,7 +57,7 @@ const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
       deliveryMethod: "",
     });
   };
-  
+
   // Only get listed books for filtering and display
   const availableBooks = useMemo(() => {
     return books.filter((book) => book.status === "listed");
@@ -90,6 +90,13 @@ const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
 
   const router = useRouter();
 
+  // Sort logic: old->new
+  const sortedBooks = useMemo(() => {
+    return [...filteredBooks].sort(
+      (a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime()
+    );
+  }, [filteredBooks]);
+
   // go to detail page
   const handleViewDetails = (bookId: string) => {
     router.push(`/books/${bookId}`);
@@ -120,7 +127,7 @@ const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
           {/* Books grid */}
           {filteredBooks.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredBooks.map((book) => {
+              {sortedBooks.map((book) => {
                 const owner = ownersMap[book.ownerId]
                 return (
                   <BookCard
@@ -142,7 +149,7 @@ const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
               </p>
               <button
                 onClick={handleClearFilters}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-black text-white rounded-md hover:bg-blue-700"
               >
                 Clear all filters
               </button>

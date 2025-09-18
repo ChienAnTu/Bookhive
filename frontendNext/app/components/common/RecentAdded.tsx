@@ -11,7 +11,7 @@ import Button from "../ui/Button";
 import Link from "next/link";
 import SimpleBookCard from "../ui/SimpleBookCard";
 
-// sorted by dateAdd
+// sorted by dateAdd old-new
 export default function NewReleases() {
   const [newBooks, setNewBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export default function NewReleases() {
           .filter((book) => book.status === "listed")
           .sort(
             (a, b) =>
-              new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+              new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime()
           )
           .slice(0, 10);
         setNewBooks(listedBooks);
@@ -40,7 +40,7 @@ export default function NewReleases() {
   }, []);
 
   if (loading) {
-    return <div className="py-6">Loading recent books...</div>;
+    return <div className="py-6">Loading books...</div>;
   }
 
   if (error) {
@@ -54,7 +54,7 @@ export default function NewReleases() {
   return (
     <div className="py-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Recent Added</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Most Popular</h2>
         <Link href="/books">
           <Button className="text-sm">See All</Button>
         </Link>
