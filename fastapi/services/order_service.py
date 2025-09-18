@@ -163,7 +163,7 @@ class OrderService:
                     deposit_or_sale_amount += float(item.deposit or 0)
 
             # Calculate shipping fee
-            post_items = [item for item in order_items if item.shipping_method.lower() == "post"]
+            post_items = [item for item in order_items if item.shipping_method.lower() == "delivery"]
             if post_items:
                 # Multiple items only post once
                 # if pickup, shipping_out_fee_amount = 0
@@ -198,7 +198,7 @@ class OrderService:
                 owner_id = first_item.owner_id,
                 borrower_id = checkout.user_id,
                 action_type = first_item.action_type.lower(),
-                shipping_method = first_item.shipping_method.lower(),
+                shipping_method = "post" if first_item.shipping_method.lower() == "delivery" else "pickup",
                 deposit_or_sale_amount = order_info["deposit_or_sale_amount"],
                 service_fee_amount = order_info["service_fee_amount"],
                 shipping_out_fee_amount = order_info["shipping_out_fee_amount"],
@@ -211,8 +211,7 @@ class OrderService:
                 country = checkout.country
             )
             db.add(order)
-            db.commit()
-            db.refresh(order)
+            db.flush()
 
             # Create OrderBook entries
             for item in items:
@@ -222,6 +221,8 @@ class OrderService:
                 )
                 db.add(order_book)
             created_orders.append(order)
+        # checkout.status
+        checkout.status = "COMPLETED"
         db.commit()
         return created_orders
 
