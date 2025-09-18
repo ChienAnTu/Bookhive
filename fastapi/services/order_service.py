@@ -4,7 +4,6 @@ from models.order import Order, OrderBook
 from models.user import User
 from models.book import Book
 from models.checkout import Checkout, CheckoutItem
-from cart_service import get_cart_with_items
 from typing import List, Dict
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -77,7 +76,7 @@ class OrderService:
 
         for item in checkout.items:
             # validate books
-            OrderService.validate_checkout_item(item, db, current_user_id=user_id)  
+            OrderService.validate_checkout_item(item, db, user_id=user_id)  
             
             # Group by owner_id and action_type
             key = (item.owner_id, item.action_type.lower())
@@ -187,7 +186,7 @@ class OrderService:
     @staticmethod
     def create_orders_data_with_validation(db: Session, checkout: Checkout, user_id: str):
         orders_data_without_price = OrderService.split_checkout_to_orders(checkout, db, user_id=user_id)
-        orders_data = OrderService.add_calculate_order_amounts(db, orders_data=orders_data_without_price, checkout=checkout)
+        orders_data = OrderService.add_calculate_order_amounts(db, orders_data=orders_data_without_price)
         created_orders = []
 
         for order_info in orders_data:

@@ -113,7 +113,6 @@ class OrderBook(Base):
     __tablename__ = "order_books"
     order_id = Column(String(36), ForeignKey("orders.id", ondelete="CASCADE"), primary_key=True)
     book_id = Column(String(36), ForeignKey("book.id", ondelete="CASCADE"), primary_key=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     # Relationships
     order = relationship("Order", back_populates="books")
     book = relationship("Book")
