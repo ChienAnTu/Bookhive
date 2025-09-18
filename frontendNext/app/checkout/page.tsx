@@ -361,7 +361,7 @@ export default function CheckoutPage() {
     );
   }
 
-  // console.log("Checkout created:", checkouts)
+  console.log("Checkout created:", checkouts)
   console.log("fullItems grouped:", Object.entries(
     fullItems.reduce((acc, it) => {
       (acc[it.ownerId] ||= []).push(it);
@@ -528,6 +528,10 @@ export default function CheckoutPage() {
           <div className="flex justify-between text-sm">
             <span>Deposits</span>
             <span>${checkouts[0]?.deposit?.toFixed(2) || "0.00"}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Purchase Price</span>
+            <span>${checkouts[0]?.price?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Shipping (selected)</span>
