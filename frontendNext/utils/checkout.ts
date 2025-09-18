@@ -1,5 +1,7 @@
 import axios from "axios";
 import { getToken, getApiUrl } from "./auth";
+import type { User } from "@/app/types/user";
+
 
 const API_URL = getApiUrl();
 
@@ -53,4 +55,64 @@ export async function createCheckout(payload: any) {
     }
     throw new Error("Failed to create checkout");
   }
+}
+
+// -------- Rebuild checkout (delete + create) --------
+export async function rebuildCheckout(
+  user: User,
+  items: any[],
+  shipping: Record<string, "delivery" | "pickup"> = {},
+  selectedQuotes: Record<string, any> = {}
+) {
+  // 1. delete old checkout
+  const existing = await getMyCheckouts();
+  for (const co of existing) {
+    await deleteCheckout(co.checkoutId);
+    console.log("Deleted old checkout:", co.checkoutId);
+  }
+
+  // 2. build payload
+  const payload = {
+    userId: user.id,
+    contactName: user.name || "",
+    phone: user.phoneNumber || "",
+    street: user.streetAddress || "",
+    city: user.city || "",
+    state: user.state || "",
+    postcode: user.zipCode || "",
+    country: "Australia",
+
+    items: items.map((it) => {
+      const bookId = it.bookId || it.id;   // ✅ 兼容 cart 和 checkout
+
+      if (!bookId) {
+        console.error("Missing bookId in item:", it);
+        throw new Error("Item missing bookId, cannot create checkout");
+      }
+      const mode = it.mode || it.actionType?.toLowerCase();
+      const quote = selectedQuotes[it.ownerId];
+
+      return {
+        itemId: it.itemId || it.cartItemId,
+        bookId,
+        ownerId: it.ownerId,
+        actionType: (it.mode || it.actionType)?.toUpperCase(), // default BORROW
+        price: mode === "purchase" ? it.salePrice : undefined,
+        deposit: mode === "borrow" ? it.deposit : undefined,
+        shippingMethod:
+          shipping[bookId] ||
+          it.shippingMethod ||
+          "",
+        serviceCode:
+          quote?.serviceLevel === "Express"
+            ? "AUS_PARCEL_EXPRESS"
+            : "AUS_PARCEL_REGULAR",
+      };
+    }),
+  };
+
+  // 3. create a new checkout
+  const newCheckout = await createCheckout(payload);
+  console.log("Created new checkout:", newCheckout.checkoutId);
+  return newCheckout;
 }

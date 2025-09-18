@@ -10,7 +10,7 @@ import { useCartStore } from "@/app/store/cartStore";
 import { useRouter } from "next/navigation";
 import { getUserById, getCurrentUser } from "@/utils/auth";
 import type { User } from "@/app/types/user";
-import { createCheckout } from "@/utils/checkout";
+import { rebuildCheckout } from "@/utils/checkout";
 
 
 export default function CartPage() {
@@ -66,17 +66,17 @@ export default function CartPage() {
 
   // select by owner group
   const toggleSelectGroup = (ownerId: string) => {
-    // 用 cartItemId，而不是 book.id
+    // use cartItemId，instead of book.id
     const ids = (groupedByOwner.groups[ownerId] || []).map((b) => b.cartItemId);
 
     setSelectedIds((prev) => {
       const allSelected = ids.every((id) => prev.includes(id));
 
       if (allSelected) {
-        // 如果已经全选，则取消这一组
+        // cancel select all
         return prev.filter((id) => !ids.includes(id));
       } else {
-        // 否则加入未选中的
+        // or add unselected
         return Array.from(new Set([...prev, ...ids]));
       }
     });
@@ -129,6 +129,8 @@ export default function CartPage() {
 
   // totals
   const selectedPrice = useMemo(() => {
+    const selectedItems = cart.filter((item) => selectedIds.includes(item.cartItemId));
+    console.log("selectedIds:", selectedIds, "selectedItems:", selectedItems);
     return cart
       .filter((item) => selectedIds.includes(item.cartItemId)) // selected
       .reduce((sum, item) => {
@@ -142,7 +144,6 @@ export default function CartPage() {
       }, 0);
   }, [cart, selectedIds]);
 
-  console.log("selectedIds:", selectedIds, "selectedPrice:", selectedPrice);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center">Loading cart...</div>;
@@ -273,13 +274,12 @@ export default function CartPage() {
                             <div className="flex justify-between items-start pl-6">
                               <div>
                                 <h3
-    className={`text-lg font-semibold ${
-      !isAvailable ? "text-gray-400 line-through" : "text-gray-900"
-    }`}
-  >
-    《{book.titleOr}》
-  </h3>
-</div>
+                                  className={`text-lg font-semibold ${!isAvailable ? "text-gray-400 line-through" : "text-gray-900"
+                                    }`}
+                                >
+                                  《{book.titleOr}》
+                                </h3>
+                              </div>
                               {/* Borrow / Purchase switch */}
                               <div className="flex border rounded-lg overflow-hidden text-sm font-medium">
                                 {book.canRent && (
@@ -288,12 +288,12 @@ export default function CartPage() {
                                     onClick={() => isAvailable && setMode(book.id, "borrow")}
                                     className={`px-4 py-1
                                       ${!isAvailable
-          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-          : book.mode === "borrow"
-          ? "bg-black text-white"
-          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-        }`}
-    >
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : book.mode === "borrow"
+                                          ? "bg-black text-white"
+                                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                      }`}
+                                  >
                                     Borrow
                                   </button>
                                 )}
@@ -304,12 +304,12 @@ export default function CartPage() {
                                     onClick={() => isAvailable && setMode(book.id, "purchase")}
                                     className={`px-4 py-1
                                       ${!isAvailable
-          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-          : book.mode === "purchase"
-          ? "bg-black text-white"
-          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-        }`}
-    >
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : book.mode === "purchase"
+                                          ? "bg-black text-white"
+                                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                      }`}
+                                  >
                                     Purchase
                                   </button>
                                 )}
@@ -391,7 +391,6 @@ export default function CartPage() {
                         variant="outline"
                         onClick={async () => {
                           try {
-                            // 拉取当前用户
                             const user = await getCurrentUser();
                             if (!user) {
                               alert("Please login first");
@@ -404,43 +403,19 @@ export default function CartPage() {
                               alert("Please select at least one item to checkout");
                               return;
                             }
-                            // 构造 checkout payload
-                            const payload = {
-                              userId: user.id,
-                              contactName: user.name || "",
-                              phone: user.phoneNumber || "",
-                              street: user.streetAddress || "",
-                              city: user.city || "",
-                              state: user?.state || "",
-                              postcode: user.zipCode || "",
-                              country: "Australia",
-                              items: selectedItems.map((it) => ({
-                                bookId: it.id,
-                                ownerId: it.ownerId,
-                                ownerZipCode: ownersMap[it.ownerId]?.zipCode || "6000",
-                                actionType: it.mode.toUpperCase(), // BORROW / PURCHASE
-                                price: it.mode === "purchase" ? it.salePrice : undefined,
-                                deposit: it.mode === "borrow" ? it.deposit : undefined,
-                                shippingMethod: "",
-                                serviceCode: "AUS_PARCEL_REGULAR",
-                              })),
-                            };
 
-                            // create checkout settlement
-                            const checkout = await createCheckout(payload);
-                            console.log("Checkout created:", checkout);
+                            // rebuild Checkout
+                            const checkout = await rebuildCheckout(user, selectedItems);
 
-                            // go to checkout page
+                            console.log("Proceeding with checkout:", checkout);
                             router.push(`/checkout?checkoutId=${checkout.checkoutId}`);
-                            console.log("selected items to checkout:", selectedItems)
                           } catch (err) {
-                            console.error("Failed to create checkout:", err);
+                            console.error("Failed to rebuild checkout:", err);
                             alert("Failed to proceed to checkout. Please try again.");
                           }
                         }}
                       >
                         Proceed to Checkout
-
                       </Button>
 
                     ) : (
