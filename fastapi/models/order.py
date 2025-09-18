@@ -11,6 +11,8 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from models.base import Base
+from models.book import Book
+from typing import Dict
 
 # Order status enum - matches frontend OrderStatus
 ORDER_STATUS_ENUM = (
@@ -105,6 +107,44 @@ class Order(Base):
     owner = relationship("User", foreign_keys=[owner_id])
     borrower = relationship("User", foreign_keys=[borrower_id])
 
+    def to_dict(self, include_books: bool = True) -> Dict:
+        """
+        Convert Order instance to dict for frontend consumption
+        """
+        books_list = []
+        if include_books:
+            for ob in self.books:  # 假设 Order 有 relationship 'order_books'
+                if ob.book:
+                    books_list.append({
+                        "bookId": ob.book.id,
+                        "titleEn": ob.book.title_en,
+                        "titleOr": ob.book.title_or,
+                        "author": ob.book.author,
+                        "coverImgUrl": ob.book.cover_img_url,
+                    })
+
+        return {
+            "id": self.id,
+            "ownerId": self.owner_id,
+            "borrowerId": self.borrower_id,
+            "status": self.status,
+            "actionType": self.action_type,
+            "shippingMethod": self.shipping_method,
+            "depositOrSaleAmount": float(self.deposit_or_sale_amount or 0),
+            "serviceFeeAmount": float(self.service_fee_amount or 0),
+            "shippingOutFeeAmount": float(self.shipping_out_fee_amount or 0),
+            "totalPaidAmount": float(self.total_paid_amount or 0),
+            "contactName": self.contact_name,
+            "phone": self.phone,
+            "street": self.street,
+            "city": self.city,
+            "postcode": self.postcode,
+            "country": self.country,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
+            "dueAt": self.due_at.isoformat() if getattr(self, "due_at", None) else None,
+            "books": books_list
+        }
 
 class OrderBook(Base):
     """

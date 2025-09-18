@@ -4,7 +4,7 @@ Clean routes with business logic delegated to service layer
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -44,3 +44,17 @@ def create_order(
             for order in created_orders
         ],
     }
+
+@router.get("/", status_code=200)
+def list_my_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    status: str | None = Query("all", description="Filter by order status"),
+    search: str | None = Query(None, description="Search by order ID or book title/author")
+):
+    orders = OrderService(db).get_orders_by_user(
+        user_id=current_user.user_id,
+        status=status,
+        search=search
+    )
+    return [o.to_dict() for o in orders]
