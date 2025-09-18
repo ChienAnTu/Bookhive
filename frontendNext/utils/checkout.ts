@@ -68,7 +68,7 @@ export async function rebuildCheckout(
   const existing = await getMyCheckouts();
   for (const co of existing) {
     await deleteCheckout(co.checkoutId);
-    console.log("Deleted old checkout:", co.checkoutId);
+    console.log("Deleted current checkout:", co.checkoutId);
   }
 
   // 2. build payload
@@ -91,7 +91,7 @@ export async function rebuildCheckout(
       }
       const mode = it.mode || it.actionType?.toLowerCase();
       const quote = selectedQuotes[it.ownerId];
-
+      console.log("Owner:", it.ownerId, "Quote:", quote);
       return {
         itemId: it.itemId || it.cartItemId,
         bookId,
@@ -107,12 +107,14 @@ export async function rebuildCheckout(
           quote?.serviceLevel === "Express"
             ? "AUS_PARCEL_EXPRESS"
             : "AUS_PARCEL_REGULAR",
+        shippingQuote: quote?.cost || 0,
       };
     }),
   };
 
   // 3. create a new checkout
+  console.log("Payload sent to createCheckout:", payload);
   const newCheckout = await createCheckout(payload);
-  console.log("Created new checkout:", newCheckout.checkoutId);
+console.log("Checkout returned from backend:", newCheckout);
   return newCheckout;
 }
