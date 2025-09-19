@@ -63,7 +63,7 @@ app.include_router(cart_router, prefix="/api/v1")
 app.include_router(complaints_router)
 
 # order router
-app.include_router(orders_router, prefix="/api/v1")
+app.include_router(orders_router, prefix="/api/v1/orders")
 
 @app.get("/")
 async def root():

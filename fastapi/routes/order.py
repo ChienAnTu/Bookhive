@@ -15,7 +15,7 @@ from models.checkout import Checkout
 from core.dependencies import get_db, get_current_user
 
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(tags=["orders"])
 
 
 # API Models
@@ -61,7 +61,7 @@ def list_my_orders(
     skip = (page - 1) * page_size
     orders = OrderService.get_orders_by_user(
         db=db,
-        user_id=current_user.id,
+        user_id=current_user.user_id,
         status=status,
         skip=skip,
         limit=page_size
