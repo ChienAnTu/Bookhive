@@ -4,7 +4,7 @@ from models.order import Order, OrderBook
 from models.user import User
 from models.book import Book
 from models.checkout import Checkout, CheckoutItem
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
@@ -231,73 +231,37 @@ class OrderService:
         checkout.status = "COMPLETED"
         db.commit()
         return created_orders
-
-
+    
 
     @staticmethod
-    def get_orders_by_user(db: Session, user_id: str) -> List[Dict]:
-        """
-        get orders (borrowing/purchasing) of a certain user, including the book information within the orders.
-        """
-        orders = db.query(Order).filter(Order.borrower_id == user_id).all()
+    def get_orders_by_user(
+        db: Session, 
+        user_id: str, 
+        status: Optional[str] = None, 
+        skip: int = 0, 
+        limit: int = 20
+    ) -> List[dict]:
+        query = db.query(Order).filter(Order.borrower_id == user_id)
+
+        if status:
+            query = query.filter(Order.status == status)
+
+        orders = query.offset(skip).limit(limit).all()  
         result = []
 
         for order in orders:
-            order_books = db.query(OrderBook).filter(OrderBook.order_id == order.id).all()
             books_info = []
-            for ob in order_books:
-                book = db.query(Book).filter(Book.id == ob.book_id).first()
-                if book:
+            for ob in order.books:
+                if ob.book:
                     books_info.append({
-                        "id": book.id,
-                        "title": book.title_en,
-                        "action_type": order.action_type,
-                        "price": book.price,
-                        "deposit": book.deposit,
-                        "shipping_method": order.shipping_method
+                        "title": ob.book.title_or,
+                        "cover": ob.book.cover_img_url
                     })
+
             result.append({
                 "order_id": order.id,
-                "owner_id": order.owner_id,
-                "borrower_id": order.borrower_id,
                 "status": order.status,
-                "deposit_or_sale_amount": order.deposit_or_sale_amount,
-                "service_fee_amount": order.service_fee_amount,
-                "shipping_out_fee_amount": order.shipping_out_fee_amount,
-                "total_paid_amount": order.total_paid_amount,
-                "contact_name": order.contact_name,
-                "phone": order.phone,
-                "address": f"{order.street}, {order.city}, {order.postcode}, {order.country}",
-                "books": books_info
+                "total_paid_amount": float(order.total_paid_amount),
+                "books": books_info    
             })
         return result
-
-    def get_orders_by_user(
-        self,
-        user_id: str,
-        status: str | None = None,
-        search: str | None = None
-    ) -> list[Order]:
-        query = self.db.query(Order).filter(Order.borrower_id == user_id)
-
-        # status
-        if status and status != "all":
-            query = query.filter(Order.status == status)
-
-        # search
-        if search:
-            search_pattern = f"%{search.lower()}%"
-            
-            # join OrderBook and Book
-            query = query.join(OrderBook, OrderBook.order_id == Order.id)\
-                         .join(Book, Book.id == OrderBook.book_id)\
-                         .filter(
-                             or_(
-                                 Order.id.ilike(search_pattern),
-                                 Book.title_en.ilike(search_pattern),
-                                 Book.title_or.ilike(search_pattern),
-                                 Book.author.ilike(search_pattern)
-                             )
-                         ).distinct()  # avoid repeat
-
-        return query.all()
