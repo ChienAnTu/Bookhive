@@ -2,26 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCartStore } from "@/app/store/cartStore";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 
-// ------- Types (adapt to your real shapes) -------
-// Assuming your cart items still look like books with an ownerId and fees
-// If you already switched to CartLine with priceSnapshot, you can swap in that type instead
+import { getCurrentUser, updateUser, getUserById } from "@/utils/auth";
+import type { User } from "@/app/types/user";
+import { getBookById } from "@/utils/books";
+
+import { getMyCheckouts, rebuildCheckout } from "@/utils/checkout";
+import { listServiceFees } from "@/utils/serviceFee";
+import { getShippingQuotes } from "@/utils/shipping";
+import { X } from "lucide-react";
+
+// When the page loads → Check if checkout exists, create a new one if not
+// The total amount is based on the calculation result returned by the backend
+// Changing the address or modifying the shipping method → Rebuild the checkout (delete + create anew)
+// Clicking to place order → Submit the checkout
 
 type DeliveryChoice = "delivery" | "pickup"; // delivery == post
-
-type Address = {
-  country: string;
-  state?: string;
-  city: string;
-  postcode: string;
-  street: string;
-  contactName: string;
-  phone?: string;
-};
 
 type ShippingQuote = {
   id: string;
@@ -31,168 +30,347 @@ type ShippingQuote = {
   serviceLevel?: string; // Standard/Express
   cost: number; // AUD dollars
   currency: "AUD";
-  etaDays?: number;
+  etaDays?: string;
   expiresAt: string; // ISO
+  serviceCode?: string;
 };
+
+interface CheckoutItem {
+  itemId: string;
+  bookId: string;
+  ownerId: string;
+  titleOr: string;
+  actionType: "BORROW" | "PURCHASE";
+  price?: number;
+  deposit?: number;
+  deliveryMethod?: "post" | "pickup" | "both";
+  shippingMethod?: "delivery" | "pickup";
+}
+
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart } = useCartStore() as {
-    cart: Array<{
-      id: string;
-      titleOr: string;
-      author?: string;
-      ownerId: string;
-      deliveryMethod?: "post" | "self-help" | "both";
-      fees?: { deposit: number; serviceFee: number };
-    }>;
-  };
-
-  // ---------- UI State ----------
-  const [address, setAddress] = useState<Address>({
-    country: "Australia",
-    city: "",
-    postcode: "",
-    street: "",
-    contactName: "",
-    phone: "",
-  });
+  const [globalShippingChoice, setGlobalShippingChoice] = useState<"standard" | "express" | null>("standard");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [checkouts, setCheckouts] = useState<any[]>([]);
+  const [ownersMap, setOwnersMap] = useState<Record<string, { name: string; zipCode: string }>>({});
+  const [serviceRate, setServiceRate] = useState<number>(0);
+  const currentCheckout = checkouts.length > 0 ? checkouts[0] : null;
+  const items: CheckoutItem[] = currentCheckout?.items || [];
+  const [fullItems, setFullItems] = useState<any[]>([]);
 
   // Per-item shipping choice (default by book capability)
-  const [itemShipping, setItemShipping] = useState<Record<string, DeliveryChoice>>({});
+  const [itemShipping, setItemShipping] = useState<Record<string, "delivery" | "pickup" | "">>({});
 
   // Quotes per owner for DELIVERY (post)
   const [quotesByOwner, setQuotesByOwner] = useState<Record<string, ShippingQuote[]>>({});
   const [selectedQuoteByOwner, setSelectedQuoteByOwner] = useState<Record<string, ShippingQuote>>({});
+  const [isEditing, setIsEditing] = useState(false);
 
-  // ---------- Helpers ----------
-  const normalizeDefaultChoice = (m?: "post" | "self-help" | "both"): DeliveryChoice => {
-    if (m === "post" || m === "both" || !m) return "delivery";
-    return "pickup"; // self-help → pickup
-  };
+  const [rebuilding, setRebuilding] = useState(false);
 
+  // 1. load current user, fill address info
   useEffect(() => {
-    // initialize defaults once cart loads/changes
-    const next: Record<string, DeliveryChoice> = {};
-    for (const b of cart) {
-      if (!itemShipping[b.id]) next[b.id] = normalizeDefaultChoice(b.deliveryMethod);
-      else next[b.id] = itemShipping[b.id];
+    async function loadUser() {
+      const user = await getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+      }
+    }
+    loadUser();
+  }, []);
+
+  // 1. load owner info
+  useEffect(() => {
+    async function loadOwners() {
+      const uniqueOwnerIds = Array.from(new Set(items.map((b) => b.ownerId)));
+      const map: Record<string, { name: string; zipCode: string }> = {};
+
+      for (const id of uniqueOwnerIds) {
+        try {
+          const u = await getUserById(id);
+          map[id] = {
+            name: [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "Unknown Owner",
+            zipCode: u?.zipCode || "0000",
+          };
+        } catch {
+          map[id] = { name: "Unknown Owner", zipCode: "0000" };
+        }
+      }
+
+      setOwnersMap(map);
+    }
+
+    if (items.length > 0) loadOwners();
+  }, [items]);
+
+
+  // 2. init checkout
+  useEffect(() => {
+    if (!currentUser) return;
+    (async () => {
+      let data = await getMyCheckouts();
+      if (!data || data.length === 0) {
+        const newCheckout = await rebuildCheckout(currentUser, [], {}, {});
+        data = [newCheckout];
+      }
+      setCheckouts(data);
+    })();
+  }, [currentUser]);
+
+  // 3. enrich items with book info
+  useEffect(() => {
+    if (!items.length) return;
+    (async () => {
+      const results = await Promise.all(
+        items.map(async (it) => {
+          try {
+            const book = await getBookById(it.bookId);
+            return { ...it, titleOr: book?.titleOr, deliveryMethod: book?.deliveryMethod };
+          } catch {
+            return { ...it, titleOr: "Unknown Book", deliveryMethod: "" };
+          }
+        })
+      );
+      setFullItems(results);
+
+      // 初始化 itemShipping
+      const next: Record<string, DeliveryChoice | ""> = {};
+      for (const b of results) {
+        if (b.deliveryMethod === "post") {
+          next[b.bookId] = "delivery";
+        } else if (b.deliveryMethod === "pickup") {
+          next[b.bookId] = "pickup";
+        } else {
+          next[b.bookId] = b.shippingMethod || ""; // both 或 未设置时，保持空，交给用户选择
+        }
+      }
+      setItemShipping(next);
+    })();
+  }, [items]);
+
+  // 4. init shipping state
+  useEffect(() => {
+    if (!items.length || Object.keys(itemShipping).length > 0) return;
+    setItemShipping(Object.fromEntries(items.map((b) => [b.bookId, ""])) as Record<string, DeliveryChoice | "">);
+  }, [items]);
+
+  // 5. load service fee
+  useEffect(() => {
+    listServiceFees().then((fees) => {
+      const activePercent = fees.find((f: any) => f.feeType === "PERCENT" && f.status);
+      if (activePercent) setServiceRate(Number(activePercent.value));
+    });
+  }, []);
+
+
+  // ---------- useEffect initialize shipping ----------
+  useEffect(() => {
+    if (!items.length) return;
+
+    if (Object.keys(itemShipping).length > 0) return;
+
+    const next: Record<string, "delivery" | "pickup" | ""> = {};
+    for (const b of items) {
+      next[b.bookId] = ""; // default empty
     }
     setItemShipping(next);
-    // reset quotes when cart or choices change
-    setQuotesByOwner({});
-    setSelectedQuoteByOwner({});
-  }, [cart]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items]);
 
-  // group by owner AND by choice
-  const groups = useMemo(() => {
-    const delivery: Record<string, typeof cart> = {};
-    const pickup: Record<string, typeof cart> = {};
-    for (const b of cart) {
-      const choice = itemShipping[b.id] ?? normalizeDefaultChoice(b.deliveryMethod);
-      const bucket = choice === "delivery" ? delivery : pickup;
-      (bucket[b.ownerId] ||= []).push(b);
-    }
-    const orderKeys = (o: Record<string, unknown>) => Object.keys(o).sort();
-    return {
-      delivery,
-      pickup,
-      deliveryOwners: orderKeys(delivery),
-      pickupOwners: orderKeys(pickup),
-    };
-  }, [cart, itemShipping]);
+  // save address
+  const saveAddress = async () => {
+    if (!currentUser || !currentCheckout) return;
+    await updateUser({
+      id: currentUser.id,
+      state: currentCheckout.state,
+      city: currentCheckout.city,
+      zipCode: currentCheckout.postcode,
+      streetAddress: currentCheckout.street,
+      name: currentCheckout.contactName,
+      phoneNumber: currentCheckout.phone,
+    });
 
-  // Compute totals (core = deposit + serviceFee for demo; replace with your snapshot calc if available)
-  const coreTotals = useMemo(() => {
-    let deposit = 0;
-    let service = 0;
-    for (const b of cart) {
-      deposit += Number(b.fees?.deposit || 0);
-      service += Number(b.fees?.serviceFee || 0);
-    }
-    return { deposit, service, core: +(deposit + service).toFixed(2) };
-  }, [cart]);
+    const cleaned = Object.fromEntries(currentCheckout.items.map((it: any) => [it.bookId, it.shippingMethod]));
+    const newCheckout = await rebuildCheckout(currentUser, fullItems, cleaned, selectedQuoteByOwner);
+    setCheckouts([newCheckout]);
+    setIsEditing(false);
+    alert("Address saved!");
+  };
 
-  const shippingTotal = useMemo(() => {
-    return Object.values(selectedQuoteByOwner).reduce((sum, q) => sum + (q?.cost || 0), 0);
-  }, [selectedQuoteByOwner]);
-
-  const grandTotal = useMemo(() => +(coreTotals.core + shippingTotal).toFixed(2), [coreTotals.core, shippingTotal]);
-
-  // ---------- Mock: get quotes per owner for DELIVERY items ----------
+  // ---------- Get quotes per owner for DELIVERY items ----------
   async function requestQuotes() {
-    // Normally POST /api/shipping/quote with address + delivery groups
-    // Here we mock it deterministically
+    if (!currentCheckout) return;
+    console.log("[requestQuotes] start... currentCheckout:", currentCheckout);
+
     const now = Date.now();
     const expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
     const result: Record<string, ShippingQuote[]> = {};
 
-    for (const ownerId of groups.deliveryOwners) {
-      const items = groups.delivery[ownerId];
-      const base = 6.9; // base per shipment
-      const perItem = 2.0 * items.length; // simplistic scaler
-      result[ownerId] = [
-        {
-          id: `${ownerId}-STD`,
-          ownerId,
-          method: "post",
-          carrier: "AusPost",
-          serviceLevel: "Standard",
-          cost: +(base + perItem).toFixed(2),
-          currency: "AUD",
-          etaDays: 3,
-          expiresAt,
-        },
-        {
-          id: `${ownerId}-EXP`,
-          ownerId,
-          method: "post",
-          carrier: "AusPost",
-          serviceLevel: "Express",
-          cost: +(base + perItem + 4).toFixed(2),
-          currency: "AUD",
-          etaDays: 1,
-          expiresAt,
-        },
-      ];
+    const deliveryGroups: Record<string, any[]> = {};
+    for (const b of items) {
+      if (itemShipping[b.bookId] === "delivery") {
+        (deliveryGroups[b.ownerId] ||= []).push(b);
+      }
+    }
+
+    for (const ownerId of Object.keys(deliveryGroups)) {
+      const group = deliveryGroups[ownerId];
+      const length = 30;
+      const width = 20;
+      const height = 5 * group.length;
+      const weight = 0.5 * group.length;
+
+      try {
+        const data = await getShippingQuotes(
+          ownersMap[ownerId]?.zipCode || "6000",
+          String(currentCheckout.postcode || ""),
+          length,
+          width,
+          height,
+          weight
+        );
+        result[ownerId] = [
+          {
+            id: `${ownerId}-STD`,
+            ownerId,
+            method: "post",
+            carrier: "AusPost",
+            serviceLevel: "Standard",
+            cost: parseFloat(String(data.AUS_PARCEL_REGULAR?.total_cost ?? "0")),
+            currency: "AUD",
+            etaDays: data.AUS_PARCEL_REGULAR?.delivery_time || "-",
+            expiresAt,
+          },
+          {
+            id: `${ownerId}-EXP`,
+            ownerId,
+            method: "post",
+            carrier: "AusPost",
+            serviceLevel: "Express",
+            cost: parseFloat(String(data.AUS_PARCEL_EXPRESS?.total_cost ?? "0")),
+            currency: "AUD",
+            etaDays: data.AUS_PARCEL_EXPRESS?.delivery_time || "-",
+            expiresAt,
+          },
+        ];
+      } catch (err) {
+        console.error(`Failed to fetch quotes for ${ownerId}:`, err);
+        result[ownerId] = [];
+      }
     }
     setQuotesByOwner(result);
+    // ✅ 默认选择 Standard
+    const defaults: Record<string, ShippingQuote> = {};
+    for (const [ownerId, quotes] of Object.entries(result)) {
+      const std = quotes.find((q) => q.serviceLevel === "Standard");
+      if (std) defaults[ownerId] = std;
+    }
+    setSelectedQuoteByOwner(defaults);
 
-    // default select first quote per owner
-    const sel: Record<string, ShippingQuote> = {};
-    for (const k of Object.keys(result)) sel[k] = result[k][0];
-    setSelectedQuoteByOwner(sel);
+    // 默认设置 global choice = standard
+    setGlobalShippingChoice("standard");
+
+    // 顺便触发一次 rebuildCheckout，把默认选择带上
+    if (Object.keys(defaults).length > 0) {
+      const cleaned = Object.fromEntries(
+        fullItems.map((it) => [it.bookId, itemShipping[it.bookId]])
+      ) as Record<string, DeliveryChoice>;
+      const newCheckout = await rebuildCheckout(currentUser!, fullItems, cleaned, defaults);
+      setCheckouts([newCheckout]);
+    }
   }
+
+  // save delivery method
+  const saveDeliveryMethod = async () => {
+    const unselected = items.filter((b) => !itemShipping[b.bookId]);
+    if (unselected.length > 0) {
+      alert("Please select delivery method for all items before saving.");
+      return;
+    }
+
+    const cleaned = Object.fromEntries(
+      Object.entries(itemShipping).filter(([, v]) => v)
+    ) as Record<string, DeliveryChoice>;
+
+    setItemShipping(cleaned);
+    console.log("[saveDeliveryMethod] calling requestQuotes...");
+
+    await requestQuotes();
+    alert("Delivery methods saved!");
+  };
+
 
   // ---------- Handlers ----------
   const setChoice = (bookId: string, value: DeliveryChoice) => {
-    setItemShipping((prev) => ({ ...prev, [bookId]: value }));
-  };
-
-  const placeOrder = async () => {
-    // Submit one order with mixed shipments
-    const shipments = Object.values(selectedQuoteByOwner).map((q) => ({ ownerId: q.ownerId, quoteId: q.id }));
-    console.log("PLACE ORDER", {
-      address,
-      shipments,
-      choices: itemShipping,
-      grandTotal,
+    setItemShipping(prev => {
+      const next = { ...prev, [bookId]: value };
+      return next;
     });
-    // const res = await fetch("/api/orders", { method: "POST", body: JSON.stringify({...}) });
-    // const data = await res.json();
-    // router.push(`/orders/${data.id}`)
-    alert("Order created (mock). Check console.");
   };
 
-  // ---------- UI ----------
-  if (cart.length === 0) {
+
+  // ---------- Place Order ----------
+  const placeOrder = async () => {
+    const checkoutToUse = checkouts[0];
+    console.log("[placeOrder] checkouts[0]:", checkouts[0]);
+    console.log("Checkout list:", checkouts)
+
+    if (!checkoutToUse) {
+      alert("No checkout found, please refresh.");
+      return;
+    }
+    console.log("[placeOrder] checkoutToUse:", checkoutToUse);
+
+    // check address
+    const { contactName, phone, street, city, state, postcode } = checkoutToUse;
+    if (!contactName || !phone || !street || !city || !state || !postcode) {
+      alert("Please complete your delivery address before placing the order.");
+      return;
+    }
+
+    // check item's delivery method
+    const invalidItems = checkoutToUse.items.filter((it: CheckoutItem) => !it.shippingMethod);
+    if (invalidItems.length > 0) {
+      alert("Please select delivery/pickup for all items and save them.");
+      return;
+    }
+
+    // if choose delivery，must get shipping quotes
+    for (const it of checkoutToUse.items) {
+      if (it.shippingMethod === "delivery" && !it.shippingQuote) {
+        alert("Please select delivery shipping quote.");
+        return;
+      }
+    }
+
+    // check amount
+    if (!checkoutToUse.totalDue || checkoutToUse.totalDue <= 0) {
+      alert("Order total is invalid.");
+      return;
+    }
+
+    alert(`Order placed! Total due: $${checkoutToUse.totalDue}`);
+    router.push(`/borrowing/${checkoutToUse.checkoutId}`);
+  };
+
+
+  // ---------- When Empty ----------
+  if (!items.length) {
     return (
       <div className="p-6 text-center">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Your cart is empty</h2>
-        <Button variant="outline" onClick={() => router.push("/books")}>Back to Books</Button>
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Loading...</h2>
+        {/* <Button variant="outline" onClick={() => router.push("/books")}>Back to Books</Button> */}
       </div>
     );
   }
+
+  console.log("Checkout created:", checkouts)
+  console.log("fullItems grouped:", Object.entries(
+    fullItems.reduce((acc, it) => {
+      (acc[it.ownerId] ||= []).push(it);
+      return acc;
+    }, {} as Record<string, CheckoutItem[]>)
+  ));
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -201,113 +379,160 @@ export default function CheckoutPage() {
       {/* Address */}
       <Card>
         <div className="p-4 space-y-3">
-          <h2 className="text-lg font-semibold">Delivery Address</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Contact Name" value={address.contactName} onChange={(e)=>setAddress({...address, contactName: e.target.value})} name="contactName" />
-            <Input label="Phone" value={address.phone||""} onChange={(e)=>setAddress({...address, phone: e.target.value})} name="phone" />
-            <Input label="Street" value={address.street} onChange={(e)=>setAddress({...address, street: e.target.value})} name="street" />
-            <Input label="City" value={address.city} onChange={(e)=>setAddress({...address, city: e.target.value})} name="city" />
-            <Input label="Postcode" value={address.postcode} onChange={(e)=>setAddress({...address, postcode: e.target.value})} name="postcode" />
-            <Input label="Country" value={address.country} onChange={(e)=>setAddress({...address, country: e.target.value})} name="country" />
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Delivery Address</h2>
+
+            {isEditing ? (
+              <Button variant="outline" onClick={saveAddress} className="text-sm">Save</Button>
+            ) : (
+              <Button variant="outline" onClick={() => setIsEditing(true)} className="text-sm">Edit</Button>
+            )}
           </div>
+          {/* address form */}
+          {checkouts.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {["contactName", "phone", "street", "city", "state", "postcode"].map((f) => (
+                <Input key={f} label={f} value={checkouts[0][f] || ""} disabled={!isEditing}
+                  onChange={(e) => setCheckouts((prev) => prev.length ? [{ ...prev[0], [f]: e.target.value }] : prev)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 
-      {/* Item shipping choices */}
+
+      {/* Items & Delivery */}
       <Card>
         <div className="p-4 space-y-3">
-          <h2 className="text-lg font-semibold">Items & Delivery Method</h2>
-          <div className="space-y-3">
-            {cart.map((b) => (
-              <div key={b.id} className="flex items-center justify-between border rounded-md p-3">
-                <div>
-                  <div className="font-medium">《{b.titleOr}》</div>
-                  <div className="text-sm text-gray-600">Owner: {b.ownerId}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-sm">Method:</label>
-                  <select
-                    className="border rounded px-2 py-1"
-                    value={itemShipping[b.id] ?? normalizeDefaultChoice(b.deliveryMethod)}
-                    onChange={(e) => setChoice(b.id, e.target.value as DeliveryChoice)}
-                  >
-                    {/* options reflect book capability */}
-                    {(b.deliveryMethod === "post" || b.deliveryMethod === "both" || !b.deliveryMethod) && (
-                      <option value="delivery">Delivery</option>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Items & Delivery</h2>
+            <Button variant="outline" onClick={saveDeliveryMethod} className="text-sm">Save Delivery Method</Button>
+
+          </div>
+
+          {/* Items group */}
+          <div className="space-y-4">
+            {Object.entries(
+              fullItems.reduce<Record<string, typeof fullItems[number][]>>((acc, item) => {
+                (acc[item.ownerId] ||= []).push(item); return acc;
+              }, {})).map(([ownerId, ownerItems]) => (
+                <div key={ownerId} className="border rounded-md p-4 space-y-3 bg-gray-100">
+                  <div className="font-semibold">📚 Owner: {ownersMap[ownerId]?.name}</div>
+                  <div className="divide-y space-y-2">
+                    {ownerItems.map((b: CheckoutItem) => (
+                      <div key={b.bookId} className="py-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">
+                              《{b.titleOr}》
+                              <span className="text-sm text-blue-600">
+                                Trading Way: {b.actionType === "BORROW" ? "Borrow" : "Purchase"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Delivery / Pickup select */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">Delivery Method:</span>
+                            {b.deliveryMethod === "post" && (
+                              <span className="px-4 py-1 rounded bg-black text-white text-sm">Delivery</span>
+                            )}
+                            {b.deliveryMethod === "pickup" && (
+                              <span className="px-4 py-1 rounded bg-black text-white text-sm">Pickup</span>
+                            )}
+                            {b.deliveryMethod === "both" && (
+                              <select
+                                value={itemShipping[b.bookId]}
+                                onChange={(e) => setChoice(b.bookId, e.target.value as DeliveryChoice)}
+                                className="px-3 py-1 border rounded bg-white text-sm"
+                              >
+                                <option value="" disabled>-- Select option --</option>
+                                <option value="delivery">Delivery</option>
+                                <option value="pickup">Pickup</option>
+                              </select>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Pickup hint */}
+                        {itemShipping[b.bookId] === "pickup" && (
+                          <p className="text-sm text-green-700 mt-2">
+                            Pickup is free. Details will be shared after order.
+                          </p>
+                        )}
+                        {/* Delivery hint */}
+                        {itemShipping[b.bookId] === "delivery" && (
+                          <p className="text-sm text-orange-700 mt-2">
+                            Shipping fees will be calculated after Save Delivery Method.
+                          </p>
+                        )}
+
+
+                      </div>
+                    ))}
+                  </div>
+                  {/* Shipping Quotes（if chose delivery, display under this owner） */}
+                  {ownerItems.some((b) => itemShipping[b.bookId] === "delivery") &&
+                    quotesByOwner[ownerId]?.length > 0 && (
+                      <div className="mt-4 p-4 rounded-md border bg-white">
+                        <h4 className="text-sm font-semibold mb-2 text-gray-800">
+                          AusPost Shipping Quotes
+                        </h4>
+                        <div className="flex gap-2">
+                          {quotesByOwner[ownerId].map((q) => {
+                            const choiceKey = q.serviceLevel === "Standard" ? "standard" : "express";
+                            return (
+                              <button
+                                key={q.id}
+                                type="button"
+                                onClick={async () => {
+                                  setGlobalShippingChoice(choiceKey);
+
+                                  // 所有 owner 都选择相同 serviceLevel
+                                  const updated: Record<string, ShippingQuote> = {};
+                                  for (const [oid, quotes] of Object.entries(quotesByOwner)) {
+                                    const match = quotes.find(
+                                      (x) => x.serviceLevel?.toLowerCase() === choiceKey
+                                    );
+                                    if (match) {
+                                      updated[oid] = {
+                                        ...match,
+                                        serviceCode: choiceKey === "express"
+                                          ? "AUS_PARCEL_EXPRESS"
+                                          : "AUS_PARCEL_REGULAR",
+                                      } as any;
+                                    }
+                                  }
+                                  setSelectedQuoteByOwner(updated);
+
+                                  // rebuild checkout
+                                  const cleaned = Object.fromEntries(
+                                    fullItems.map((it) => [it.bookId, itemShipping[it.bookId]])
+                                  ) as Record<string, DeliveryChoice>;
+
+                                  const newCheckout = await rebuildCheckout(currentUser!, fullItems, cleaned, updated);
+                                  setCheckouts([newCheckout]);
+
+                                }}
+                                className={`px-3 py-2 rounded border text-sm ${selectedQuoteByOwner[ownerId]?.id === q.id
+                                  ? "bg-black text-white"
+                                  : "bg-white hover:bg-gray-50"
+                                  }`}
+                              >
+                                {q.carrier} {q.serviceLevel} • ${q.cost} • ETA {q.etaDays || "-"}d
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                      </div>
                     )}
-                    {(b.deliveryMethod === "self-help" || b.deliveryMethod === "both" || !b.deliveryMethod) && (
-                      <option value="pickup">Pickup</option>
-                    )}
-                  </select>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </Card>
-
-      {/* Delivery groups (POST) */}
-      {groups.deliveryOwners.length > 0 && (
-        <Card>
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Shipments – Delivery</h2>
-              <Button variant="outline" onClick={requestQuotes}>Get Shipping Quotes</Button>
-            </div>
-
-            {groups.deliveryOwners.map((ownerId) => (
-              <div key={ownerId} className="border rounded-md p-3 space-y-2">
-                <div className="font-medium">Owner: {ownerId}</div>
-                <ul className="text-sm text-gray-600 list-disc pl-5">
-                  {groups.delivery[ownerId].map((b) => (
-                    <li key={b.id}>《{b.titleOr}》</li>
-                  ))}
-                </ul>
-
-                {/* Quotes chooser */}
-                {quotesByOwner[ownerId]?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {quotesByOwner[ownerId].map((q) => (
-                      <button
-                        key={q.id}
-                        type="button"
-                        onClick={() => setSelectedQuoteByOwner((prev) => ({ ...prev, [ownerId]: q }))}
-                        className={`px-3 py-2 rounded border text-sm ${
-                          selectedQuoteByOwner[ownerId]?.id === q.id ? "bg-black text-white" : "bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        {q.carrier} {q.serviceLevel || ""} • ${q.cost} • ETA {q.etaDays || "-"}d
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Quotes pending. Click "Get Shipping Quotes".</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Pickup groups */}
-      {groups.pickupOwners.length > 0 && (
-        <Card>
-          <div className="p-4 space-y-3">
-            <h2 className="text-lg font-semibold">Shipments – Pickup</h2>
-            {groups.pickupOwners.map((ownerId) => (
-              <div key={ownerId} className="border rounded-md p-3 space-y-2">
-                <div className="font-medium">Owner: {ownerId}</div>
-                <ul className="text-sm text-gray-600 list-disc pl-5">
-                  {groups.pickup[ownerId].map((b) => (
-                    <li key={b.id}>《{b.titleOr}》</li>
-                  ))}
-                </ul>
-                <p className="text-sm text-green-700">Pickup is free. Details will be shared after order.</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* Summary */}
       <Card>
@@ -315,21 +540,27 @@ export default function CheckoutPage() {
           <h2 className="text-lg font-semibold">Order Summary</h2>
           <div className="flex justify-between text-sm">
             <span>Deposits</span>
-            <span>${coreTotals.deposit.toFixed(2)}</span>
+            <span>${checkouts[0]?.deposit?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Platform Service Fees</span>
-            <span>${coreTotals.service.toFixed(2)}</span>
+            <span>Purchase Price</span>
+            <span>${checkouts[0]?.price?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Shipping (selected)</span>
-            <span>${shippingTotal.toFixed(2)}</span>
+            <span>${checkouts[0]?.shippingFee?.toFixed(2) || "0.00"}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Platform Service Fees</span>
+            <span>${checkouts[0]?.serviceFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-lg font-bold border-t pt-2">
             <span>Total Due</span>
-            <span>${grandTotal.toFixed(2)}</span>
+            <span>${checkouts[0]?.totalDue?.toFixed(2) || "0.00"}</span>
           </div>
-          <p className="text-xs text-gray-500">Deposits may be refundable upon return. Shipping is charged per owner based on your selected quote.</p>
+          <p className="text-xs text-gray-500">
+            Deposits may be refundable upon return. Shipping is charged per owner based on your selected quote.
+          </p>
         </div>
       </Card>
 
