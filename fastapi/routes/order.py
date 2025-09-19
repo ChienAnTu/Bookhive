@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from app.schemas.order import OrderSummary
+from schemas.order import OrderSummary
 from typing import List
 from services.order_service import OrderService
 from models.user import User
