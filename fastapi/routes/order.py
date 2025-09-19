@@ -7,11 +7,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-
+from app.schemas.order import OrderSummary
+from typing import List
 from services.order_service import OrderService
 from models.user import User
 from models.checkout import Checkout
 from core.dependencies import get_db, get_current_user
+
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -45,16 +47,23 @@ def create_order(
         ],
     }
 
-@router.get("/", status_code=200)
+@router.get("/", response_model=List[OrderSummary], status_code=status.HTTP_200_OK)
 def list_my_orders(
+    status: Optional[str] = Query(None, description="Filter by order status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Orders per page"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    status: str | None = Query("all", description="Filter by order status"),
-    search: str | None = Query(None, description="Search by order ID or book title/author")
 ):
-    orders = OrderService(db).get_orders_by_user(
-        user_id=current_user.user_id,
+    """
+    List current user's orders (summary + basic book info), optionally filtered by status, with pagination.
+    """
+    skip = (page - 1) * page_size
+    orders = OrderService.get_orders_by_user(
+        db=db,
+        user_id=current_user.id,
         status=status,
-        search=search
+        skip=skip,
+        limit=page_size
     )
-    return [o.to_dict() for o in orders]
+    return orders
