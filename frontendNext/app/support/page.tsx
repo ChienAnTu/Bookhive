@@ -1,7 +1,7 @@
-// app/complain/page.tsx
+// app/support/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   MessageSquare, 
   AlertTriangle, 
@@ -17,21 +17,20 @@ import {
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
-import { 
-  getCurrentUser,
-  mockComplaints,
-  mockBooks,
-  getUserById 
-} from "@/app/data/mockData";
+import { getCurrentUser } from "@/utils/auth";
+import { getUserComplaints, createComplaint, type Complaint, type CreateComplaintRequest } from "@/utils/complaints";
+import type { User } from "@/app/types/user";
 
 type ComplaintStatus = "pending" | "investigating" | "resolved" | "closed";
-type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "other";
+type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "overdue" | "other";
 type FilterStatus = "all" | ComplaintStatus;
 
 export default function ComplainPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewComplaintModalOpen, setIsNewComplaintModalOpen] = useState(false);
+  const [userComplaints, setUserComplaints] = useState<Complaint[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newComplaint, setNewComplaint] = useState({
     type: "book-condition" as ComplaintType,
     subject: "",
@@ -39,14 +38,27 @@ export default function ComplainPage() {
     orderId: ""
   });
   
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Get user's complaints
-  const userComplaints = useMemo(() => {
-    return mockComplaints.filter(complaint => 
-      complaint.complainantId === currentUser.id
-    );
-  }, [currentUser.id]);
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+        
+        if (user) {
+          const complaints = await getUserComplaints();
+          setUserComplaints(complaints);
+        }
+      } catch (error) {
+        console.error("Failed to load user complaints:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const filteredComplaints = useMemo(() => {
     let filtered = userComplaints;
@@ -105,22 +117,40 @@ export default function ComplainPage() {
     });
   };
 
-  const handleSubmitComplaint = () => {
-    if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
+  const handleSubmitComplaint = async () => {
+    if (!newComplaint.subject.trim() || !newComplaint.description.trim() || !currentUser) {
       return;
     }
     
-    // Here you would typically send the complaint to your backend
-    console.log("Submitting complaint:", newComplaint);
-    
-    // Reset form and close modal
-    setNewComplaint({
-      type: "book-condition",
-      subject: "",
-      description: "",
-      orderId: ""
-    });
-    setIsNewComplaintModalOpen(false);
+    try {
+      const complaintData: CreateComplaintRequest = {
+        type: newComplaint.type,
+        subject: newComplaint.subject,
+        description: newComplaint.description,
+        source: "support",
+        priority: "medium",
+        ...(newComplaint.orderId && { orderId: newComplaint.orderId })
+      };
+
+      const createdComplaint = await createComplaint(complaintData);
+      
+      // Add the new complaint to the list
+      setUserComplaints(prev => [createdComplaint, ...prev]);
+      
+      // Reset form and close modal
+      setNewComplaint({
+        type: "book-condition",
+        subject: "",
+        description: "",
+        orderId: ""
+      });
+      setIsNewComplaintModalOpen(false);
+      
+      alert("Complaint submitted successfully!");
+    } catch (error) {
+      console.error("Failed to create complaint:", error);
+      alert("Failed to submit complaint. Please try again.");
+    }
   };
 
   const filterOptions = [
