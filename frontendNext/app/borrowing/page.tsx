@@ -11,10 +11,13 @@ import Modal from "../components/ui/Modal";
 
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
-import { mockOrders, mockBooks, mockUsers, getCurrentUser } from "@/app/data/mockData";
+import type { Order as APIOrder } from "@/utils/orders";
+import { getCurrentUser, getUserById } from "@/utils/auth";
+import { getBorrowingOrders } from "@/utils/orders";
+import { createComplaint, type CreateComplaintRequest } from "@/utils/complaints";
+import { getBookById } from "@/utils/books";
 
 //import { getOrders, updateOrder, cancelOrder } from "@/utils/orders";
-import { getBookById } from "@/utils/books";
 
 type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "other";
 
@@ -29,14 +32,15 @@ const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
 };
 
 export default function OrderListPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<APIOrder[]>([]);
   const [booksMap, setBooksMap] = useState<Record<string, Book>>({});
+  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [search, setSearch] = useState("");
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<APIOrder | null>(null);
   const [complaintForm, setComplaintForm] = useState({
     type: "book-condition" as ComplaintType,
     subject: "",
@@ -44,40 +48,69 @@ export default function OrderListPage() {
   });
   const router = useRouter();
 
-  const currentUser = getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // // get borrowing orders & related books
-  //  useEffect(() => {
-  //   let alive = true;
-  //   (async () => {
-  //     const user = await getCurrentUser();
-  //     if (!user) return;
-
-  //     const list = await getOrders(user.id);
-  //     if (!alive) return;
-  //     setOrders(list);
-
-  // get books info
-  // const ids = Array.from(new Set(orders.flatMap(o => o.bookIds))); 
-  // if (ids.length) {
-  //   const books = await getBooksByIds(ids);
-  //   const map: Record<string, Book> = {};
-  //   for (const b of books) map[b.id] = b;
-  //   setBooksMap(map);
-  // }
-  //   })();
-  //   return () => {
-  //     alive = false;
-  //   };
-  // }, []);
-
-  // 暂时直接用 mock 数据
+  // Load data from API
   useEffect(() => {
-    setOrders(mockOrders);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setErr(null);
 
-    const map: Record<string, Book> = {};
-    for (const b of mockBooks) map[b.id] = b;
-    setBooksMap(map);
+        // Get current user and orders
+        const user = await getCurrentUser();
+        if (!user) {
+          setErr("Failed to load user information");
+          return;
+        }
+        setCurrentUser(user);
+
+        // Get borrowing orders
+        const ordersData = await getBorrowingOrders();
+        setOrders(ordersData);
+
+        // Get books for all orders
+        const allBookIds = Array.from(new Set(ordersData.flatMap(o => o.bookIds)));
+        const allUserIds = Array.from(new Set(ordersData.flatMap(o => [o.ownerId, o.borrowerId])));
+        
+        const booksData: Record<string, Book> = {};
+        const usersData: Record<string, any> = {};
+        
+        // Load books and users in parallel
+        await Promise.all([
+          ...allBookIds.map(async (bookId) => {
+            try {
+              const book = await getBookById(bookId);
+              if (book) {
+                booksData[bookId] = book;
+              }
+            } catch (error) {
+              console.error(`Failed to load book ${bookId}:`, error);
+            }
+          }),
+          ...allUserIds.map(async (userId) => {
+            try {
+              const userInfo = await getUserById(userId);
+              if (userInfo) {
+                usersData[userId] = userInfo;
+              }
+            } catch (error) {
+              console.error(`Failed to load user ${userId}:`, error);
+            }
+          })
+        ]);
+        
+        setBooksMap(booksData);
+        setUsersMap(usersData);
+      } catch (error) {
+        console.error("Failed to load orders:", error);
+        setErr("Failed to load orders. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   // search and filter
@@ -194,7 +227,7 @@ export default function OrderListPage() {
                 filteredOrders.map((o) => {
                   const booksInOrder = o.bookIds.map((id) => booksMap[id]).filter(Boolean) as Book[];
                   const first = booksInOrder[0];
-                  const ownerName = mockUsers.find(u => u.id === o.ownerId)?.name || "Unknown Owner";
+                  const ownerName = usersMap[o.ownerId]?.name || "Unknown Owner";
 
                   const extra = Math.max(0, booksInOrder.length - 1);
 
@@ -430,22 +463,30 @@ export default function OrderListPage() {
     </div>
   );
 
-  function handleSubmitComplaint() {
+  async function handleSubmitComplaint() {
     if (!selectedOrder || !complaintForm.subject.trim() || !complaintForm.description.trim()) {
       return;
     }
 
-    // Here you would typically send the complaint to your backend
-    console.log("Submitting order complaint:", {
-      orderId: selectedOrder.id,
-      type: complaintForm.type,
-      subject: complaintForm.subject,
-      description: complaintForm.description,
-      source: "order"
-    });
+    try {
+      const complaintData: CreateComplaintRequest = {
+        subject: complaintForm.subject,
+        description: complaintForm.description,
+        type: complaintForm.type,
+        source: "order",
+        orderId: selectedOrder.id
+      };
 
-    // Show success message
-    alert("Your complaint has been submitted successfully! You can track its progress in the Complaints page.");
+      const createdComplaint = await createComplaint(complaintData);
+      console.log("Order complaint created:", createdComplaint);
+
+      // Show success message
+      alert("Your complaint has been submitted successfully! You can track its progress in the Complaints page.");
+    } catch (error) {
+      console.error("Failed to create complaint:", error);
+      alert("Failed to submit complaint. Please try again.");
+      return;
+    }
 
     // Reset and close
     setComplaintForm({

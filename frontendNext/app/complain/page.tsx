@@ -14,20 +14,25 @@ import {
   Search,
   FileText,
   DollarSign,
-  User,
   Settings
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
+import { getCurrentUser, getUserById } from "@/utils/auth";
 import { 
-  getCurrentUser,
-  mockComplaints,
-  mockBooks,
-  mockOrders,
-  getUserById,
-  processManualDepositDeduction
-} from "@/app/data/mockData";
+  getComplaints, 
+  createComplaint, 
+  updateComplaintStatus, 
+  processDepositDeduction,
+  type Complaint,
+  type CreateComplaintRequest,
+  type UpdateComplaintStatusRequest,
+  type DepositDeductionRequest
+} from "@/utils/complaints";
+import { getBorrowingOrders, type Order } from "@/utils/orders";
+import { getBookById } from "@/utils/books";
+import type { User } from "@/app/types/user";
 
 type ComplaintStatus = "open" | "in-progress" | "resolved" | "closed";
 type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "overdue" | "other";
@@ -40,13 +45,20 @@ export default function EnhancedComplainPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewComplaintModalOpen, setIsNewComplaintModalOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false); // Toggle for admin features
-  const [selectedComplaint, setSelectedComplaint] = useState<any>(null);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [isDepositDeductionModalOpen, setIsDepositDeductionModalOpen] = useState(false);
   const [isStatusUpdateModalOpen, setIsStatusUpdateModalOpen] = useState(false);
   const [deductionAmount, setDeductionAmount] = useState("");
   const [deductionReason, setDeductionReason] = useState("");
   const [newStatus, setNewStatus] = useState<ComplaintStatus>("open");
   const [resolutionNotes, setResolutionNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Data states
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   
   const [newComplaint, setNewComplaint] = useState({
     type: "book-condition" as ComplaintType,
@@ -55,22 +67,56 @@ export default function EnhancedComplainPage() {
     orderId: "",
     source: "support" as ComplaintSource
   });
-  
-  const currentUser = getCurrentUser();
-  
-  // Get user's complaints (or all if admin)
-  const complaints = useMemo(() => {
+
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Get current user
+        const user = await getCurrentUser();
+        if (!user) {
+          setError("Failed to load user information");
+          return;
+        }
+        setCurrentUser(user);
+
+        // Load complaints and orders in parallel
+        const [complaintsData, ordersData] = await Promise.all([
+          getComplaints(isAdminMode),
+          getBorrowingOrders()
+        ]);
+
+        setComplaints(complaintsData);
+        setAvailableOrders(ordersData);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setError("Failed to load data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [isAdminMode]);
+
+  // Filter complaints based on current user and admin mode
+  const userComplaints = useMemo(() => {
+    if (!currentUser) return [];
+    
     if (isAdminMode) {
-      return mockComplaints; // Admin sees all complaints
+      return complaints; // Admin sees all complaints
     }
-    return mockComplaints.filter(complaint => 
+    return complaints.filter(complaint => 
       complaint.affectedUsers?.includes(currentUser.id) || 
       complaint.complainantId === currentUser.id
     );
-  }, [currentUser.id, isAdminMode]);
+  }, [complaints, currentUser, isAdminMode]);
 
   const filteredComplaints = useMemo(() => {
-    let filtered = complaints;
+    let filtered = userComplaints;
     
     if (selectedFilter !== "all") {
       filtered = filtered.filter(complaint => complaint.status === selectedFilter);
@@ -84,7 +130,7 @@ export default function EnhancedComplainPage() {
     }
     
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [complaints, selectedFilter, searchTerm]);
+  }, [userComplaints, selectedFilter, searchTerm]);
 
   const getStatusIcon = (status: ComplaintStatus) => {
     switch (status) {
@@ -137,13 +183,34 @@ export default function EnhancedComplainPage() {
     });
   };
 
-  const handleSubmitComplaint = () => {
+  const handleSubmitComplaint = async () => {
     if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
       return;
     }
     
-    // Here you would typically send the complaint to your backend
-    console.log("Submitting complaint:", newComplaint);
+    try {
+      const complaintData: CreateComplaintRequest = {
+        subject: newComplaint.subject,
+        description: newComplaint.description,
+        type: newComplaint.type,
+        source: newComplaint.source,
+        orderId: newComplaint.orderId || undefined
+      };
+
+      const createdComplaint = await createComplaint(complaintData);
+      console.log("Complaint created:", createdComplaint);
+      
+      // Reload complaints to include the new one
+      const updatedComplaints = await getComplaints(isAdminMode);
+      setComplaints(updatedComplaints);
+      
+      // Show success message
+      alert("Your complaint has been submitted successfully!");
+    } catch (error) {
+      console.error("Failed to create complaint:", error);
+      alert("Failed to submit complaint. Please try again.");
+      return;
+    }
     
     // Reset form and close modal
     setNewComplaint({
@@ -156,33 +223,31 @@ export default function EnhancedComplainPage() {
     setIsNewComplaintModalOpen(false);
   };
 
-  const handleDepositDeduction = () => {
+  const handleDepositDeduction = async () => {
     if (!deductionAmount || !deductionReason.trim() || !selectedComplaint) {
       return;
     }
     
     const amount = parseFloat(deductionAmount);
     
-    // Use the manual deduction function
-    const result = processManualDepositDeduction(
-      selectedComplaint.id,
-      amount,
-      deductionReason,
-      "admin1" // In real app, this would be current admin ID
-    );
-    
-    if (result) {
-      console.log("Deposit deduction processed:", {
-        complaintId: selectedComplaint.id,
-        deductionAmount: result.deductionAmount,
-        remainingDeposit: result.remainingDeposit,
-        compensationToOwner: result.compensationToOwner
+    try {
+      // Use the API deduction function
+      const result = await processDepositDeduction(selectedComplaint.id, {
+        amount,
+        reason: deductionReason
       });
+      
+      console.log("Deposit deduction processed:", result);
       
       // Show success message
       alert(`Deposit deduction processed successfully!\nDeducted: $${amount}\nRemaining deposit: $${(result.remainingDeposit / 100).toFixed(2)}\nCompensation to owner: $${(result.compensationToOwner / 100).toFixed(2)}`);
-    } else {
-      alert("Failed to process deposit deduction. Please check the complaint and order details.");
+      
+      // Reload complaints to get updated data
+      const updatedComplaints = await getComplaints(isAdminMode);
+      setComplaints(updatedComplaints);
+    } catch (error) {
+      console.error("Failed to process deposit deduction:", error);
+      alert("Failed to process deposit deduction. Please try again.");
     }
     
     // Reset form and close modal
@@ -192,17 +257,29 @@ export default function EnhancedComplainPage() {
     setSelectedComplaint(null);
   };
 
-  const handleStatusUpdate = () => {
+  const handleStatusUpdate = async () => {
     if (!selectedComplaint) {
       return;
     }
     
-    console.log("Updating complaint status:", {
-      complaintId: selectedComplaint.id,
-      oldStatus: selectedComplaint.status,
-      newStatus,
-      resolutionNotes: resolutionNotes.trim() || undefined
-    });
+    try {
+      const updateData: UpdateComplaintStatusRequest = {
+        status: newStatus,
+        resolutionNotes: resolutionNotes.trim() || undefined
+      };
+
+      const updatedComplaint = await updateComplaintStatus(selectedComplaint.id, updateData);
+      console.log("Complaint status updated:", updatedComplaint);
+      
+      // Reload complaints to get updated data
+      const updatedComplaints = await getComplaints(isAdminMode);
+      setComplaints(updatedComplaints);
+      
+      alert("Complaint status updated successfully!");
+    } catch (error) {
+      console.error("Failed to update complaint status:", error);
+      alert("Failed to update complaint status. Please try again.");
+    }
     
     // Reset form and close modal
     setNewStatus("open");
@@ -211,7 +288,7 @@ export default function EnhancedComplainPage() {
     setSelectedComplaint(null);
   };
 
-  const openStatusUpdateModal = (complaint: any) => {
+  const openStatusUpdateModal = (complaint: Complaint) => {
     setSelectedComplaint(complaint);
     setNewStatus(complaint.status);
     setResolutionNotes(complaint.resolutionNotes || "");
@@ -219,11 +296,11 @@ export default function EnhancedComplainPage() {
   };
 
   const filterOptions = [
-    { value: "all", label: "All Complaints", count: complaints.length },
-    { value: "open", label: "Open", count: complaints.filter(c => c.status === "open").length },
-    { value: "in-progress", label: "In Progress", count: complaints.filter(c => c.status === "in-progress").length },
-    { value: "resolved", label: "Resolved", count: complaints.filter(c => c.status === "resolved").length },
-    { value: "closed", label: "Closed", count: complaints.filter(c => c.status === "closed").length }
+    { value: "all", label: "All Complaints", count: userComplaints.length },
+    { value: "open", label: "Open", count: userComplaints.filter(c => c.status === "open").length },
+    { value: "in-progress", label: "In Progress", count: userComplaints.filter(c => c.status === "in-progress").length },
+    { value: "resolved", label: "Resolved", count: userComplaints.filter(c => c.status === "resolved").length },
+    { value: "closed", label: "Closed", count: userComplaints.filter(c => c.status === "closed").length }
   ];
 
   const complaintTypeOptions: { value: ComplaintType; label: string }[] = [
@@ -234,12 +311,32 @@ export default function EnhancedComplainPage() {
     { value: "other", label: "Other Issue" }
   ];
 
-  // Get available orders for dropdown
-  const availableOrders = useMemo(() => {
-    return mockOrders.filter(order => 
-      order.ownerId === currentUser.id || order.borrowerId === currentUser.id
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading complaints...</p>
+        </div>
+      </div>
     );
-  }, [currentUser.id]);
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full">
@@ -534,14 +631,11 @@ export default function EnhancedComplainPage() {
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select an order (optional)</option>
-              {availableOrders.map((order) => {
-                const book = mockBooks.find(b => order.bookIds.includes(b.id));
-                return (
-                  <option key={order.id} value={order.id}>
-                    Order {order.id} - {book?.titleOr || 'Unknown Book'}
-                  </option>
-                );
-              })}
+              {availableOrders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  Order {order.id} - {order.bookIds?.length || 0} book(s)
+                </option>
+              ))}
             </select>
           </div>
 

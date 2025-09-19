@@ -1,7 +1,7 @@
 // Support Page with complaint submission functionality
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   MessageSquare, 
@@ -22,7 +22,8 @@ import {
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
-import { getCurrentUser } from "@/app/data/mockData";
+import { getCurrentUser } from "@/utils/auth";
+import { createComplaint, type CreateComplaintRequest } from "@/utils/complaints";
 
 type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "other";
 type SupportTopic = "complaint" | "general-help" | "account" | "billing" | "technical";
@@ -31,6 +32,9 @@ export default function SupportPage() {
   const router = useRouter();
   const [selectedTopic, setSelectedTopic] = useState<SupportTopic | null>(null);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  
   const [complaintForm, setComplaintForm] = useState({
     type: "book-condition" as ComplaintType,
     subject: "",
@@ -45,7 +49,18 @@ export default function SupportPage() {
     preferredContact: "email" as "email" | "phone"
   });
 
-  const currentUser = getCurrentUser();
+  // Load user data
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+      } catch (error) {
+        console.error("Failed to load user:", error);
+      }
+    };
+    loadUser();
+  }, []);
 
   const supportTopics = [
     {
@@ -111,24 +126,35 @@ export default function SupportPage() {
     }
   ];
 
-  const handleComplaintSubmit = () => {
+  const handleComplaintSubmit = async () => {
     if (!complaintForm.subject.trim() || !complaintForm.description.trim()) {
       return;
     }
 
-    // Create complaint with support source
-    const complaintData = {
-      ...complaintForm,
-      source: "support",
-      priority: complaintForm.urgency === "high" ? "urgent" : complaintForm.urgency,
-      createdBy: "user"
-    };
+    try {
+      setLoading(true);
+      
+      const complaintData: CreateComplaintRequest = {
+        subject: complaintForm.subject,
+        description: complaintForm.description,
+        type: complaintForm.type,
+        source: "support",
+        priority: complaintForm.urgency === "high" ? "urgent" : complaintForm.urgency,
+        orderId: complaintForm.orderId || undefined
+      };
 
-    console.log("Submitting complaint from support:", complaintData);
+      const createdComplaint = await createComplaint(complaintData);
+      console.log("Support complaint created:", createdComplaint);
 
-    // Show success message and redirect
-    alert("Your complaint has been submitted successfully! You will be redirected to view all your complaints.");
-    router.push("/complain");
+      // Show success message and redirect
+      alert("Your complaint has been submitted successfully! You will be redirected to view all your complaints.");
+      router.push("/complain");
+    } catch (error) {
+      console.error("Failed to create complaint:", error);
+      alert("Failed to submit complaint. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGeneralSubmit = () => {
@@ -386,7 +412,7 @@ export default function SupportPage() {
     );
   }
 
-  if (selectedTopic && selectedTopic !== "complaint") {
+  if (selectedTopic === "general-help" || selectedTopic === "account" || selectedTopic === "billing" || selectedTopic === "technical") {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <Card>
