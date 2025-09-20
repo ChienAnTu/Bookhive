@@ -82,7 +82,7 @@ async def create_notification(
     
     email_message = MessageSchema(
         subject=notification.title,
-        recipients=["vinhtongthanh57@gmail.com"],
+        recipients=[""],
         body=email_template,
         subtype="html"
     )
