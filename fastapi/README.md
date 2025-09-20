@@ -144,9 +144,73 @@ authentication:
         "createdAt": "2025-08-24T15:00:00Z"
     }          
 
+## Email service:
+
+- **POST /send_verification**:
+Endpoint: http://localhost:8000/api/v1/email/send_verification
+Description: This endpoint sends a verification email with an OTP code to the specified address. The server temporarily stores the OTP for validation.
+Example Request:
+{
+    "emailAddress": "user@example.com"
+}
+Example Response:
+{
+    "message": "Verification email sent successfully."
+}
+
+
+- **POST /verify_otp**:
+  Endpoint: http://localhost:8000/api/v1/email/verify_otp
+Description: This endpoint verifies the OTP that was previously sent to the user’s email. If the OTP is valid, it is removed from the server.
+Example Request:
+{
+    "emailAddress": "user@example.com",
+    "otp": "123456"
+}
+Example Response (success):
+{
+    "message": "OTP verified successfully"
+}
+Example Response (failure):
+{
+    "detail": "Incorrect OTP"
+
+}
+
+- **POST /send_receipt**:
+Endpoint: http://localhost:8000/api/v1/email/send_receipt
+Description: This endpoint sends a receipt email containing order details and payment amount to the specified user.
+Example Request:
+{
+    "email": "user@example.com",
+    "username": "Alice",
+    "total_amount": 120.50,
+    "order_id": "ORD-2025-123"
+}
+Example Response:
+{
+    "message": "Receipt email sent successfully."
+
+- **POST /send_shipment_confirmation**:
+Endpoint: http://localhost:8000/api/v1/email/send_shipment_confirmation
+Description: This endpoint sends a shipment confirmation email including tracking number, carrier, and estimated delivery date.
+Example Request:
+{
+    "email": "user@example.com",
+    "username": "Alice",
+    "order_id": "ORD-2025-123",
+    "tracking_number": "TRACK123456",
+    "courier_name": "DHL",
+    "estimated_delivery_date": "24/09/2025"
+}
+Example Response:
+{
+    "message": "Shipment confirmation email sent successfully."
+}
+
 ## Messaging System
 The messaging system allows users to send private messages in real-time using WebSockets, with persistence in the database, read receipts, and unread counts.
-
+                   
 ### Image Attachments
 - Messages can include an optional image attachment. The server validates image type/size and stores files under `/media/messageAttachments/{sender_id}/`.
 - Responses and WebSocket payloads include `image_url` when an image is attached.

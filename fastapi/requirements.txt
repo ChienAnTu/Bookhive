@@ -12,3 +12,4 @@ PyMySQL
 websockets
 fastapi_mail
 Pillow
+httpx>=0.27.0

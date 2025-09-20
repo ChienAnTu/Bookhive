@@ -4,41 +4,28 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, MapPin, Calendar, Book, Edit } from "lucide-react";
 import { getCurrentUser, isAuthenticated } from "../../utils/auth";
-import {
-  getUserLendingOrders,
-  getUserBorrowingOrders,
-  mockOrders,
-} from "../data/mockData";
+// import {
+//   getUserLendingOrders,
+//   getUserBorrowingOrders,
+//   mockOrders,
+// } from "../data/mockData";  
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
+import type { User } from "@/app/types/user";
 
-
-
-// User data interface
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  location: string;
-  avatar: string;
-  createdAt: string;
-  // Additional fields that might be needed for profile
-  rating?: number;
-  booksLent?: number;
-  booksBorrowed?: number;
-}
 
 const ProfilePage: React.FC = () => {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  console.log("adrress:", currentUser?.streetAddress);
 
   // Check authentication and load user data
   useEffect(() => {
     const loadUserData = async () => {
       // Check if user is authenticated
       if (!isAuthenticated()) {
-        router.push("/login");
+        router.push("/auth");
         return;
       }
 
@@ -53,7 +40,7 @@ const ProfilePage: React.FC = () => {
         }
       } catch (error) {
         console.error("Failed to load user data:", error);
-        router.push("/login");
+        router.push("/auth");
       } finally {
         setIsLoading(false);
       }
@@ -80,24 +67,9 @@ const ProfilePage: React.FC = () => {
     );
   }
 
-  // Get user's orders (using mock data for now)
-  const lendingOrders = getUserLendingOrders(currentUser.id);
-  const borrowingOrders = getUserBorrowingOrders(currentUser.id);
-
-  // Count orders by status
-  const ongoingLending = lendingOrders.filter(
-    (order) => order.status === "ongoing"
-  ).length;
-  const ongoingBorrowing = borrowingOrders.filter(
-    (order) => order.status === "ongoing"
-  ).length;
-  const shippingOrders = mockOrders.filter(
-    (order) =>
-      (order.lenderId === currentUser.id ||
-        order.borrowerId === currentUser.id) &&
-      order.deliveryMethod === "post" &&
-      order.status === "ongoing"
-  ).length;
+  // // Get user's orders (using mock data for now)
+  // const lendingOrders = getUserLendingOrders(currentUser.id);
+  // const borrowingOrders = getUserBorrowingOrders(currentUser.id);
 
   // Format join date from createdAt
   const joinDate = new Date(currentUser.createdAt).toLocaleDateString("en-US", {
@@ -107,8 +79,7 @@ const ProfilePage: React.FC = () => {
 
   // Use default values for rating and books if not provided by API
   const rating = currentUser.rating || 0;
-  const booksLent = currentUser.booksLent || 0;
-  const booksBorrowed = currentUser.booksBorrowed || 0;
+
 
   // Calculate star rating display
   const fullStars = Math.floor(rating);
@@ -134,7 +105,7 @@ const ProfilePage: React.FC = () => {
             {/* User name */}
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {currentUser.name}
+                {currentUser.firstName} {currentUser.lastName}
               </h1>
 
               {/* Email */}
@@ -142,43 +113,40 @@ const ProfilePage: React.FC = () => {
                 <span className="text-sm">{currentUser.email}</span>
               </div>
 
-              {/* Location */}
-              <div className="flex items-center text-gray-600 mb-2">
-                <MapPin className="w-4 h-4 mr-2" />
-                <span className="text-sm">
-                  {currentUser.location || "Location not set"}
+
+              {/* Renting stars */}
+              <div className="flex items-center mt-2 mb-2">
+                <div className="flex items-center mr-3">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-4 h-4 ${star <= Math.floor(currentUser.rating)
+                        ? "text-yellow-400 fill-current"
+                        : "text-gray-300"
+                        }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-gray-600">
+                  {currentUser.rating}
                 </span>
               </div>
 
-              {/* Star Rating */}
-              {rating > 0 && (
-                <div className="flex items-center mb-2">
-                  <div className="flex items-center mr-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-4 h-4 ${star <= fullStars
-                          ? "text-yellow-400 fill-current"
-                          : star === fullStars + 1 && hasHalfStar
-                            ? "text-yellow-400 fill-current"
-                            : "text-gray-300"
-                          }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-600">
-                    {rating} ({booksBorrowed} reviews)
-                  </span>
-                </div>
-              )}
-
-
-
-              {/* Books Lent */}
+              {/* Location */}
               <div className="flex items-center text-gray-600 mb-2">
-                <Book className="w-4 h-4 mr-2" />
-                <span className="text-sm">{booksLent} books lent out</span>
+
+
+                <MapPin className="w-4 h-4 mr-2" />
+                <p>
+                  {[
+                    currentUser.streetAddress,
+                    currentUser.city,
+                    currentUser.state,
+                    currentUser.zipCode,
+                  ].filter(Boolean).join(", ")}
+                </p>
               </div>
+
 
               {/* Member Since */}
               <div className="flex items-center text-gray-600">
@@ -200,31 +168,27 @@ const ProfilePage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Lending */}
             <Link
-              href="/lend"
+              href="/lending"
               className="block bg-blue-50 border border-blue-200 rounded-lg p-4 text-center hover:bg-blue-100 transition"
             >
-              <div className="text-2xl font-bold text-blue-600 mb-1">
-                {ongoingLending}
+              <div className="text-xl font-bold text-blue-600 mb-1">
+                Lending
               </div>
-              <div className="text-sm font-medium text-blue-800">Lending</div>
-              <div className="text-xs text-blue-600 mt-1">
-                Books you're lending
+              <div className="text-sm font-medium text-blue-800">
+                Books you’re sharing
               </div>
             </Link>
 
             {/* Borrowing */}
             <Link
-              href="/borrow"
+              href="/borrowing"
               className="block bg-green-50 border border-green-200 rounded-lg p-4 text-center hover:bg-green-100 transition"
             >
-              <div className="text-2xl font-bold text-green-600 mb-1">
-                {ongoingBorrowing}
-              </div>
-              <div className="text-sm font-medium text-green-800">
+              <div className="text-xl font-bold text-green-600 mb-1">
                 Borrowing
               </div>
-              <div className="text-xs text-green-600 mt-1">
-                Books you're borrowing
+              <div className="text-sm font-medium text-green-800">
+                Your borrowed books
               </div>
             </Link>
 
@@ -233,15 +197,13 @@ const ProfilePage: React.FC = () => {
               href="/shipping"
               className="block bg-orange-50 border border-orange-200 rounded-lg p-4 text-center hover:bg-orange-100 transition"
             >
-              <div className="text-2xl font-bold text-orange-600 mb-1">
-                {shippingOrders}
-              </div>
-              <div className="text-sm font-medium text-orange-800">
+              <div className="text-xl font-bold text-orange-600 mb-1">
                 Shipping
               </div>
-              <div className="text-xs text-orange-600 mt-1">
+              <div className="text-sm font-medium text-orange-800">
                 Books in transit
               </div>
+
             </Link>
           </div>
         </div>
