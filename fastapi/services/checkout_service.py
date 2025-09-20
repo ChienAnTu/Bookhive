@@ -153,6 +153,7 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
     # Step 7: Save totals into checkout record
     checkout.deposit = depositTotal
     checkout.service_fee = serviceFeeAmount
+    checkout.book_fee = priceTotal 
     checkout.shipping_fee = shippingFeeTotal
     checkout.total_due = depositTotal + priceTotal + serviceFeeAmount + shippingFeeTotal
 

@@ -40,6 +40,7 @@ def _checkout_to_dict(checkout: Checkout) -> dict:
         "country": checkout.country,
         "deposit": float(checkout.deposit),
         "serviceFee": float(checkout.service_fee),
+        "bookFee": float(checkout.book_fee),
         "shippingFee": float(checkout.shipping_fee),
         "totalDue": float(checkout.total_due),
         "status": checkout.status,
