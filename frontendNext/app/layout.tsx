@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BookHive",
-  description: "Share and discover books in your community",
+  title: "BookBorrow",
+  description: "Share and discover books in Australia",
 };
 
 export default function RootLayout({
@@ -32,7 +32,7 @@ export default function RootLayout({
           <Header />
           <main className="flex-1 pt-16 pb-24 bg-gray-100">{children}</main>
           <Footer />
-          <Toaster richColors />
+          <Toaster richColors position="top-right" offset={64} expand={false} />
         </AuthProvider>
       </body>
     </html>
