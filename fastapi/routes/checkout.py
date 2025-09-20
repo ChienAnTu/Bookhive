@@ -11,9 +11,6 @@ from models.user import User as UserModel
 
 router = APIRouter(prefix="/checkouts", tags=["Checkouts"])
 
-# -------- Helper: manual response builders --------
-
-
 def _checkout_item_to_dict(item: CheckoutItem) -> dict:
     return {
         "itemId": item.item_id,
@@ -49,6 +46,19 @@ def _checkout_to_dict(checkout: Checkout) -> dict:
         "items": [_checkout_item_to_dict(item) for item in checkout.items],
     }
 
+
+@router.put("/{checkout_id}", status_code=status.HTTP_200_OK)
+async def update_checkout(
+    checkout_id: str,
+    checkout_in: CheckoutCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Update an existing checkout if it's still PENDING"""
+    updated = await checkout_service.update_checkout(db, checkout_id, checkout_in)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Checkout not found")
+    return _checkout_to_dict(updated)
 
 @router.get("/list", status_code=status.HTTP_200_OK)
 def list_my_checkouts(
