@@ -7,8 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from routes.upload import router as upload_router
 from routes.books import router as books_router
-from routes.message_routes import router as message_router
-from routes.notification_routes import router as notification_router
+from routes.messages import router as message_router
 
 
 # Create FastAPI app
@@ -44,7 +43,6 @@ app.include_router(user_router, prefix="/api/v1")
 # books router
 app.include_router(books_router)
 app.include_router(message_router, prefix="/api/v1")
-app.include_router(notification_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

@@ -372,64 +372,6 @@ When a message is sent, receivers connected via WebSocket get:
 - Security: All endpoints require authentication; WebSocket uses token in query.
 - Test in Swagger (authorize with "Bearer <token>") or Postman.
 
-## Notification System
-Notifications are stored in the database, pushed via WebSocket, and emailed using fastapi-mail.
-
-### Setup
-1. **Install Dependencies**:
-   - Install `fastapi-mail` and `python-dotenv`: `pip install fastapi-mail python-dotenv`.
-   - Ensure core dependencies: `pip install -r requirements.txt`.
-
-2. **Database Configuration**:
-   - Add the `notifications` table by running `docs/sql-script/BookHive.sql` against your MySQL DB (e.g., `mysql -h yourhost -u youruser -p yourdb < BookHive.sql`).
-   - For migrations, use Alembic if set up.
-
-3. **Environment Variables**:
-   - Copy `.env.example` to `.env` and fill in email details:
-     ```
-     MAIL_USERNAME=do-not-reply@bookhive.com
-     MAIL_PASSWORD=your_gmail_app_password  # 16-char code from Google
-     MAIL_FROM=do-not-reply@bookhive.com
-     # Other MAIL_* vars as needed
-     ```
-   - Load in code with `load_dotenv()`.
-
-4. **Email Configuration**:
-   - For Gmail: Enable 2-Step Verification in Google Account, generate an app password (under Security > App passwords).
-   - Update `MAIL_PASSWORD` with the app password.
-   - Test SMTP: Send a test email via the `/create` endpoint.
-
-5. **Frontend Integration**:
-   - Use the same WebSocket as messaging to receive real-time notifications (`{"type": "notification", "data": {...}}`).
-
-6. **Troubleshooting**:
-   - Email not sending: Check server logs for SMTP errors; verify app password and Gmail settings (disable "Less secure apps" if prompted).
-   - WebSocket issues: Ensure token is valid; test with wscat.
-   - Database errors: Confirm table exists and DB connection is correct.
-
-### Endpoints
-- **POST /api/v1/notifications/create**: Create and send a notification (DB + email + WebSocket).
-  - **Headers**: `Authorization: Bearer <jwt_token>`
-  - **Body**: `{"user_email": "user@example.com", "title": "Alert", "message": "Details", "notification_type": "info"}`
-  - **Response**: Notification details (ID, title, message, type, is_read, timestamp).
-  - **Notes**: Requires permission (e.g., admin); emails use HTML template.
-
-- **GET /api/v1/notifications/**: Get user's notifications.
-  - **Headers**: `Authorization: Bearer <jwt_token>`
-  - **Query Param**: `unread_only=true` (optional, filters to unread).
-  - **Response**: Array of notifications with details.
-  - **Notes**: Ordered by timestamp descending.
-
-- **POST /api/v1/notifications/{notification_id}/read**: Mark a notification as read.
-  - **Headers**: `Authorization: Bearer <jwt_token>`
-  - **Path Param**: `notification_id`
-  - **Response**: `{"message": "Marked as read"}`
-  - **Notes**: Only works for the notification's owner.
-
-### Usage
-- Notifications trigger email sends (HTML template) and WebSocket pushes.
-- Test with Swagger at `/docs`.
-- Integrate in frontend: Poll endpoints or use WebSocket for updates.
 
 ## Project Structure
 - Overall:
@@ -448,20 +390,17 @@ BookHive/
 │ │ ├── init.py
 │ │ ├── base.py # SQLAlchemy base model
 │ │ ├── user.py # User model
-│ │ ├── message.py # Message model
-│ │ └── notification.py # Notification model
+│ │ └── message.py # Message model
 │ ├── routes/ # API routes
 │ │ ├── init.py
 │ │ ├── auth.py # Authentication endpoints
 │ │ ├── users.py # User management endpoints
-│ │ ├── message_routes.py # Message endpoints
-│ │ └── notification_routes.py # Notification endpoints
+│ │ └── message_routes.py # Message endpoints
 │ ├── services/ # Business logic
 │ │ ├── init.py
 │ │ ├── auth_service.py # Authentication services
 │ │ ├── user_service.py # User CRUD operations
-│ │ ├── message_service.py # Message operations
-│ │ └── notification_service.py # Notification operations
+│ │ └── message_service.py # Message operations
 │ ├── database/ # Database handling
 │ │ ├── init.py
 │ │ ├── connection.py # Database connection
