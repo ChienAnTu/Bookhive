@@ -59,7 +59,7 @@ app.include_router(books_router)
 app.include_router(cart_router, prefix="/api/v1")
 
 # complaints router
-app.include_router(complaints_router)
+app.include_router(complaints_router, prefix="/api/v1")
 
 
 @app.get("/")
