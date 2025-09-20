@@ -476,4 +476,52 @@ INSERT INTO `users` (`user_id`, `first_name`, `last_name`, `name`, `email`, `pho
 INSERT INTO `users` (`user_id`, `first_name`, `last_name`, `name`, `email`, `phone_number`, `date_of_birth`, `password_hash`, `password_algo`, `password_set_at`, `location`, `country`, `street_address`, `city`, `state`, `zip_code`, `avatar`, `profile_picture`, `created_at`, `remember_token`, `last_login_at`, `terms_accepted`) VALUES ('user-uuid-1234', NULL, NULL, 'Test User', 'test@example.com', NULL, NULL, '$2b$12$examplehashedpassword', 'bcrypt', '2025-08-23 08:14:33', 'Sample Location', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-08-23 08:14:33', NULL, NULL, 1);
 COMMIT;
 
+-- ----------------------------
+-- Table structure for messages
+-- ----------------------------
+DROP TABLE IF EXISTS `messages`;
+CREATE TABLE `messages` (
+  `message_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sender_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `receiver_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `image_path` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `timestamp` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `is_read` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`message_id`),
+  KEY `idx_sender` (`sender_id`),
+  KEY `idx_receiver` (`receiver_id`),
+  CONSTRAINT `fk_message_sender` FOREIGN KEY (`sender_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_message_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Records of messages
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+-- ----------------------------
+-- Table structure for notifications
+-- ----------------------------
+DROP TABLE IF EXISTS `notifications`;
+CREATE TABLE `notifications` (
+  `notification_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `message` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notification_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT '0',
+  `timestamp` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`notification_id`),
+  KEY `idx_user` (`user_id`),
+  CONSTRAINT `fk_notification_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Records of notifications
+-- ----------------------------
+BEGIN;
+COMMIT;
+
 SET FOREIGN_KEY_CHECKS = 1;
