@@ -10,17 +10,20 @@ export interface Book {
   description: string;
   coverImgUrl?: string;
   ownerId: string;
-  // borrowerId?: string;
 
-  // 状态
+  canRent: boolean;
+  canSell: boolean;
+
+  // status
   status: "listed" | "unlisted" | "lent" | "sold";
   condition: "new" | "like-new" | "good" | "fair";
   conditionImgURLs?: string[];
 
-  canRent: boolean;
-  canSell: boolean;
-  
-  // 时间相关
+  // The current borrowing order ID when status of this book is lent
+  currentOrderId?: string;
+
+
+  // Date
   dateAdded: string;
   updateDate: string;
 
@@ -39,11 +42,12 @@ export interface Book {
   //   estimatedShipping?: number; // Estimated shipping cost (for post delivery)
   // };
 
-  // Sale费用
+  // Sale & Borrow 费用
   salePrice?: number;          // Sale amount (non-refundable)
   deposit?: number;          // Security deposit amount (refundable)
 
-  // serviceFee: number;       // Platform 10% service fee (non-refundable)
+  // these not a attribute of books
+  // serviceFee: number;       //Platform 10% service fee (non-refundable)
   // estimatedShipping?: number; // Estimated shipping cost (for post delivery)
 
 

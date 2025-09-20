@@ -1,64 +1,108 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ShoppingBag, Trash2, CheckSquare, Square } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import CoverImg from "../components/ui/CoverImg";
+
 import { useCartStore } from "@/app/store/cartStore";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getUserById, getCurrentUser } from "@/utils/auth";
+import type { User } from "@/app/types/user";
+import { rebuildCheckout } from "@/utils/checkout";
 
-
-// 与 store 中的 CartItem 对齐：Book & { mode }
-type CartItem = {
-  id: string;
-  ownerId: string | null;
-  titleOr: string;
-  author?: string;
-  status?: "listed" | "unlisted" | "lent" | "sold" | string;
-  deliveryMethod?: "post" | "pickup" | "both" | string | null;
-  // 价格相关（来自 Book）
-  salePrice?: number | null;
-  deposit?: number | null;
-  fees?: {
-    serviceFee: number;
-    estimatedShipping?: number;
-  } | null;
-  // 能否租/卖
-  canRent: boolean;
-  canSell: boolean;
-  // 购物车选择
-  mode: "borrow" | "purchase";
-};
 
 export default function CartPage() {
-  const { cart, removeFromCart, setMode } = useCartStore() as {
-    cart: CartItem[];
-    removeFromCart: (id: string) => void;
-    setMode: (id: string, mode: "borrow" | "purchase") => void;
+  const { cart, loading, fetchCart, removeFromCart, setMode } = useCartStore();
+  const [isRemoveMode, setIsRemoveMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const router = useRouter();
+  const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
+
+  // Pull the backend shopping cart then owner Info
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+
+  // useEffect：listen cart，then load owner Info
+  useEffect(() => {
+    const loadOwners = async () => {
+      const uniqueOwnerIds = Array.from(new Set(cart.map((b) => b.ownerId).filter(Boolean)));
+      const map: Record<string, User> = {};
+
+      for (const id of uniqueOwnerIds) {
+        const u = await getUserById(id);
+        if (u) map[id] = u;
+      }
+
+      setOwnersMap(map);
+    };
+
+    if (cart.length > 0) {
+      loadOwners();
+    }
+  }, [cart]);
+
+
+
+  // delete confirm
+  const handleConfirmRemove = async () => {
+    try {
+      await removeFromCart(selectedIds); // recall cartStore，use api upload local
+      setSelectedIds([]);
+      setIsRemoveMode(false);
+    } catch (err) {
+      console.error("Failed to remove items:", err);
+    }
   };
 
-  // 多选删除模式
-  const [isRemoveMode, setIsRemoveMode] = useState(false);
-  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
+  // select by one item
+  const toggleSelect = (cartItemId: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(cartItemId) ? prev.filter((id) => id !== cartItemId) : [...prev, cartItemId]
+    );
+  };
 
-  // —— 工具函数：每本书展示价（不含运费），用于卡片右上角数字 —— //
-  const displayUnitPrice = (item: CartItem) => {
+  // select by owner group
+  const toggleSelectGroup = (ownerId: string) => {
+    // use cartItemId，instead of book.id
+    const ids = (groupedByOwner.groups[ownerId] || []).map((b) => b.cartItemId);
+
+    setSelectedIds((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+
+      if (allSelected) {
+        // cancel select all
+        return prev.filter((id) => !ids.includes(id));
+      } else {
+        // or add unselected
+        return Array.from(new Set([...prev, ...ids]));
+      }
+    });
+  };
+
+
+  // select all
+  const toggleSelectAll = () => {
+    const allIds = cart.map((b) => b.cartItemId);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : allIds);
+  };
+
+  // —— price without shipping fee —— //
+  const displayUnitPrice = (item: any) => {
     if (item.mode === "purchase") {
       return Number(item.salePrice ?? 0);
     }
-    // borrow：不显示运费，避免逐项费用；展示 serviceFee + deposit
-    const serviceFee = Number(item.fees?.serviceFee ?? 0);
-    const deposit = Number(item.deposit ?? 0);
-    return serviceFee + deposit;
+    return Number(item.deposit ?? 0); // borrow
   };
 
-  // —— 工具函数：每本书用于合计的小计（同样不含运费；运费在结算计算） —— //
-  const lineSubtotal = (item: CartItem) => displayUnitPrice(item);
+  const lineSubtotal = (item: any) => displayUnitPrice(item);
 
-  // 按 ownerId 分组（避免 ||= 在 TS 下的类型问题）
+  // Group by ownerId
   const groupedByOwner = useMemo(() => {
-    const groups: Record<string, CartItem[]> = {};
+    const groups: Record<string, any[]> = {};
     for (const book of cart) {
       const key = book.ownerId || "Unknown";
       if (!groups[key]) groups[key] = [];
@@ -72,50 +116,7 @@ export default function CartPage() {
     return { groups, orderedKeys };
   }, [cart]);
 
-  // 选择逻辑
-  const toggleSelect = (bookId: string) => {
-    setSelectedBooks((prev) =>
-      prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId]
-    );
-  };
-  const toggleSelectGroup = (ownerId: string) => {
-    const ids = (groupedByOwner.groups[ownerId] || []).map((b) => b.id);
-    const allSelected = ids.every((id) => selectedBooks.includes(id));
-    setSelectedBooks((prev) =>
-      allSelected ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]))
-    );
-  };
-  const toggleSelectAll = () => {
-    const allIds = cart.map((b) => b.id);
-    const allSelected = allIds.length > 0 && allIds.every((id) => selectedBooks.includes(id));
-    setSelectedBooks(allSelected ? [] : allIds);
-  };
-  const handleConfirmRemove = () => {
-    selectedBooks.forEach((id) => removeFromCart(id));
-    setSelectedBooks([]);
-    setIsRemoveMode(false);
-  };
-
-  // 统计（不含运费；运费在结算时计算）
-  const { totalCount, totalPrice } = useMemo(() => {
-    const totalCount = cart.length;
-    const totalPrice = cart.reduce((sum, it) => sum + lineSubtotal(it), 0);
-    return { totalCount, totalPrice };
-  }, [cart]);
-
-  const { selectedCount, selectedPrice } = useMemo(() => {
-    const set = new Set(selectedBooks);
-    let count = 0;
-    let sum = 0;
-    for (const it of cart) {
-      if (set.has(it.id)) {
-        count += 1;
-        sum += lineSubtotal(it);
-      }
-    }
-    return { selectedCount: count, selectedPrice: sum };
-  }, [selectedBooks, cart]);
-
+  // total price for every owner
   const ownerSummaries = useMemo(() => {
     const map = new Map<string, { count: number; subtotal: number }>();
     for (const ownerId of groupedByOwner.orderedKeys) {
@@ -126,8 +127,31 @@ export default function CartPage() {
     return map;
   }, [groupedByOwner]);
 
+  // totals
+  const selectedPrice = useMemo(() => {
+    const selectedItems = cart.filter((item) => selectedIds.includes(item.cartItemId));
+    console.log("selectedIds:", selectedIds, "selectedItems:", selectedItems);
+    return cart
+      .filter((item) => selectedIds.includes(item.cartItemId)) // selected
+      .reduce((sum, item) => {
+        if (item.mode === "purchase") {
+          return sum + (item.salePrice || 0);
+        }
+        if (item.mode === "borrow") {
+          return sum + (item.deposit || 0);
+        }
+        return sum;
+      }, 0);
+  }, [cart, selectedIds]);
+
+
+  if (loading) {
+    return <div className="flex h-full items-center justify-center">Loading cart...</div>;
+  }
+
   const cartEmpty = cart.length === 0;
-  const router = useRouter();
+
+
 
   return (
     <div className="flex h-full">
@@ -144,12 +168,12 @@ export default function CartPage() {
               <div className="flex items-center gap-2">
                 {isRemoveMode && (
                   <Button variant="outline" onClick={toggleSelectAll} className="flex items-center gap-2">
-                    {cart.length > 0 && cart.every((b) => selectedBooks.includes(b.id)) ? (
+                    {cart.length > 0 && cart.every((b) => selectedIds.includes(b.id)) ? (
                       <CheckSquare className="w-4 h-4" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
-                    {cart.length > 0 && cart.every((b) => selectedBooks.includes(b.id)) ? "Unselect all" : "Select all"}
+                    {cart.length > 0 && cart.every((b) => selectedIds.includes(b.id)) ? "Unselect all" : "Select all"}
                   </Button>
                 )}
 
@@ -162,7 +186,7 @@ export default function CartPage() {
                       variant="outline"
                       onClick={() => {
                         setIsRemoveMode(false);
-                        setSelectedBooks([]);
+                        setSelectedIds([]);
                       }}
                     >
                       Cancel
@@ -191,166 +215,218 @@ export default function CartPage() {
               groupedByOwner.orderedKeys.map((ownerId) => {
                 const books = groupedByOwner.groups[ownerId];
                 const summary = ownerSummaries.get(ownerId)!;
-                const ids = books.map((b) => b.id);
-                const groupAllSelected = ids.every((id) => selectedBooks.includes(id));
+                const ownerName =
+                  [ownersMap[ownerId]?.firstName, ownersMap[ownerId]?.lastName]
+                    .filter(Boolean)
+                    .join(" ") || "Unknown Owner";
 
                 return (
                   <section key={ownerId} className="space-y-4">
                     {/* Group Header */}
                     <div className="flex items-center justify-between">
-                      <h2 className="text-xl font-bold text-gray-800">
-                        Owner: <span className="font-semibold">{ownerId}</span>
-                        <span className="ml-3 text-sm text-gray-500">
-                          ({summary.count} item{summary.count > 1 ? "s" : ""})
-                        </span>
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        {/* checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={(groupedByOwner.groups[ownerId] || [])
+                            .map((b) => b.cartItemId)
+                            .every((id) => selectedIds.includes(id))}
+                          onChange={() => toggleSelectGroup(ownerId)}
+                          className="w-4 h-4"
+                        />
+
+                        {/* Owner */}
+                        <h2 className="text-xl font-bold text-gray-800">
+                          Owner: <span className="font-semibold">{ownerName}</span>
+                          <span className="ml-3 text-sm text-gray-500">
+                            ({summary.count} item{summary.count > 1 ? "s" : ""})
+                          </span>
+                        </h2>
+                      </div>
+
 
                       <div className="flex items-center gap-2">
                         <div className="text-sm text-gray-700">
                           <span className="font-medium">Subtotal: </span>
                           <span style={{ color: "#FF6801" }}>${summary.subtotal.toFixed(2)}</span>
                         </div>
-                        {isRemoveMode && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toggleSelectGroup(ownerId)}
-                            className="flex items-center gap-2"
-                          >
-                            {groupAllSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                            {groupAllSelected ? "Unselect" : "Select"}
-                          </Button>
-                        )}
+
+
                       </div>
+
                     </div>
 
-                    {books.map((book) => (
-                      <Card key={book.id}>
-                        <div className="space-y-3 relative">
-                          {/* 多选框（卡片左侧中间） */}
-                          {isRemoveMode && (
+                    {books.map((book) => {
+                      const isAvailable = book.status === "listed"; // choose on "listed book"
+                      return (
+                        <Card key={book.cartItemId}>
+                          <div className="space-y-3 relative">
+                            {/* multiple select box */}
                             <input
                               type="checkbox"
-                              checked={selectedBooks.includes(book.id)}
-                              onChange={() => toggleSelect(book.id)}
+                              disabled={!isAvailable}
+                              checked={selectedIds.includes(book.cartItemId)}
+                              onChange={() => toggleSelect(book.cartItemId)}
                               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
                             />
-                          )}
 
-                          {/* Title + Toggle */}
-                          <div className="flex justify-between items-start pl-6">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900">《{book.titleOr}》</h3>
-                            </div>
-
-                            {/* Borrow / Purchase 开关（只显示可用的） */}
-                            <div className="flex border rounded-lg overflow-hidden text-sm font-medium">
-                              {book.canRent && (
-                                <button
-                                  onClick={() => setMode(book.id, "borrow")}
-                                  className={`px-4 py-1 ${book.mode === "borrow"
-                                      ? "bg-black text-white"
-                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            {/* Title + Toggle */}
+                            <div className="flex justify-between items-start pl-6">
+                              <div>
+                                <h3
+                                  className={`text-lg font-semibold ${!isAvailable ? "text-gray-400 line-through" : "text-gray-900"
                                     }`}
                                 >
-                                  Borrow
-                                </button>
-                              )}
-                              {book.canSell && (
-                                <button
-                                  onClick={() => setMode(book.id, "purchase")}
-                                  className={`px-4 py-1 ${book.mode === "purchase"
-                                      ? "bg-black text-white"
-                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                    }`}
-                                >
-                                  Purchase
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                                  《{book.titleOr}》
+                                </h3>
+                              </div>
+                              {/* Borrow / Purchase switch */}
+                              <div className="flex border rounded-lg overflow-hidden text-sm font-medium">
+                                {book.canRent && (
+                                  <button
+                                    disabled={!isAvailable}
+                                    onClick={() => isAvailable && setMode(book.id, "borrow")}
+                                    className={`px-4 py-1
+                                      ${!isAvailable
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : book.mode === "borrow"
+                                          ? "bg-black text-white"
+                                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                      }`}
+                                  >
+                                    Borrow
+                                  </button>
+                                )}
 
-                          {/* 内容整体右移，避免与 checkbox 重叠 */}
-                          <div className="pl-10">
-                            {/* Info（每条占一行） */}
-                            <div className="space-y-2 text-sm text-gray-700 pl-6">
-                              {book.author && (
-                                <div>
-                                  <span className="font-medium">Author:&nbsp;</span>
-                                  {book.author}
+                                {book.canSell && (
+                                  <button
+                                    disabled={!isAvailable}
+                                    onClick={() => isAvailable && setMode(book.id, "purchase")}
+                                    className={`px-4 py-1
+                                      ${!isAvailable
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : book.mode === "purchase"
+                                          ? "bg-black text-white"
+                                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                      }`}
+                                  >
+                                    Purchase
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* book info */}
+                            <div className="flex pl-10 items-start gap-4">
+
+                              {/* cover page */}
+                              <div className="w-20 h-28 flex-shrink-0 overflow-hidden rounded-md bg-gray-100">
+                                <CoverImg src={book.coverImgUrl} title={book.titleOr} />
+                              </div>
+
+                              {/* other info */}
+                              <div className="flex flex-col justify-between flex-1">
+                                <div className="space-y-2 text-sm text-gray-700 pl-6">
+                                  {book.author && (
+                                    <div>
+                                      <span className="font-medium">Author:&nbsp;</span>
+                                      {book.author}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <span className="font-medium">Status:&nbsp;</span>
+                                    {book.status === "listed"
+                                      ? "Listed"
+                                      : "Unavailable"}
+                                  </div>
+                                  {/* <div>
+                                  <span className="font-medium">Shipping Method:&nbsp;</span>
+                                  {book.deliveryMethod || "N/A"}
+                                </div> */}
+
                                 </div>
-                              )}
-                              <div>
-                                <span className="font-medium">Status:&nbsp;</span>
-                                {book.status === "listed"
-                                  ? "Listed"
-                                  : book.status
-                                    ? book.status
-                                    : "Unlisted"}
-                              </div>
-                              <div>
-                                <span className="font-medium">Shipping Method:&nbsp;</span>
-                                {book.deliveryMethod || "N/A"}
-                              </div>
 
-                            </div>
-
-                            {/* Price（右侧，橙色） */}
-                            <div className="flex justify-end items-center gap-2 pr-1">
-                              <span className="text-sm text-gray-600">Price:</span>
-                              <span className="text-lg font-semibold" style={{ color: "#FF6801" }}>
-                                ${displayUnitPrice(book).toFixed(2)}
-                              </span>
+                                {/* Price（right） */}
+                                <div className="flex justify-end items-center gap-2 pr-1">
+                                  <span className="text-sm text-gray-600">Price:</span>
+                                  <span
+                                    className={`text-lg font-semibold ${isAvailable ? "text-[#FF6801]" : "text-gray-400"
+                                      }`}
+                                  >
+                                    ${displayUnitPrice(book).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      );
+                    })}
                   </section>
                 );
               })
             )}
           </div>
 
-          {/* Total Footer（全宽，拉开与上方间距） */}
+          {/* Total Footer */}
           {!cartEmpty && (
             <div className="w-full mt-12">
               <div className="max-w-6xl mx-auto p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  {/* Info */}
+                  {/* Total Info */}
+
                   <div className="text-sm text-gray-700 flex items-center gap-2">
                     <span className="text-lg font-semibold text-gray-900">Total</span>
-                    <span>({isRemoveMode ? selectedCount : totalCount} items)</span>
+                    <span>({selectedIds.length} items)</span>
                     <span className="font-medium">:</span>
                     <span className="text-xl font-bold" style={{ color: "#FF6801" }}>
-                      ${(isRemoveMode ? selectedPrice : totalPrice).toFixed(2)}
+                      ${selectedPrice.toFixed(2)}
                     </span>
-                    {isRemoveMode && <span className="ml-2 text-gray-500">(selected)</span>}
                   </div>
-
-  
 
                   {/* Buttons */}
                   <div className="flex gap-2">
                     {!isRemoveMode ? (
-                      <>
-                        <Button
-            variant="outline"
-            onClick={() => router.push("/checkout")}
-          >
-            Proceed to Checkout
-          </Button>
-                      </>
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            const user = await getCurrentUser();
+                            if (!user) {
+                              alert("Please login first");
+                              router.push("/auth");
+                              return;
+                            }
+
+                            const selectedItems = cart.filter(it => selectedIds.includes(it.cartItemId));
+                            if (selectedItems.length === 0) {
+                              alert("Please select at least one item to checkout");
+                              return;
+                            }
+
+                            // rebuild Checkout
+                            const checkout = await rebuildCheckout(user, selectedItems);
+
+                            console.log("Proceeding with checkout:", checkout);
+                            router.push(`/checkout?checkoutId=${checkout.checkoutId}`);
+                          } catch (err) {
+                            console.error("Failed to rebuild checkout:", err);
+                            alert("Failed to proceed to checkout. Please try again.");
+                          }
+                        }}
+                      >
+                        Proceed to Checkout
+                      </Button>
+
                     ) : (
                       <Button
                         variant="outline"
-                        className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-2"
-                        onClick={handleConfirmRemove}
-                        disabled={selectedCount === 0}
+                        onClick={() => setIsRemoveMode(false)}
                       >
-                        <Trash2 className="w-4 h-4" /> Remove selected
+                        Exit Remove Mode
                       </Button>
                     )}
+
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
