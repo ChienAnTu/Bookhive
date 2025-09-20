@@ -20,9 +20,10 @@ import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import { getCurrentUser } from "@/utils/auth";
 import { 
-  getComplaints, 
+  getUserComplaints, 
   createComplaint, 
   processDepositDeduction,
+  isAdmin,
   type Complaint,
   type CreateComplaintRequest,
   type DepositDeductionRequest
@@ -32,19 +33,6 @@ import type { User } from "@/app/types/user";
 type ComplaintStatus = "pending" | "investigating" | "resolved" | "closed";
 type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "overdue" | "other";
 type FilterStatus = "all" | ComplaintStatus;
-
-// Admin email list - only these emails can access deposit deduction
-const ADMIN_EMAILS = [
-  'admin@bookhive.com',
-  'admin@bookhive.com.au',
-  'support@bookhive.com',
-  // Add more admin emails as needed
-];
-
-function isAdmin(email?: string): boolean {
-  if (!email) return false;
-  return ADMIN_EMAILS.includes(email.toLowerCase());
-}
 
 export default function ComplainPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
@@ -82,8 +70,8 @@ export default function ComplainPage() {
         const user = await getCurrentUser();
         setCurrentUser(user);
 
-        // Then get complaints
-        const complaintsData = await getComplaints();
+        // Then get user's complaints
+        const complaintsData = await getUserComplaints();
         setComplaints(complaintsData || []);
       } catch (err) {
         console.error("Failed to load data:", err);
@@ -96,16 +84,8 @@ export default function ComplainPage() {
     loadData();
   }, []);
   
-  // Get user's complaints
-  const userComplaints = useMemo(() => {
-    if (!currentUser) return [];
-    return complaints.filter(complaint => 
-      complaint.complainantId === currentUser.id
-    );
-  }, [complaints, currentUser]);
-
   const filteredComplaints = useMemo(() => {
-    let filtered = userComplaints;
+    let filtered = complaints; // Use complaints directly since getUserComplaints already filters
     
     if (selectedFilter !== "all") {
       filtered = filtered.filter(complaint => complaint.status === selectedFilter);
@@ -119,7 +99,7 @@ export default function ComplainPage() {
     }
     
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [userComplaints, selectedFilter, searchTerm]);
+  }, [complaints, selectedFilter, searchTerm]);
 
   const getStatusIcon = (status: ComplaintStatus) => {
     switch (status) {
@@ -180,7 +160,7 @@ export default function ComplainPage() {
       await createComplaint(complaintData);
       
       // Reload complaints
-      const updatedComplaints = await getComplaints();
+      const updatedComplaints = await getUserComplaints();
       setComplaints(updatedComplaints || []);
       
       // Reset form and close modal
@@ -219,7 +199,7 @@ export default function ComplainPage() {
       });
       
       // Reload complaints
-      const updatedComplaints = await getComplaints();
+      const updatedComplaints = await getUserComplaints();
       setComplaints(updatedComplaints || []);
       
       alert(`Deposit deduction processed successfully!\nDeducted: $${amount}`);
@@ -236,11 +216,11 @@ export default function ComplainPage() {
   };
 
   const filterOptions = [
-    { value: "all", label: "All", count: userComplaints.length },
-    { value: "pending", label: "Pending", count: userComplaints.filter(c => c.status === "pending").length },
-    { value: "investigating", label: "Investigating", count: userComplaints.filter(c => c.status === "investigating").length },
-    { value: "resolved", label: "Resolved", count: userComplaints.filter(c => c.status === "resolved").length },
-    { value: "closed", label: "Closed", count: userComplaints.filter(c => c.status === "closed").length }
+    { value: "all", label: "All", count: complaints.length },
+    { value: "pending", label: "Pending", count: complaints.filter((c: Complaint) => c.status === "pending").length },
+    { value: "investigating", label: "Investigating", count: complaints.filter((c: Complaint) => c.status === "investigating").length },
+    { value: "resolved", label: "Resolved", count: complaints.filter((c: Complaint) => c.status === "resolved").length },
+    { value: "closed", label: "Closed", count: complaints.filter((c: Complaint) => c.status === "closed").length }
   ];
 
   const complaintTypeOptions: { value: ComplaintType; label: string }[] = [
