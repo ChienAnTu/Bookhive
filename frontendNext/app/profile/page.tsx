@@ -4,11 +4,11 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, MapPin, Calendar, Book, Edit } from "lucide-react";
 import { getCurrentUser, isAuthenticated } from "../../utils/auth";
-import {
-  getUserLendingOrders,
-  getUserBorrowingOrders,
-  mockOrders,
-} from "../data/mockData";
+// import {
+//   getUserLendingOrders,
+//   getUserBorrowingOrders,
+//   mockOrders,
+// } from "../data/mockData";  
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
@@ -67,9 +67,9 @@ const ProfilePage: React.FC = () => {
     );
   }
 
-  // Get user's orders (using mock data for now)
-  const lendingOrders = getUserLendingOrders(currentUser.id);
-  const borrowingOrders = getUserBorrowingOrders(currentUser.id);
+  // // Get user's orders (using mock data for now)
+  // const lendingOrders = getUserLendingOrders(currentUser.id);
+  // const borrowingOrders = getUserBorrowingOrders(currentUser.id);
 
   // Format join date from createdAt
   const joinDate = new Date(currentUser.createdAt).toLocaleDateString("en-US", {

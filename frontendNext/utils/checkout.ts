@@ -19,6 +19,7 @@ export async function getMyCheckouts() {
     if (res.status === 404) return []; // 没有 checkout
     throw new Error("Failed to fetch checkouts");
   }
+  
   return res.json();
 }
 
@@ -57,19 +58,16 @@ export async function createCheckout(payload: any) {
   }
 }
 
-// -------- Rebuild checkout (delete + create) --------
+// -------- Rebuild checkout ( update ) --------
 export async function rebuildCheckout(
   user: User,
   items: any[],
   shipping: Record<string, "delivery" | "pickup"> = {},
   selectedQuotes: Record<string, any> = {}
 ) {
-  // 1. delete old checkout
+  // 1. get current checkout id
   const existing = await getMyCheckouts();
-  for (const co of existing) {
-    await deleteCheckout(co.checkoutId);
-    console.log("Deleted current checkout:", co.checkoutId);
-  }
+  const checkoutId = existing.length > 0 ? existing[0].checkoutId : null;
 
   // 2. build payload
   const payload = {
@@ -91,13 +89,15 @@ export async function rebuildCheckout(
       }
       const mode = it.mode || it.actionType?.toLowerCase();
       const quote = selectedQuotes[it.ownerId];
-      console.log("Owner:", it.ownerId, "Quote:", quote);
+
+      console.log("Owner:", it.ownerId, "mode:", mode, "Quote:", quote);
+
       return {
         itemId: it.itemId || it.cartItemId,
         bookId,
         ownerId: it.ownerId,
         actionType: (it.mode || it.actionType)?.toUpperCase(), // default BORROW
-        price: mode === "purchase" ? it.salePrice : undefined,
+        price: mode === "purchase" ? it.salePrice : undefined, // Sale Price
         deposit: mode === "borrow" ? it.deposit : undefined,
         shippingMethod:
           shipping[bookId] ||
@@ -112,9 +112,29 @@ export async function rebuildCheckout(
     }),
   };
 
-  // 3. create a new checkout
+  // 3. if checkout exist and pending → update
+  if (checkoutId) {
+    try {
+      const res = await axios.put(
+        `${API_URL}/api/v1/checkouts/${checkoutId}`,
+        payload,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } }
+      );
+      console.log("Payload sent to updateCheckout:", payload);
+
+      return res.data;
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        // checkout doesn't exist then create
+        return await createCheckout(payload);
+      }
+      throw err;
+    }
+  }
+
+  // 4. if no checkout → create
   console.log("Payload sent to createCheckout:", payload);
   const newCheckout = await createCheckout(payload);
-console.log("Checkout returned from backend:", newCheckout);
+  console.log("Checkout returned from backend:", newCheckout);
   return newCheckout;
 }
