@@ -12,6 +12,8 @@ from routes.complaints import router as complaints_router  # routes/complaints
 from routes.shipping import router as shipping_router  # Import shipping router
 from routes.service_fee import router as service_fee_router
 from routes.checkout import router as checkout_router  # Import checkout router
+from routes.mail import router as mail_router
+from routes.payment_gateway import router as payment_gateway_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -61,6 +63,11 @@ app.include_router(cart_router, prefix="/api/v1")
 # complaints router
 app.include_router(complaints_router)
 
+# mail router
+app.include_router(mail_router) 
+
+# payment gateway router
+app.include_router(payment_gateway_router) 
 
 @app.get("/")
 async def root():
