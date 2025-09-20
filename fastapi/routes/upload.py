@@ -1,7 +1,6 @@
 import uuid
 import io
 from pathlib import Path
-from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends, Form
 from PIL import Image
 from core.dependencies import get_current_user
@@ -15,7 +14,7 @@ MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 MAX_SIZE   = 2 * 1024 * 1024  # 2MB
 ALLOWEDEXT = {"png", "jpg", "jpeg", "gif", "webp"}
 
-def _detect_image_ext(data: bytes) -> Optional[str]:
+def _detect_image_ext(data: bytes) -> str | None:
     try:
         img = Image.open(io.BytesIO(data))
         fmt = (img.format or "").lower()
