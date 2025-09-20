@@ -125,28 +125,3 @@ CREATE TABLE `messages` (
 -- ----------------------------
 BEGIN;
 COMMIT;
-
--- ----------------------------
--- Table structure for notifications
--- ----------------------------
-DROP TABLE IF EXISTS `notifications`;
-CREATE TABLE `notifications` (
-  `notification_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `user_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `message` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `notification_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `is_read` tinyint(1) NOT NULL DEFAULT '0',
-  `timestamp` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`notification_id`),
-  KEY `idx_user` (`user_id`),
-  CONSTRAINT `fk_notification_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ----------------------------
--- Records of notifications
--- ----------------------------
-BEGIN;
-COMMIT;
-
-SET FOREIGN_KEY_CHECKS = 1;
