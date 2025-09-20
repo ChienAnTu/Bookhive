@@ -20,11 +20,13 @@ class Checkout(Base):
     street = Column(String(255), nullable=False)
     city = Column(String(100), nullable=False)
     postcode = Column(String(10), nullable=False)
+    state          = Column(String(100), nullable=True)
     country = Column(String(100), nullable=False)
 
     # Fee summary
     deposit = Column(Numeric(10, 2), default=0.00)
     service_fee = Column(Numeric(10, 2), default=0.00)
+    book_fee = Column(Numeric(10, 2), default=0.00) 
     shipping_fee = Column(Numeric(10, 2), default=0.00)
     total_due = Column(Numeric(10, 2), default=0.00)
 
@@ -92,8 +94,10 @@ class CheckoutBase(BaseModel):
     city: str
     postcode: str
     country: str
+    state : str
     deposit: Optional[float] = 0.00
     serviceFee: Optional[float] = 0.00
+    bookFee: Optional[float] = 0.00  
     shippingFee: Optional[float] = 0.00
     totalDue: Optional[float] = 0.00
     status: Optional[str] = "PENDING"
