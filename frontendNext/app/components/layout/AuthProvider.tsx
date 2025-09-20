@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-import { initAuth } from "../../../utils/auth";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { initAuth, isAuthenticated } from "../../../utils/auth";
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -9,14 +10,52 @@ interface AuthProviderProps {
 
 /**
  * AuthProvider component that initializes authentication state on app startup
- * This component should wrap the entire app to ensure auth tokens are restored from storage
+ * and enforces route protection for pages that require login
  */
 export default function AuthProvider({ children }: AuthProviderProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [loading, setLoading] = useState(true);
+
+  // routes need to login 
+  const protectedRoutes = ["/profile", "/orders", "/lending", "/borrowing", 
+    "/cart", "/checkout",
+    "/message","/shipping", "/complain"
+  ];
+
+  // Special rule: only protect sub-routes under /books (e.g. /books/123)
+  const isProtectedRoute = (pathname: string) => {
+    if (protectedRoutes.some((route) => pathname.startsWith(route))) {
+      return true;
+    }
+    // Protect /books/* but NOT /books itself
+    if (pathname.startsWith("/books/") && pathname !== "/books") {
+      return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
-    // Initialize authentication state from localStorage on app startup
-    // This restores the user's session if they have a valid token
-    initAuth();
-  }, []);
+    const checkAuth = async () => {
+      initAuth();
+
+      if (isProtectedRoute(pathname)) {
+        const authed = await isAuthenticated();
+        if (!authed) {
+          router.replace("/auth");
+          return;
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, [pathname, router]);
+
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
 
   return <>{children}</>;
 }

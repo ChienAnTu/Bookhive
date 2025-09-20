@@ -2,9 +2,8 @@ import axios from "axios";
 import type { User } from "@/app/types/user";
 
 
-
 // API Configuration
-const getApiUrl = () => {
+export const getApiUrl = () => {
   if (process.env.NODE_ENV === "production") {
     return "https://your-production-api.com";
   }
@@ -23,20 +22,6 @@ interface RegisterData {
   password: string;
   confirm_password: string;
   agree_terms: boolean;
-}
-
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  location: string;
-  avatar: string;
-  createdAt: string;
-  phoneNumber?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
 }
 
 // User login function
@@ -168,67 +153,164 @@ export const initAuth = () => {
   if (token) {
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   }
+
+  // a global response interceptor
+  if (!(axios as any)._hasAuthInterceptor) {
+    axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          console.warn("Session expired, logging out...");
+          // Clear the local login status
+          localStorage.removeItem("access_token");
+          delete axios.defaults.headers.common["Authorization"];
+
+          // Notify the global refresh
+          window.dispatchEvent(new Event("auth-changed"));
+
+          window.location.href = "/auth";
+        }
+        return Promise.reject(error);
+      }
+    );
+    (axios as any)._hasAuthInterceptor = true;
+  }
 };
 
+
 // Get current user information from API
-export const getCurrentUser = async (): Promise<UserData | null> => {
+export const getCurrentUser = async (): Promise<User | null> => {
   const token = getToken();
   if (!token) return null;
 
   try {
     const API_URL = getApiUrl();
-    const response = await axios.get(`${API_URL}/api/v1/auth/me`, {
+    const response = await axios.get(`${API_URL}/api/v1/user/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
     const userData = response.data;
-    return {
+
+    const user: User = {
       id: userData.id,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
       name: userData.name,
       email: userData.email,
-      location: userData.location,
-      phoneNumber: userData.phoneNumber || '',
-      address: userData.address || '',
-      city: userData.city || '',
-      state: userData.state || '',
-      zipCode: userData.zipCode || '',
+      phoneNumber: userData.phoneNumber || undefined,
+      dateOfBirth: userData.dateOfBirth || undefined,
+
+      country: userData.country,
+      streetAddress: userData.streetAddress,
+      city: userData.city,
+      state: userData.state,
+      zipCode: userData.zipCode,
+      coordinates: userData.coordinates || undefined,
+      maxDistance: userData.maxDistance || undefined,
+
       avatar:
         userData.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(
           userData.name
         )}&background=f97316&color=fff`,
-      createdAt: userData.createdAt,
+      profilePicture: userData.profilePicture || undefined,
+
+      createdAt: new Date(userData.createdAt),
+
+      bio: userData.bio || undefined,
+      preferredLanguages: userData.preferredLanguages || undefined,
     };
+
+    return user;
   } catch (error) {
     console.error("Failed to get user info:", error);
-    // Clear invalid token if API call fails
     localStorage.removeItem("access_token");
     delete axios.defaults.headers.common["Authorization"];
     return null;
   }
 };
 
+
 // Update user profile
-export const updateUser = async (user: User) => {
+export const updateUser = async (user: Partial<User> & { id: string }) => {
   const API_URL = getApiUrl();
 
   try {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      throw new Error("No access token found in localStorage");
+    }
+
     const response = await axios.put(
       `${API_URL}/api/v1/user/${user.id}`,
       user,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${token}`,
         },
-        withCredentials: true,
       }
     );
 
-    return response.data; // 返回更新后的用户数据
+    return response.data;
   } catch (error) {
     console.error("Update API failed:", error);
     throw error;
+  }
+};
+
+// Get any user information by id
+export const getUserById = async (id: string): Promise<User | null> => {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const API_URL = getApiUrl();
+    const response = await axios.get(`${API_URL}/api/v1/user/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    console.log("fetch owner response:", response.status, response.data);
+
+
+    const userData = response.data;
+
+    const user: User = {
+      id: userData.id,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      name: userData.name,
+      email: userData.email,
+      phoneNumber: userData.phoneNumber || undefined,
+      dateOfBirth: userData.dateOfBirth || undefined,
+
+      country: userData.country,
+      streetAddress: userData.streetAddress,
+      city: userData.city,
+      state: userData.state,
+      zipCode: userData.zipCode,
+      coordinates: userData.coordinates || undefined,
+      maxDistance: userData.maxDistance || undefined,
+
+      avatar:
+        userData.avatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          userData.name
+        )}&background=f97316&color=fff`,
+      profilePicture: userData.profilePicture || undefined,
+
+      createdAt: new Date(userData.createdAt),
+
+      bio: userData.bio || undefined,
+      preferredLanguages: userData.preferredLanguages || undefined,
+    };
+
+    return user;
+  } catch (error) {
+    console.error(`Failed to get user ${id}:`, error);
+    return null;
   }
 };
