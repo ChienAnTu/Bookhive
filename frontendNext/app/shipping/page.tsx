@@ -1,7 +1,7 @@
 // app/shipping/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Package,
   Truck,
@@ -15,28 +15,98 @@ import {
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import {
-  getCurrentUser,
-  mockOrders,
-  mockBooks,
-  getUserById
-} from "@/app/data/mockData";
+import { getCurrentUser, getUserById } from "@/utils/auth";
+import { getBorrowingOrders, getLendingOrders, type Order } from "@/utils/orders";
+import { getBookById } from "@/utils/books";
+import type { Book } from "@/app/types/book";
+import type { User } from "@/app/types/user";
 
-type OrderStatus = "pending" | "shipped" | "in-transit" | "delivered" | "cancelled";
-type FilterStatus = "all" | OrderStatus;
+// Shipping specific status mapping - only show shipping-relevant statuses
+type ShippingStatus = "PENDING_SHIPMENT" | "BORROWING" | "RETURNED" | "COMPLETED";
+type FilterStatus = "all" | ShippingStatus;
 
 export default function ShippingPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Data states
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [books, setBooks] = useState<Record<string, Book>>({});
+  const [users, setUsers] = useState<Record<string, User>>({});
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const currentUser = getCurrentUser();
+  // Load data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  // Get user's shipping orders (both as borrower and lender)
+        // Get current user
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+
+        if (user) {
+          // Get both borrowing and lending orders
+          const [borrowingOrders, lendingOrders] = await Promise.all([
+            getBorrowingOrders(),
+            getLendingOrders()
+          ]);
+          
+          const allOrders = [...borrowingOrders, ...lendingOrders];
+          setOrders(allOrders);
+
+          // Load book details for all orders
+          const bookMap: Record<string, Book> = {};
+          const userMap: Record<string, User> = {};
+          
+          for (const order of allOrders) {
+            // Load books
+            for (const bookId of order.bookIds) {
+              try {
+                const book = await getBookById(bookId);
+                if (book) {
+                  bookMap[bookId] = book;
+                }
+              } catch (error) {
+                console.error(`Failed to load book ${bookId}:`, error);
+              }
+            }
+            
+            // Load users
+            try {
+              const borrower = await getUserById(order.borrowerId);
+              const owner = await getUserById(order.ownerId);
+              if (borrower) userMap[order.borrowerId] = borrower;
+              if (owner) userMap[order.ownerId] = owner;
+            } catch (error) {
+              console.error(`Failed to load users for order ${order.id}:`, error);
+            }
+          }
+          
+          setBooks(bookMap);
+          setUsers(userMap);
+        }
+      } catch (err) {
+        console.error("Failed to load shipping data:", err);
+        setError("Failed to load shipping information. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Get user's shipping orders (both as borrower and owner)
   const userOrders = useMemo(() => {
-    return mockOrders.filter(order =>
-      order.borrowerId === currentUser.id || order.lenderId === currentUser.id
+    if (!currentUser) return [];
+    return orders.filter(order =>
+      order.borrowerId === currentUser.id || order.ownerId === currentUser.id
     );
-  }, [currentUser.id]);
+  }, [orders, currentUser]);
 
   const filteredOrders = useMemo(() => {
     let filtered = userOrders;
@@ -47,33 +117,36 @@ export default function ShippingPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(order => {
-        const book = mockBooks.find(b => b.id === order.bookId);
-        return book?.titleOr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          book?.author.toLowerCase().includes(searchTerm.toLowerCase());
+        // Search in book titles from loaded books
+        const orderBooks = order.bookIds.map(id => books[id]).filter(Boolean);
+        return orderBooks.some(book => 
+          book.titleOr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          book.author?.toLowerCase().includes(searchTerm.toLowerCase())
+        ) || order.id.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
 
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [userOrders, selectedFilter, searchTerm]);
+  }, [userOrders, selectedFilter, searchTerm, books]);
 
-  const getStatusIcon = (status: OrderStatus) => {
+  const getStatusIcon = (status: Order["status"]) => {
     switch (status) {
-      case "pending": return <Clock className="w-5 h-5 text-yellow-500" />;
-      case "shipped": return <Package className="w-5 h-5 text-blue-500" />;
-      case "in-transit": return <Truck className="w-5 h-5 text-orange-500" />;
-      case "delivered": return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case "cancelled": return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case "PENDING_SHIPMENT": return <Clock className="w-5 h-5 text-orange-500" />;
+      case "BORROWING": return <Truck className="w-5 h-5 text-blue-500" />;
+      case "RETURNED": return <Package className="w-5 h-5 text-green-500" />;
+      case "COMPLETED": return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case "CANCELED": return <AlertCircle className="w-5 h-5 text-red-500" />;
       default: return <Clock className="w-5 h-5 text-gray-500" />;
     }
   };
 
-  const getStatusColor = (status: OrderStatus) => {
+  const getStatusColor = (status: Order["status"]) => {
     switch (status) {
-      case "pending": return "text-yellow-700 bg-yellow-50 border-yellow-200";
-      case "shipped": return "text-blue-700 bg-blue-50 border-blue-200";
-      case "in-transit": return "text-orange-700 bg-orange-50 border-orange-200";
-      case "delivered": return "text-green-700 bg-green-50 border-green-200";
-      case "cancelled": return "text-red-700 bg-red-50 border-red-200";
+      case "PENDING_SHIPMENT": return "text-orange-700 bg-orange-50 border-orange-200";
+      case "BORROWING": return "text-blue-700 bg-blue-50 border-blue-200";
+      case "RETURNED": return "text-green-700 bg-green-50 border-green-200";
+      case "COMPLETED": return "text-green-700 bg-green-50 border-green-200";
+      case "CANCELED": return "text-red-700 bg-red-50 border-red-200";
       default: return "text-gray-700 bg-gray-50 border-gray-200";
     }
   };
@@ -86,22 +159,23 @@ export default function ShippingPage() {
     });
   };
 
-  const getOrderRole = (order: any) => {
+  const getOrderRole = (order: Order) => {
+    if (!currentUser) return "Unknown";
     return order.borrowerId === currentUser.id ? "Borrowing" : "Lending";
   };
 
-  const getOtherUser = (order: any) => {
-    const otherUserId = order.borrowerId === currentUser.id ? order.lenderId : order.borrowerId;
-    return getUserById(otherUserId);
+  const getOtherUser = (order: Order): User | null => {
+    if (!currentUser) return null;
+    const otherUserId = order.borrowerId === currentUser.id ? order.ownerId : order.borrowerId;
+    return users[otherUserId] || null;
   };
 
   const filterOptions = [
     { value: "all", label: "All Orders", count: userOrders.length },
-    { value: "pending", label: "Pending", count: userOrders.filter(o => o.status === "pending").length },
-    { value: "shipped", label: "Shipped", count: userOrders.filter(o => o.status === "shipped").length },
-    { value: "in-transit", label: "In Transit", count: userOrders.filter(o => o.status === "in-transit").length },
-    { value: "delivered", label: "Delivered", count: userOrders.filter(o => o.status === "delivered").length },
-    { value: "cancelled", label: "Cancelled", count: userOrders.filter(o => o.status === "cancelled").length }
+    { value: "PENDING_SHIPMENT", label: "Pending Shipment", count: userOrders.filter(o => o.status === "PENDING_SHIPMENT").length },
+    { value: "BORROWING", label: "In Transit", count: userOrders.filter(o => o.status === "BORROWING").length },
+    { value: "RETURNED", label: "Returned", count: userOrders.filter(o => o.status === "RETURNED").length },
+    { value: "COMPLETED", label: "Completed", count: userOrders.filter(o => o.status === "COMPLETED").length }
   ];
 
   return (
@@ -163,7 +237,9 @@ export default function ShippingPage() {
               </Card>
             ) : (
               filteredOrders.map((order) => {
-                const book = mockBooks.find(b => b.id === order.bookId);
+                // Get book data for the first book ID in the order
+                const firstBookId = order.bookIds[0];
+                const book = books[firstBookId];
                 const otherUser = getOtherUser(order);
                 const role = getOrderRole(order);
 
@@ -206,7 +282,7 @@ export default function ShippingPage() {
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             <MapPin className="w-4 h-4 mr-2" />
-                            <span>{role === "Borrowing" ? "From" : "To"}: {otherUser.location}</span>
+                            <span>{role === "Borrowing" ? "From" : "To"}: {otherUser.city}, {otherUser.state}</span>
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             {getStatusIcon(order.status)}
@@ -227,7 +303,7 @@ export default function ShippingPage() {
                                 <span className="font-medium">Carrier:</span> {order.shippingInfo.carrier}
                               </div>
                               <div>
-                                <span className="font-medium">Estimated Delivery:</span> {formatDate(order.shippingInfo.estimatedDelivery)}
+                                <span className="font-medium">Tracking Number:</span> {order.shippingInfo?.trackingNumber || "Not available"}
                               </div>
                               <div>
                                 <span className="font-medium">Shipping Address:</span> {order.shippingInfo.address}
