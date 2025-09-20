@@ -8,7 +8,12 @@ from pathlib import Path
 from routes.upload import router as upload_router
 from routes.books import router as books_router
 from routes.messages import router as message_router
-
+from routes.cart import router as cart_router
+from routes.complaints import router as complaints_router  # routes/complaints
+from routes.shipping import router as shipping_router  # Import shipping router
+from routes.service_fee import router as service_fee_router
+from routes.checkout import router as checkout_router  # Import checkout router
+from routes.order import router as orders_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,6 +32,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#service checkout router
+app.include_router(checkout_router, prefix="/api/v1")
+
+#service fee router
+app.include_router(service_fee_router, prefix="/api/v1")
+
+# shipping router
+app.include_router(shipping_router)
+
 # media root directory: /media is mounted to the app/media folder
 MEDIA_ROOT = Path(__file__).parent / "media"
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
@@ -43,6 +57,15 @@ app.include_router(user_router, prefix="/api/v1")
 # books router
 app.include_router(books_router)
 app.include_router(message_router, prefix="/api/v1")
+
+# cart router
+app.include_router(cart_router, prefix="/api/v1")
+
+# complaints router
+app.include_router(complaints_router)
+
+# order router
+app.include_router(orders_router, prefix="/api/v1/orders")
 
 @app.get("/")
 async def root():
