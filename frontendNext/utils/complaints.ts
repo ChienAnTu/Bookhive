@@ -72,13 +72,13 @@ export async function getComplaints(): Promise<Complaint[]> {
 // Get current user's complaints
 export async function getUserComplaints(): Promise<Complaint[]> {
   try {
-    const response = await axios.get(`${API_URL}/api/v1/complaints/my`, {
+    const response = await axios.get(`${API_URL}/api/v1/complaints?role=mine`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("access_token")}`,
       },
       withCredentials: true,
     });
-    return response.data;
+    return response.data.items || [];
   } catch (error) {
     console.error("Failed to fetch user complaints:", error);
     throw error;

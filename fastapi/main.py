@@ -62,7 +62,7 @@ app.include_router(message_router, prefix="/api/v1")
 app.include_router(cart_router, prefix="/api/v1")
 
 # complaints router
-app.include_router(complaints_router)
+app.include_router(complaints_router, prefix="/api/v1")
 
 # order router
 app.include_router(orders_router, prefix="/api/v1/orders")
