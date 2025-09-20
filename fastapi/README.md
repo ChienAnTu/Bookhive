@@ -144,7 +144,7 @@ authentication:
         "createdAt": "2025-08-24T15:00:00Z"
     }          
 
-email service:
+## Email service:
 
 - **POST /send_verification**:
 Endpoint: http://localhost:8000/api/v1/email/send_verification
@@ -208,11 +208,296 @@ Example Response:
     "message": "Shipment confirmation email sent successfully."
 }
 
+## Messaging System
+The messaging system allows users to send private messages in real-time using WebSockets, with persistence in the database, read receipts, and unread counts.
+                   
+### Image Attachments
+- Messages can include an optional image attachment. The server validates image type/size and stores files under `/media/messageAttachments/{sender_id}/`.
+- Responses and WebSocket payloads include `image_url` when an image is attached.
 
-Test in Swagger (authorize with "Bearer <token>") or Postman.
+#### DB Migration
+Run this against your existing MySQL database to support image messages (if u have already created the table in mysql, otherwise, just execute the .sql file in docs will do the job):
+```sql
+ALTER TABLE `messages`
+  MODIFY `content` varchar(1000) NULL,
+  ADD COLUMN `image_path` varchar(255) NULL AFTER `content`;
+```
+
+If recreating the table, ensure `content` is nullable and `image_path` exists.
+
+#### Dependencies
+Install Pillow (used for image validation):
+```
+pip install Pillow
+```
+Already added in `requirements.txt`.
+
+#### Endpoint: Send Message With Image
+- **POST /api/v1/messages/send-with-image**
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Content-Type**: `multipart/form-data`
+  - **Form fields**:
+    - `receiver_email` (string, required)
+    - `content` (string, optional)
+    - `file` (image file, required)
+  - **Notes**: Accepts png, jpg/jpeg, gif, webp up to 5MB.
+  - **Example (curl)**:
+    ```bash
+    curl -X POST "http://localhost:8000/api/v1/messages/send-with-image" \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -F "receiver_email=user@example.com" \
+      -F "content=Check this out" \
+      -F "file=@/path/to/image.jpg"
+    ```
+  - **Example Response**:
+    ```json
+    {
+      "message_id": "uuid",
+      "sender_email": "alice@example.com",
+      "receiver_email": "user@example.com",
+      "content": "Check this out",
+      "image_url": "/media/messageAttachments/<sender_id>/<filename>.jpg",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "is_read": false
+    }
+    ```
+
+#### File Storage
+- Files are saved to `fastapi/media/messageAttachments/{sender_id}/{uuid.ext}`.
+- Static files are served under `/media` (configured in `main.py`). You can open the `image_url` in the browser to verify upload success.
+
+#### WebSocket Payload
+When a message is sent, receivers connected via WebSocket get:
+```json
+{
+  "type": "message",
+  "data": {
+    "sender_email": "alice@example.com",
+    "content": "Hello",
+    "image_url": "/media/messageAttachments/<sender_id>/<filename>.jpg",
+    "timestamp": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+### Setup
+1. **Install Dependencies**:
+   - Ensure `websockets` is installed: `pip install websockets`.
+   - If not already, install core dependencies: `pip install -r requirements.txt`.
+
+2. **Database Configuration**:
+   - Update your database schema to include the `messages` table. Run the SQL script in `docs/sql-script/BookHive.sql` against your MySQL database (e.g., via MySQL Workbench or CLI: `mysql -h yourhost -u youruser -p yourdb < BookHive.sql`).
+   - If using migrations (e.g., Alembic), set it up in `database/` and run `alembic upgrade head`.
+
+3. **Environment Variables**:
+   - No additional .env vars needed beyond the base setup (e.g., DATABASE_URL, JWT_SECRET).
+
+4. **Frontend Integration**:
+   - In your Next.js app (e.g., `frontendNext/`), add WebSocket handling: Connect to `ws://your-api-url/api/v1/messages/ws?token={jwt_token}`.
+   - Example in JavaScript: 
+     ```javascript
+     const ws = new WebSocket('ws://localhost:8000/api/v1/messages/ws?token=' + token);
+     ws.onmessage = (event) => {
+       const data = JSON.parse(event.data);
+       if (data.type === 'message') {
+         // Handle new message
+         console.log('New message:', data.data);
+       }
+     };
+     ```
+   - Handle reconnections and errors for production.
+
+5. **Troubleshooting**:
+   - WebSocket connection fails: Check JWT token validity and server logs for authentication errors.
+   - Messages not persisting: Verify database connection in `database/connection.py`.
+   - Test: Use tools like wscat (`npm install -g wscat`) – `wscat -c "ws://localhost:8000/api/v1/messages/ws?token=your_token"`.
+
+### Endpoints
+- **POST /api/v1/messages/send**: Send a message to another user and notify them via WebSocket.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Request**:
+    ```json
+    {
+      "receiver_email": "user@example.com",
+      "content": "Hello! How are you?"
+    }
+    ```
+  - **Example Response**:
+    ```json
+    {
+      "message_id": "msg123456789",
+      "sender_email": "alice@example.com",
+      "receiver_email": "user@example.com",
+      "content": "Hello! How are you?",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "is_read": false
+    }
+    ```
+  - **Notes**: Triggers real-time WebSocket notification to the receiver if connected.
+
+- **GET /api/v1/messages/conversation/{other_user_email}**: Get all messages in a conversation between current user and another user.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Response**:
+    ```json
+    [
+      {
+        "message_id": "msg123",
+        "sender_email": "alice@example.com",
+        "receiver_email": "user@example.com",
+        "content": "Hello!",
+        "timestamp": "2025-01-15T10:30:00Z",
+        "is_read": true
+      },
+      {
+        "message_id": "msg124",
+        "sender_email": "user@example.com",
+        "receiver_email": "alice@example.com",
+        "content": "Hi there!",
+        "timestamp": "2025-01-15T10:31:00Z",
+        "is_read": false
+      }
+    ]
+    ```
+  - **Notes**: Ordered by timestamp; paginate if needed for large conversations.
+
+- **GET /api/v1/messages/conversations**: Get list of all users that current user has had conversations with.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Response**:
+    ```json
+    [
+      {
+        "email": "user@example.com",
+        "name": "John Doe"
+      },
+      {
+        "email": "bob@example.com",
+        "name": "Bob Smith"
+      }
+    ]
+    ```
+  - **Notes**: Based on sent/received messages; useful for chat lists.
+
+- **PUT /api/v1/messages/mark-read/{message_id}**: Mark a specific message as read by the receiver.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Response**:
+    ```json
+    {
+      "message": "Message marked as read",
+      "message_id": "msg123456789"
+    }
+    ```
+  - **Notes**: Only accessible by the message receiver.
+
+- **PUT /api/v1/messages/mark-conversation-read/{other_user_email}**: Mark all unread messages from a specific user as read.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Response**:
+    ```json
+    {
+      "message": "Marked 3 messages as read",
+      "count": 3
+    }
+    ```
+  - **Notes**: Applies to messages from the specified email.
+
+- **GET /api/v1/messages/unread-count**: Get total count of unread messages for current user.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Response**:
+    ```json
+    {
+      "unread_count": 5
+    }
+    ```
+
+- **GET /api/v1/messages/unread-count/{other_user_email}**: Get count of unread messages from a specific sender.
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Example Response**:
+    ```json
+    {
+      "unread_count": 2,
+      "sender_email": "user@example.com"
+    }
+    ```
+
+- **WebSocket /api/v1/messages/ws?token={jwt_token}**: WebSocket endpoint for real-time message notifications.
+  - **Description**: Connect to receive instant notifications when new messages arrive.
+  - **Usage**: 
+    ```javascript
+    const ws = new WebSocket('ws://localhost:8000/api/v1/messages/ws?token=your_jwt_token');
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('New message:', data);
+    };
+    ```
+  - **Notes**: Handles disconnections; integrate with frontend for live updates.
+
+### Usage
+- Send messages via HTTP; real-time delivery to connected users.
+- Frontend: Use `new WebSocket("ws://localhost:8000/api/v1/messages/ws?token=...")` and handle `onmessage`.
+- Security: All endpoints require authentication; WebSocket uses token in query.
+- Test in Swagger (authorize with "Bearer <token>") or Postman.
+
+## Notification System
+Notifications are stored in the database, pushed via WebSocket, and emailed using fastapi-mail.
+
+### Setup
+1. **Install Dependencies**:
+   - Install `fastapi-mail` and `python-dotenv`: `pip install fastapi-mail python-dotenv`.
+   - Ensure core dependencies: `pip install -r requirements.txt`.
+
+2. **Database Configuration**:
+   - Add the `notifications` table by running `docs/sql-script/BookHive.sql` against your MySQL DB (e.g., `mysql -h yourhost -u youruser -p yourdb < BookHive.sql`).
+   - For migrations, use Alembic if set up.
+
+3. **Environment Variables**:
+   - Copy `.env.example` to `.env` and fill in email details:
+     ```
+     MAIL_USERNAME=do-not-reply@bookhive.com
+     MAIL_PASSWORD=your_gmail_app_password  # 16-char code from Google
+     MAIL_FROM=do-not-reply@bookhive.com
+     # Other MAIL_* vars as needed
+     ```
+   - Load in code with `load_dotenv()`.
+
+4. **Email Configuration**:
+   - For Gmail: Enable 2-Step Verification in Google Account, generate an app password (under Security > App passwords).
+   - Update `MAIL_PASSWORD` with the app password.
+   - Test SMTP: Send a test email via the `/create` endpoint.
+
+5. **Frontend Integration**:
+   - Use the same WebSocket as messaging to receive real-time notifications (`{"type": "notification", "data": {...}}`).
+
+6. **Troubleshooting**:
+   - Email not sending: Check server logs for SMTP errors; verify app password and Gmail settings (disable "Less secure apps" if prompted).
+   - WebSocket issues: Ensure token is valid; test with wscat.
+   - Database errors: Confirm table exists and DB connection is correct.
+
+### Endpoints
+- **POST /api/v1/notifications/create**: Create and send a notification (DB + email + WebSocket).
+  - **Headers**: `Authorization: Bearer <jwt_token>`
+  - **Body**: `{"user_email": "user@example.com", "title": "Alert", "message": "Details", "notification_type": "info"}`
+  - **Response**: Notification details (ID, title, message, type, is_read, timestamp).
+  - **Notes**: Requires permission (e.g., admin); emails use HTML template.
+
+- **GET /api/v1/notifications/**: Get user's notifications.
+  - **Headers**: `Authorization: Bearer <jwt_token>`
+  - **Query Param**: `unread_only=true` (optional, filters to unread).
+  - **Response**: Array of notifications with details.
+  - **Notes**: Ordered by timestamp descending.
+
+- **POST /api/v1/notifications/{notification_id}/read**: Mark a notification as read.
+  - **Headers**: `Authorization: Bearer <jwt_token>`
+  - **Path Param**: `notification_id`
+  - **Response**: `{"message": "Marked as read"}`
+  - **Notes**: Only works for the notification's owner.
+
+### Usage
+- Notifications trigger email sends (HTML template) and WebSocket pushes.
+- Test with Swagger at `/docs`.
+- Integrate in frontend: Poll endpoints or use WebSocket for updates.
 
 ## Project Structure
 - Overall:
+```
 BookHive/
 ├── fastapi/ # Backend API
 │ ├── main.py # FastAPI application entry point
@@ -226,15 +511,21 @@ BookHive/
 │ ├── models/ # Database models
 │ │ ├── init.py
 │ │ ├── base.py # SQLAlchemy base model
-│ │ └── user.py # User model
+│ │ ├── user.py # User model
+│ │ ├── message.py # Message model
+│ │ └── notification.py # Notification model
 │ ├── routes/ # API routes
 │ │ ├── init.py
 │ │ ├── auth.py # Authentication endpoints
-│ │ └── users.py # User management endpoints
+│ │ ├── users.py # User management endpoints
+│ │ ├── message_routes.py # Message endpoints
+│ │ └── notification_routes.py # Notification endpoints
 │ ├── services/ # Business logic
 │ │ ├── init.py
 │ │ ├── auth_service.py # Authentication services
-│ │ └── user_service.py # User CRUD operations
+│ │ ├── user_service.py # User CRUD operations
+│ │ ├── message_service.py # Message operations
+│ │ └── notification_service.py # Notification operations
 │ ├── database/ # Database handling
 │ │ ├── init.py
 │ │ ├── connection.py # Database connection
@@ -248,10 +539,11 @@ BookHive/
 │ ├── password.py # Password utilities
 │ └── validators.py # Input validation
 │
-├── capstone-project/ # Next.js frontend
+├── frontendNext/ # Next.js frontend
 ├── .env # Shared environment variables
 ├── README.md # Project documentation
 └── vincent-tong-mysql-query-create-db.sql # Database schema
+```
 
 - 3 tiers design architecture:
 FrontEnd --- API ---> Business Logic ---> DB
