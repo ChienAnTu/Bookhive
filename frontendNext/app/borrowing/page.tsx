@@ -10,11 +10,10 @@ import Button from "../components/ui/Button";
 
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
-import { mockOrders, mockBooks, mockUsers } from "@/app/data/mockData";
-
-import { getCurrentUser } from "@/utils/auth";
-//import { getOrders, updateOrder, cancelOrder } from "@/utils/orders";
+import { getCurrentUser, getUserById } from "@/utils/auth";
+import { getBorrowingOrders, type Order as ApiOrder } from "@/utils/orders";
 import { getBookById } from "@/utils/books";
+import { createComplaint, type CreateComplaintRequest } from "@/utils/complaints";
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -33,6 +32,11 @@ export default function OrderListPage() {
   const [err, setErr] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [search, setSearch] = useState("");
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [complaintType, setComplaintType] = useState<"book-condition" | "delivery" | "user-behavior" | "overdue" | "other">("book-condition");
+  const [complaintDescription, setComplaintDescription] = useState("");
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
   const router = useRouter();
 
   // // get borrowing orders & related books
@@ -62,11 +66,58 @@ export default function OrderListPage() {
 
   // 暂时直接用 mock 数据
   useEffect(() => {
-    setOrders(mockOrders);
+    const loadData = async () => {
+      try {
+        const apiOrders = await getBorrowingOrders();
+        
+        // Convert API orders to app Order format
+        const convertedOrders: Order[] = apiOrders.map(apiOrder => ({
+          id: apiOrder.id,
+          borrowerId: apiOrder.borrowerId,
+          ownerId: apiOrder.ownerId,
+          bookIds: apiOrder.bookIds,
+          status: apiOrder.status,
+          createdAt: apiOrder.createdAt,
+          updatedAt: apiOrder.updatedAt || apiOrder.createdAt,
+          dueAt: apiOrder.dueAt,
+          returnedAt: apiOrder.returnedAt,
+          notes: apiOrder.notes,
+          // Add required fields for app Order type
+          deliveryMethod: "post" as const,
+          deposit: { amount: apiOrder.deposit.amount },
+          serviceFee: { amount: apiOrder.serviceFee },
+          totalPaid: { amount: apiOrder.totalAmount },
+          items: apiOrder.bookIds.map(bookId => ({
+            bookId,
+            quantity: 1,
+            price: 0, // Will be updated when book data loads
+          })),
+        }));
+        
+        setOrders(convertedOrders);
+        
+        const booksMapping: Record<string, Book> = {};
+        for (const order of convertedOrders) {
+          for (const bookId of order.bookIds) {
+            try {
+              const book = await getBookById(bookId);
+              if (book) {
+                booksMapping[bookId] = book;
+              }
+            } catch (error) {
+              console.error(`Failed to load book ${bookId}:`, error);
+            }
+          }
+        }
+        setBooksMap(booksMapping);
+      } catch (error) {
+        console.error("Failed to load orders:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const map: Record<string, Book> = {};
-    for (const b of mockBooks) map[b.id] = b;
-    setBooksMap(map);
+    loadData();
   }, []);
 
   // search and filter
@@ -183,7 +234,7 @@ export default function OrderListPage() {
                 filteredOrders.map((o) => {
                   const booksInOrder = o.bookIds.map((id) => booksMap[id]).filter(Boolean) as Book[];
                   const first = booksInOrder[0];
-                  const ownerName = mockUsers.find(u => u.id === o.ownerId)?.name || "Unknown Owner";
+                  const ownerName = "Book Owner"; // TODO: Fetch owner name from API
 
                   const extra = Math.max(0, booksInOrder.length - 1);
 
@@ -288,6 +339,21 @@ export default function OrderListPage() {
                             </Button>
                           )}
 
+                          {/* Create Complaint */}
+                          {(o.status === "BORROWING" || o.status === "OVERDUE" || o.status === "RETURNED") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white"
+                              onClick={() => {
+                                setSelectedOrder(o);
+                                setIsComplaintModalOpen(true);
+                              }}
+                            >
+                              Create Complaint
+                            </Button>
+                          )}
+
                         </div>
                       </div>
                     </Card>
@@ -301,6 +367,99 @@ export default function OrderListPage() {
           )}
         </div>
       </div>
+
+      {/* Complaint Modal */}
+      {isComplaintModalOpen && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-xl font-semibold mb-4">Create Complaint - Order #{selectedOrder.id}</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Complaint Type</label>
+                <select
+                  value={complaintType}
+                  onChange={(e) => setComplaintType(e.target.value as "book-condition" | "delivery" | "user-behavior" | "overdue" | "other")}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="book-condition">Book Condition</option>
+                  <option value="delivery">Delivery Issue</option>
+                  <option value="user-behavior">User Behavior</option>
+                  <option value="overdue">Overdue Issue</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <textarea
+                  value={complaintDescription}
+                  onChange={(e) => setComplaintDescription(e.target.value)}
+                  placeholder="Please describe the issue in detail..."
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  rows={4}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsComplaintModalOpen(false);
+                  setSelectedOrder(null);
+                  setComplaintDescription("");
+                  setComplaintType("book-condition");
+                }}
+                disabled={isSubmittingComplaint}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!complaintDescription.trim()) return;
+                  
+                  setIsSubmittingComplaint(true);
+                  try {
+                    const user = await getCurrentUser();
+                    if (!user) throw new Error("User not authenticated");
+
+                    const complaintData: CreateComplaintRequest = {
+                      subject: `Complaint for Order ${selectedOrder?.id}`,
+                      orderId: selectedOrder?.id || "",
+                      type: complaintType,
+                      description: complaintDescription.trim(),
+                      source: "order",
+                    };
+
+                    await createComplaint(complaintData);
+                    
+                    // Close modal and reset form
+                    setIsComplaintModalOpen(false);
+                    setSelectedOrder(null);
+                    setComplaintDescription("");
+                    setComplaintType("book-condition");
+                    
+                    // Show success message (you might want to add a toast notification here)
+                    alert("Complaint submitted successfully!");
+                  } catch (error) {
+                    console.error("Failed to create complaint:", error);
+                    alert("Failed to submit complaint. Please try again.");
+                  } finally {
+                    setIsSubmittingComplaint(false);
+                  }
+                }}
+                disabled={!complaintDescription.trim() || isSubmittingComplaint}
+                className="flex-1 bg-orange-500 hover:bg-orange-600"
+              >
+                {isSubmittingComplaint ? "Submitting..." : "Submit Complaint"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

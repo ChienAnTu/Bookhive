@@ -11,16 +11,16 @@ const Footer: React.FC = () => {
         <div className="flex flex-col items-center space-y-3">
           {/* Copyright */}
           <p className="text-sm text-gray-500">
-            &copy; 2025 BookHive. All rights reserved.
+            &copy; 2025 BookBorrow. All rights reserved.
           </p>
           {/* Links */}
           <div className="flex items-center space-x-6 text-sm text-gray-600">
             <Link href="/about" className="hover:text-orange-500">
               About Us
             </Link>
-            <Link href="/contact" className="hover:text-orange-500">
+            {/* <Link href="/contact" className="hover:text-orange-500">
               Contact
-            </Link>
+            </Link> */}
           </div>
         </div>
       </div>

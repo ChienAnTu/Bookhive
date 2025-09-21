@@ -11,3 +11,6 @@ email-validator
 PyMySQL
 httpx>=0.27.0
 stripe>=12.0.0
+websockets
+fastapi_mail
+Pillow
