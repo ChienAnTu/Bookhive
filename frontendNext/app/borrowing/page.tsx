@@ -8,12 +8,14 @@ import { Search, Filter, Package, Clock, AlertTriangle } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 
-import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
 import { getCurrentUser, getUserById } from "@/utils/auth";
-import { getBorrowingOrders, type Order as ApiOrder } from "@/utils/orders";
+import { getBorrowingOrders, type Order } from "@/utils/orders";
 import { getBookById } from "@/utils/books";
 import { createComplaint, type CreateComplaintRequest } from "@/utils/complaints";
+
+// Use Order status from utils/orders.ts
+type OrderStatus = Order["status"];
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -64,40 +66,15 @@ export default function OrderListPage() {
   //   };
   // }, []);
 
-  // 暂时直接用 mock 数据
+  // Load borrowing orders (checkouts) 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const apiOrders = await getBorrowingOrders();
-        
-        // Convert API orders to app Order format
-        const convertedOrders: Order[] = apiOrders.map(apiOrder => ({
-          id: apiOrder.id,
-          borrowerId: apiOrder.borrowerId,
-          ownerId: apiOrder.ownerId,
-          bookIds: apiOrder.bookIds,
-          status: apiOrder.status,
-          createdAt: apiOrder.createdAt,
-          updatedAt: apiOrder.updatedAt || apiOrder.createdAt,
-          dueAt: apiOrder.dueAt,
-          returnedAt: apiOrder.returnedAt,
-          notes: apiOrder.notes,
-          // Add required fields for app Order type
-          deliveryMethod: "post" as const,
-          deposit: { amount: apiOrder.deposit.amount },
-          serviceFee: { amount: apiOrder.serviceFee },
-          totalPaid: { amount: apiOrder.totalAmount },
-          items: apiOrder.bookIds.map(bookId => ({
-            bookId,
-            quantity: 1,
-            price: 0, // Will be updated when book data loads
-          })),
-        }));
-        
-        setOrders(convertedOrders);
+        const orders = await getBorrowingOrders();
+        setOrders(orders);
         
         const booksMapping: Record<string, Book> = {};
-        for (const order of convertedOrders) {
+        for (const order of orders) {
           for (const bookId of order.bookIds) {
             try {
               const book = await getBookById(bookId);
