@@ -1,5 +1,6 @@
 .DS_Store
 .venv
+venv/
 .env
 __pycache__
 .pytest_cache
@@ -10,3 +11,8 @@ __pycache__
 .env.test.local
 .env.production.local
 .pem
+
+# Alembic local config
+alembic.ini
+alembic/
+node_modules/

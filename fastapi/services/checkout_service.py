@@ -68,10 +68,7 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
                 )
 
     return results
-
-# -------- Create Checkout --------
 async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
-    # Step 1: Initialize checkout record
     checkout = Checkout(
         checkout_id=str(uuid.uuid4()),
         user_id=checkoutIn.userId,
@@ -85,17 +82,54 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
         status="PENDING",
     )
 
-    # Step 2: Initialize accumulators
+    checkout = await _apply_checkout_data(db, checkout, checkoutIn)
+
+    db.add(checkout)
+    db.commit()
+    db.refresh(checkout)
+    return checkout
+
+async def update_checkout(db: Session, checkout_id: str, checkoutIn: CheckoutCreate):
+    checkout = db.query(Checkout).filter(
+        Checkout.checkout_id == checkout_id,
+        Checkout.status == "PENDING"
+    ).first()
+
+    if not checkout:
+        raise HTTPException(status_code=404, detail="Checkout not found or not editable")
+
+    # Update address fields
+    checkout.contact_name = checkoutIn.contactName
+    checkout.phone = checkoutIn.phone
+    checkout.street = checkoutIn.street
+    checkout.city = checkoutIn.city
+    checkout.postcode = checkoutIn.postcode
+    checkout.state = checkoutIn.state
+    checkout.country = checkoutIn.country
+
+    checkout = await _apply_checkout_data(db, checkout, checkoutIn)
+
+    db.commit()
+    db.refresh(checkout)
+    return checkout
+
+
+async def _apply_checkout_data(db: Session, checkout: Checkout, checkoutIn: CheckoutCreate):
     depositTotal = 0.0
     priceTotal = 0.0
-
-    # Step 3: Build ownerData dict (zipcode + serviceCode)
     ownerData = {}
+
+    # Step A: clear existing items
+    checkout.items.clear()
+    db.flush()
+
+    # Step B: ownerData + items
     for itemIn in checkoutIn.items:
         user = db.query(User).filter(User.user_id == itemIn.ownerId).first()
         if not user or not user.zip_code:
             raise HTTPException(
-                status_code=400, detail=f"Zipcode not found for owner {itemIn.ownerId}"
+                status_code=400,
+                detail=f"Zipcode not found for owner {itemIn.ownerId}"
             )
 
         ownerData[itemIn.ownerId] = {
@@ -103,13 +137,11 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
             "serviceCode": getattr(itemIn, "serviceCode", "AUS_PARCEL_REGULAR"),
         }
 
-        # Add to totals
         if itemIn.actionType.upper() == "PURCHASE" and itemIn.price:
             priceTotal += float(itemIn.price)
         elif itemIn.actionType.upper() == "BORROW" and itemIn.deposit:
             depositTotal += float(itemIn.deposit)
 
-        # Create checkout item)
         item = CheckoutItem(
             item_id=str(uuid.uuid4()),
             checkout_id=checkout.checkout_id,
@@ -119,16 +151,13 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
             price=itemIn.price,
             deposit=itemIn.deposit,
             shipping_method=itemIn.shippingMethod,
-            shipping_quote=0.0, 
+            shipping_quote=0.0,
             service_code=getattr(itemIn, "serviceCode", "AUS_PARCEL_REGULAR"),
         )
         checkout.items.append(item)
 
-    # Step 4: Call shipping calculator
+    # Step C: calculate shipping fee
     shippingFees = await calculate_shipping_fee(checkoutIn.items, checkoutIn.postcode, ownerData)
-
-    
-    # Step 5: update item 的 shipping_quote
     shippingFeeTotal = 0.0
     processedOwners = set()
     for item in checkout.items:
@@ -138,31 +167,26 @@ async def create_checkout(db: Session, checkoutIn: CheckoutCreate):
                 shippingFeeTotal += float(item.shipping_quote)
                 processedOwners.add(item.owner_id)
 
-    # Step 6: Get service fee percentage from service_fee table
+    # Step D: service fee
     serviceFeeRate = (
         db.query(ServiceFee)
         .filter(ServiceFee.status == True, ServiceFee.fee_type == "PERCENT")
         .order_by(ServiceFee.created_at.desc())
         .first()
     )
-
     serviceFeeAmount = 0.0
     if serviceFeeRate:
         serviceFeeAmount = (priceTotal + depositTotal) * float(serviceFeeRate.value) / 100.0
 
-    # Step 7: Save totals into checkout record
+    # Step E: update checkout totals
     checkout.deposit = depositTotal
+    checkout.book_fee = priceTotal
     checkout.service_fee = serviceFeeAmount
     checkout.shipping_fee = shippingFeeTotal
     checkout.total_due = depositTotal + priceTotal + serviceFeeAmount + shippingFeeTotal
 
-    # Step 8: Commit to database
-    db.add(checkout)
-    db.commit()
-    db.refresh(checkout)
     return checkout
 
-# -------- Retrieve Pending Checkouts for a User --------
 
 
 def get_pending_checkouts_by_user_id(db: Session, user_id: str):
@@ -174,8 +198,6 @@ def get_pending_checkouts_by_user_id(db: Session, user_id: str):
         .filter(Checkout.user_id == user_id, Checkout.status == "PENDING")
         .all()
     )
-
-# -------- Delete Checkout --------
 
 
 def delete_checkout(db: Session, checkout_id: str) -> bool:
@@ -192,3 +214,4 @@ def delete_checkout(db: Session, checkout_id: str) -> bool:
     db.delete(checkout)
     db.commit()
     return True
+
