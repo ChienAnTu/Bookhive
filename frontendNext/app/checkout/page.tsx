@@ -69,7 +69,14 @@ export default function CheckoutPage() {
 
   const [rebuilding, setRebuilding] = useState(false);
   const [loading, setLoading] = useState(false);
-
+const checkoutFields = [
+      { f: "contactName", label: "Full Name" },
+      { f: "phone", label: "Phone Number" },
+      { f: "street", label: "Street Address" },
+      { f: "city", label: "City" },
+      { f: "state", label: "State" },
+      { f: "postcode", label: "Postcode" },
+    ];
   // 1. load current user, fill address info
   useEffect(() => {
     async function loadUser() {
@@ -260,7 +267,7 @@ export default function CheckoutPage() {
       }
     }
     setQuotesByOwner(result);
-    // ✅ 默认选择 Standard
+    // default Standard
     const defaults: Record<string, ShippingQuote> = {};
     for (const [ownerId, quotes] of Object.entries(result)) {
       const std = quotes.find((q) => q.serviceLevel === "Standard");
@@ -268,10 +275,9 @@ export default function CheckoutPage() {
     }
     setSelectedQuoteByOwner(defaults);
 
-    // 默认设置 global choice = standard
     setGlobalShippingChoice("standard");
 
-    // 顺便触发一次 rebuildCheckout，把默认选择带上
+    // rebuildCheckout
     if (Object.keys(defaults).length > 0) {
       const cleaned = Object.fromEntries(
         fullItems.map((it) => [it.bookId, itemShipping[it.bookId]])
@@ -404,8 +410,8 @@ export default function CheckoutPage() {
           {/* address form */}
           {checkouts.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {["contactName", "phone", "street", "city", "state", "postcode"].map((f) => (
-                <Input key={f} label={f} value={checkouts[0][f] || ""} disabled={!isEditing}
+              {checkoutFields.map(({ f, label }) => (
+                <Input key={f} label={label} value={checkouts[0][f] || ""} disabled={!isEditing}
                   onChange={(e) => setCheckouts((prev) => prev.length ? [{ ...prev[0], [f]: e.target.value }] : prev)}
                 />
               ))}
@@ -552,7 +558,7 @@ export default function CheckoutPage() {
         <div className="p-4 space-y-2">
           <h2 className="text-lg font-semibold">Order Summary</h2>
           <div className="flex justify-between text-sm">
-            <span>Deposits</span>
+            <span>Deposits (Refundable)</span>
             <span>${checkouts[0]?.deposit?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
@@ -560,11 +566,11 @@ export default function CheckoutPage() {
             <span>${checkouts[0]?.bookFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Shipping (selected)</span>
+            <span>Shipping</span>
             <span>${checkouts[0]?.shippingFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Platform Service Fees</span>
+            <span>Platform Service Fees (10%)</span>
             <span>${checkouts[0]?.serviceFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-lg font-bold border-t pt-2">
