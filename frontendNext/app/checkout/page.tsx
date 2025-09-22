@@ -13,7 +13,7 @@ import { getBookById } from "@/utils/books";
 import { getMyCheckouts, rebuildCheckout } from "@/utils/checkout";
 import { listServiceFees } from "@/utils/serviceFee";
 import { getShippingQuotes } from "@/utils/shipping";
-import { createOrder } from "@/utils/orders";
+import { createOrder } from "@/utils/borrowingOrders";
 
 // When the page loads → Check if checkout exists, create a new one if not
 // The total amount is based on the calculation result returned by the backend
