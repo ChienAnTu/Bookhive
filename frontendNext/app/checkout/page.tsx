@@ -13,7 +13,7 @@ import { getBookById } from "@/utils/books";
 import { getMyCheckouts, rebuildCheckout } from "@/utils/checkout";
 import { listServiceFees } from "@/utils/serviceFee";
 import { getShippingQuotes } from "@/utils/shipping";
-import { X } from "lucide-react";
+import { createOrder } from "@/utils/borrowingOrders";
 
 // When the page loads → Check if checkout exists, create a new one if not
 // The total amount is based on the calculation result returned by the backend
@@ -68,6 +68,7 @@ export default function CheckoutPage() {
   const [isEditing, setIsEditing] = useState(false);
 
   const [rebuilding, setRebuilding] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // 1. load current user, fill address info
   useEffect(() => {
@@ -349,8 +350,20 @@ export default function CheckoutPage() {
       return;
     }
 
-    alert(`Order placed! Total due: $${checkoutToUse.totalDue}`);
-    router.push(`/borrowing/${checkoutToUse.checkoutId}`);
+    try {
+      setLoading(true);
+      const checkoutId = currentCheckout?.checkoutId;
+      const result = await createOrder(checkoutId);
+      console.log("Order created:", result);
+
+      alert(`Order placed! Total due: $${checkoutToUse.totalDue}`);
+      router.push(`/borrowing`);
+    } catch (err: any) {
+      console.error("Failed to place order:", err);
+      alert(err.response?.data?.detail || "Failed to place order");
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -544,7 +557,7 @@ export default function CheckoutPage() {
           </div>
           <div className="flex justify-between text-sm">
             <span>Purchase Price</span>
-            <span>${checkouts[0]?.price?.toFixed(2) || "0.00"}</span>
+            <span>${checkouts[0]?.bookFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Shipping (selected)</span>
