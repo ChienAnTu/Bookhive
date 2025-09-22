@@ -525,3 +525,26 @@ CREATE TABLE `bans` (
 -- ----------------------------
 BEGIN;
 COMMIT;
+
+-- ----------------------------
+-- Table structure for blacklists
+-- ----------------------------
+DROP TABLE IF EXISTS `blacklists`;
+CREATE TABLE `blacklists` (
+  `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `blocked_user_id` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_user_blocked` (`user_id`,`blocked_user_id`),
+  KEY `fk_blacklist_user` (`user_id`),
+  KEY `fk_blacklist_blocked` (`blocked_user_id`),
+  CONSTRAINT `fk_blacklist_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_blacklist_blocked` FOREIGN KEY (`blocked_user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Records of blacklists
+-- ----------------------------
+BEGIN;
+COMMIT;
