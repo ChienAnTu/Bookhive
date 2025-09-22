@@ -436,6 +436,40 @@ When a message is sent, receivers connected via WebSocket get:
 - Security: All endpoints require authentication; WebSocket uses token in query.
 - Test in Swagger (authorize with "Bearer <token>") or Postman.
 
+## Ban Management
+The ban system allows admins to ban users, list bans, and unban users. Bans prevent users from logging in.
+
+### Endpoints
+- **POST /api/v1/bans**: Create a new ban (admin only).
+  - **Headers**: Authorization: Bearer <token>
+  - **Body**:
+    ```json
+    {
+      "user_id": "user-uuid",
+      "reason": "Violation of terms"
+    }
+    ```
+  - **Response**:
+    ```json
+    {
+      "ban_id": "ban-uuid",
+      "user_id": "user-uuid",
+      "reason": "Violation of terms",
+      "banned_at": "2025-09-22T08:00:00",
+      "banned_by": "admin-uuid",
+      "is_active": true
+    }
+    ```
+
+- **GET /api/v1/bans**: List all bans (admin only).
+  - **Headers**: Authorization: Bearer <token>
+  - **Response**: Array of ban objects as above.
+
+- **DELETE /api/v1/bans/{ban_id}**: Unban a user by deactivating the ban (admin only).
+  - **Headers**: Authorization: Bearer <token>
+  - **Response**: Updated ban object with is_active: false.
+
+Banned users cannot log in; checks are performed during authentication.
 
 ## Project Structure
 - Overall:
@@ -454,17 +488,20 @@ BookHive/
 │ │ ├── init.py
 │ │ ├── base.py # SQLAlchemy base model
 │ │ ├── user.py # User model
-│ │ └── message.py # Message model
+│ │ ├── message.py # Message model
+│ │ └── ban.py # Ban model
 │ ├── routes/ # API routes
 │ │ ├── init.py
 │ │ ├── auth.py # Authentication endpoints
 │ │ ├── users.py # User management endpoints
 │ │ └── message_routes.py # Message endpoints
+│ │   └── bans.py # Ban management endpoints
 │ ├── services/ # Business logic
 │ │ ├── init.py
 │ │ ├── auth_service.py # Authentication services
 │ │ ├── user_service.py # User CRUD operations
 │ │ └── message_service.py # Message operations
+│ │   └── ban_service.py # Ban operations
 │ ├── database/ # Database handling
 │ │ ├── init.py
 │ │ ├── connection.py # Database connection
