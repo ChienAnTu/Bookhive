@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, MapPin, Calendar, Book, Edit } from "lucide-react";
 import { getCurrentUser, isAuthenticated } from "../../utils/auth";
-import { getBorrowingOrders, getLendingOrders } from "@/utils/orders";
+import { getBorrowingOrders, getLendingOrders } from "@/utils/borrowingOrders";
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
