@@ -471,6 +471,24 @@ The ban system allows admins to ban users, list bans, and unban users. Bans prev
 
 Banned users cannot log in; checks are performed during authentication.
 
+## Blacklist Management
+Users can blacklist others to prevent them from sending messages or potentially other interactions.
+
+### Endpoints
+- **POST /api/v1/blacklists**: Add a user to your blacklist.
+  - **Body**:
+    ```json
+    {
+      "blocked_user_id": "user-uuid"
+    }
+    ```
+
+- **DELETE /api/v1/blacklists/{blocked_user_id}**: Remove a user from your blacklist.
+
+- **GET /api/v1/blacklists**: List all users in your blacklist (returns array of user_ids).
+
+Blacklisted users cannot send messages to the blocker.
+
 ## Project Structure
 - Overall:
 ```
@@ -490,18 +508,21 @@ BookHive/
 │ │ ├── user.py # User model
 │ │ ├── message.py # Message model
 │ │ └── ban.py # Ban model
+│ │     └── blacklist.py # Blacklist model
 │ ├── routes/ # API routes
 │ │ ├── init.py
 │ │ ├── auth.py # Authentication endpoints
 │ │ ├── users.py # User management endpoints
 │ │ └── message_routes.py # Message endpoints
 │ │   └── bans.py # Ban management endpoints
+│ │   └── blacklists.py # Blacklist management endpoints
 │ ├── services/ # Business logic
 │ │ ├── init.py
 │ │ ├── auth_service.py # Authentication services
 │ │ ├── user_service.py # User CRUD operations
 │ │ └── message_service.py # Message operations
 │ │   └── ban_service.py # Ban operations
+│ │   └── blacklist_service.py # Blacklist operations
 │ ├── database/ # Database handling
 │ │ ├── init.py
 │ │ ├── connection.py # Database connection
