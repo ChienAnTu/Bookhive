@@ -6,6 +6,7 @@ from jose import JWTError
 from database.connection import SessionLocal
 from core.security import decode_access_token
 from models.user import User
+from models.ban import Ban
 
 bearer_scheme = HTTPBearer()
 
@@ -35,4 +36,11 @@ def get_current_user(
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         raise credentials_exception
+    # Check if user is banned
+    active_ban = db.query(Ban).filter(Ban.user_id == user.user_id, Ban.is_active == True).first()
+    if active_ban:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User is banned: {active_ban.reason}"
+        )
     return user
