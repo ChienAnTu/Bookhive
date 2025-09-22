@@ -75,15 +75,17 @@ const ProfilePage: React.FC = () => {
 
   // Count orders by status
   const ongoingLending = lendingOrders.filter(
-    (order) => order.status === "BORROWING"
+    (order) => order.status && !order.status.toLowerCase().includes("completed")
   ).length;
   const ongoingBorrowing = borrowingOrders.filter(
-    (order) => order.status === "BORROWING"
+    (order) => order.status && !order.status.toLowerCase().includes("completed")
   ).length;
   const shippingOrders = [...lendingOrders, ...borrowingOrders].filter(
-    (order) =>
-      (order.borrowerId === currentUser.id || order.ownerId === currentUser.id) &&
-      order.status === "PENDING_SHIPMENT"
+    (order) => order.status && (
+      order.status.toLowerCase().includes("shipping") || 
+      order.status.toLowerCase().includes("transit") ||
+      order.status.toLowerCase().includes("pending")
+    )
   ).length;
 
   // Format join date from createdAt
