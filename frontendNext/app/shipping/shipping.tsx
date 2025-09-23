@@ -16,7 +16,7 @@ const ShippingPage: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!isAuthenticated()) {
-        router.push("/login");
+        router.push("/auth");
         return;
       }
 
@@ -27,7 +27,7 @@ const ShippingPage: React.FC = () => {
           const ordersData = await getOrders();
           setOrders(ordersData);
         } else {
-          router.push("/login");
+          router.push("/auth");
         }
       } catch (error) {
         console.error("Failed to load data:", error);
