@@ -40,7 +40,7 @@ interface CheckoutItem {
   bookId: string;
   ownerId: string;
   titleOr: string;
-  actionType: "BORROW" | "PURCHASE";
+  actionType: "borrow" | "purchase";
   price?: number;
   deposit?: number;
   deliveryMethod?: "post" | "pickup" | "both";
@@ -446,7 +446,7 @@ const checkoutFields = [
                             <div className="font-medium">
                               《{b.titleOr}》
                               <span className="text-sm text-blue-600">
-                                Trading Way: {b.actionType === "BORROW" ? "Borrow" : "Purchase"}
+                                Trading Way: {b.actionType === "borrow" ? "Borrow" : "Purchase"}
                               </span>
                             </div>
                           </div>
