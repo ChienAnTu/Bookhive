@@ -186,6 +186,13 @@ class OrderService:
     
     @staticmethod
     def create_orders_data_with_validation(db: Session, checkout: Checkout, user_id: str):
+        # Idempotency: only PENDING checkout can create orders
+        if getattr(checkout, "status", "").upper() != "PENDING":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Checkout {getattr(checkout, 'checkout_id', '')} status is {checkout.status}, cannot create orders again."
+            )
+
         orders_data_without_price = OrderService.split_checkout_to_orders(checkout, db, user_id=user_id)
         orders_data = OrderService.add_calculate_order_amounts(db, orders_data=orders_data_without_price)
         created_orders = []
@@ -223,6 +230,7 @@ class OrderService:
                 db.add(order_book)
 
                 # Update book status to 'unlisted'
+                # TODO: book status need to be 'lent' or 'unlisted'?
                 book = db.query(Book).filter(Book.id == item.book_id).first()
                 if book:
                     book.status = "unlisted"
@@ -265,3 +273,108 @@ class OrderService:
                 "books": books_info    
             })
         return result
+    
+# ---------------- Added: state machine helper methods ----------------
+
+    @staticmethod
+    def set_initial_status_after_payment(db: Session, orders: List[Order]) -> None:
+        """
+        After successful payment and orders created, set all order statuses to PENDING_SHIPMENT.
+        """
+        for o in orders:
+            o.status = "PENDING_SHIPMENT"
+            db.add(o)
+        db.commit()
+
+    @staticmethod
+    def mark_order_shipped(
+        db: Session,
+        order_id: str,
+        carrier: str | None = None,
+        tracking_number: str | None = None,
+        tracking_url: str | None = None,
+    ) -> Order:
+        """
+        Shipping: update shipping/tracking fields.
+        - Borrow: status -> BORROWING, books -> lent, start_at = now
+        - Purchase: keep PENDING_SHIPMENT (set to COMPLETED only after transfer), only record shipping info
+        """
+        order: Order | None = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Precondition: only allow transition from PENDING_SHIPMENT to shipping states
+        if (order.action_type == "borrow" and order.status not in ("PENDING_SHIPMENT", "BORROWING")) \
+           or (order.action_type == "purchase" and order.status != "PENDING_SHIPMENT"):
+            raise HTTPException(status_code=409, detail=f"Invalid state transition for mark_shipped: {order.status}")
+
+        # Write logistics info (idempotent safe)
+        if carrier:
+            order.shipping_out_carrier = carrier
+        if tracking_number:
+            order.shipping_out_tracking_number = tracking_number
+        if tracking_url:
+            order.shipping_out_tracking_url = tracking_url
+
+        # Borrow: first time marking shipped → BORROWING + books set to lent + start_at
+        if order.action_type == "borrow" and order.status == "PENDING_SHIPMENT":
+            order.status = "BORROWING"
+            order.start_at = datetime.now(timezone.utc)
+            for ob in order.books:
+                if ob.book:
+                    ob.book.status = "lent"
+                    db.add(ob.book)
+
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
+
+    @staticmethod
+    def complete_purchase(db: Session, order_id: str) -> Order:
+        """
+        Purchase completed (after successful transfer): status -> COMPLETED, books -> sold, completed_at = now
+        """
+        order: Order | None = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        if order.action_type != "purchase":
+            raise HTTPException(status_code=409, detail="Only purchase orders can be completed via this endpoint")
+        if order.status != "PENDING_SHIPMENT":
+            raise HTTPException(status_code=409, detail=f"Invalid state for purchase completion: {order.status}")
+
+        order.status = "COMPLETED"
+        order.completed_at = datetime.now(timezone.utc)
+        for ob in order.books:
+            if ob.book:
+                ob.book.status = "sold"
+                db.add(ob.book)
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
+
+    @staticmethod
+    def complete_borrow(db: Session, order_id: str) -> Order:
+        """
+        Borrow return completed (after deposit refunded): status -> COMPLETED, books -> listed, completed_at = now
+        """
+        order: Order | None = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        if order.action_type != "borrow":
+            raise HTTPException(status_code=409, detail="Only borrow orders can be returned via this endpoint")
+        if order.status != "BORROWING":
+            raise HTTPException(status_code=409, detail=f"Invalid state for borrow completion: {order.status}")
+
+        order.status = "COMPLETED"
+        order.completed_at = datetime.now(timezone.utc)
+        for ob in order.books:
+            if ob.book:
+                ob.book.status = "listed"
+                db.add(ob.book)
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
+

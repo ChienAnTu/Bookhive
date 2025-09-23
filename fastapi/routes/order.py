@@ -19,33 +19,33 @@ router = APIRouter(tags=["orders"])
 
 
 # API Models
-class CreateOrderRequest(BaseModel):
-    checkout_id: str
+# class CreateOrderRequest(BaseModel):
+#     checkout_id: str
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def create_order(
-    request: CreateOrderRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+# @router.post("/", status_code=status.HTTP_201_CREATED)
+# def create_order(
+#     request: CreateOrderRequest,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
 
-    checkout = db.query(Checkout).filter(Checkout.checkout_id == request.checkout_id).first()
-    if not checkout:
-        raise HTTPException(status_code=404, detail=f"Checkout {request.checkout_id} not found")
+#     checkout = db.query(Checkout).filter(Checkout.checkout_id == request.checkout_id).first()
+#     if not checkout:
+#         raise HTTPException(status_code=404, detail=f"Checkout {request.checkout_id} not found")
     
-    if checkout.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+#     if checkout.user_id != current_user.user_id:
+#         raise HTTPException(status_code=403, detail="Access denied")
     
-    created_orders = OrderService.create_orders_data_with_validation(db, checkout, user_id=current_user.user_id)
-    return {
-        "message": "Orders created successfully",
-        "orders": [
-            {
-                "id": order.id,
-            }
-            for order in created_orders
-        ],
-    }
+#     created_orders = OrderService.create_orders_data_with_validation(db, checkout, user_id=current_user.user_id)
+#     return {
+#         "message": "Orders created successfully",
+#         "orders": [
+#             {
+#                 "id": order.id,
+#             }
+#             for order in created_orders
+#         ],
+#     }
 
 @router.get("/", response_model=List[OrderSummary], status_code=status.HTTP_200_OK)
 def list_my_orders(

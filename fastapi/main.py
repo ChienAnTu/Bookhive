@@ -16,6 +16,8 @@ from routes.checkout import router as checkout_router  # Import checkout router
 from routes.mail import router as mail_router
 from routes.payment_gateway import router as payment_gateway_router
 from routes.order import router as orders_router
+from routes.stripe_connect import router as stripe_connect_router
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -71,6 +73,10 @@ app.include_router(mail_router)
 
 # payment gateway router
 app.include_router(payment_gateway_router) 
+
+# Stripe connect account router
+app.include_router(stripe_connect_router)
+
 # order router
 app.include_router(orders_router, prefix="/api/v1/orders")
 

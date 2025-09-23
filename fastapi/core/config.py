@@ -67,5 +67,10 @@ class Settings:
         allowed_origins_str = os.getenv('ALLOWED_ORIGINS', '*')
         self.ALLOWED_ORIGINS = [origin.strip() for origin in allowed_origins_str.split(',')]
 
+        # Public URLs for redirect defaults (dev-friendly)
+        self.FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        self.API_PUBLIC_URL = os.getenv('API_PUBLIC_URL', 'http://localhost:8000')
+
+
 # Instantiate settings (will raise errors if required vars are missing)
 settings = Settings()

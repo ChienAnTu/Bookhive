@@ -1,14 +1,19 @@
-import stripe
-import uuid
+# fastapi/services/payment_gateway_service.py
 import os
+import uuid
+import stripe
 from datetime import datetime
-from sqlalchemy.orm import Session
-from models.service_fee import ServiceFee, ServiceFeeUpdate
-from models.payment_gateway import Payment, Refund, Dispute, AuditLog, Donation
 from functools import wraps
-from typing import Callable
-from fastapi import Request, HTTPException
+from typing import Callable, Optional, List, Dict
 
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import func as sa_func
+
+from models.payment_gateway import Payment, Refund, Dispute, AuditLog, Donation
+from models.checkout import Checkout
+from models.order import Order
+from models.payment_split import PaymentSplit
 
 # -------- Helpers --------
 def log_event(db: Session, event_type: str, reference_id: str = None, actor: str = None, message: str = None):
@@ -20,12 +25,18 @@ def log_event(db: Session, event_type: str, reference_id: str = None, actor: str
         reference_id=reference_id,
         actor=actor,
         message=message,
-        created_at=datetime.utcnow() 
+        created_at=datetime.utcnow()
     )
     db.add(log)
     db.commit()
     return log.id
 
+# Money helpers (avoid floating point errors)
+def to_cents(amount_dollars: float | int) -> int:
+    return int(round(float(amount_dollars) * 100))
+
+def to_dollars(amount_cents: int | None) -> float:
+    return (amount_cents or 0) / 100.0
 
 def audit(event_type: str):
     """
@@ -47,13 +58,14 @@ def audit(event_type: str):
                 if isinstance(result, dict):
                     reference_id = result.get("payment_id") or result.get("dispute_id")
 
-                log_event(
-                    db,
-                    event_type=event_type,
-                    reference_id=reference_id,
-                    actor=actor,
-                    message=f"{event_type} executed successfully"
-                )
+                if db:
+                    log_event(
+                        db,
+                        event_type=event_type,
+                        reference_id=reference_id,
+                        actor=actor,
+                        message=f"{event_type} executed successfully"
+                    )
 
                 return result
             except Exception as e:
@@ -74,21 +86,22 @@ def audit(event_type: str):
 @audit("payment_initiated")
 def initiate_payment(data: dict, db: Session):
     """
-    1. Create PaymentIntent with Stripe
+    1. Create PaymentIntent with Stripe (platform charge)
     2. Extract client_secret
     3. Save payment record into DB
     4. Return client_secret to frontend
     """
-
     user_id = data.get("user_id")
     amount = data.get("amount")
-    currency = data.get("currency", "usd")
+    currency = data.get("currency") or "aud"
     deposit = data.get("deposit", 0)
     shipping_fee = data.get("shipping_fee", 0)
     service_fee = data.get("service_fee", 0)
-    lender_account_id = data.get("lender_account_id")
+    checkout_id = data.get("checkout_id", "")
 
-    total_amount = amount + deposit + shipping_fee + service_fee
+    total_amount = amount if amount is not None else (deposit + shipping_fee + service_fee)
+    if total_amount is None or int(total_amount) <= 0:
+        raise HTTPException(status_code=400, detail="Invalid total amount (cents) for PaymentIntent")
 
     try:
         # 1. Create Stripe PaymentIntent
@@ -96,14 +109,16 @@ def initiate_payment(data: dict, db: Session):
             amount=total_amount,
             currency=currency,
             payment_method_types=["card"],
-            capture_method="manual",
-            transfer_data={"destination": lender_account_id},
+            capture_method="automatic",
             metadata={
+                "type": "payment",
                 "user_id": user_id,
-                "deposit": deposit,
-                "shipping_fee": shipping_fee,
-                "service_fee": service_fee,
+                "checkout_id": checkout_id,
+                "deposit": str(deposit),
+                "shipping_fee": str(shipping_fee),
+                "service_fee": str(service_fee),
             },
+            idempotency_key=f"pi:init:{user_id}:{uuid.uuid4()}",
         )
 
         # 2. Extract client_secret
@@ -115,7 +130,7 @@ def initiate_payment(data: dict, db: Session):
             user_id=user_id,
             amount=total_amount,
             currency=currency,
-            status=intent.status,
+            status=str(intent.status),
             deposit=deposit,
             shipping_fee=shipping_fee,
             service_fee=service_fee,
@@ -142,49 +157,17 @@ def initiate_payment(data: dict, db: Session):
         return {"error": str(e)}, 400
 
 
-def get_payment_status(payment_id: str):
+def get_payment_status(payment_id: str, db: Session = None):
     """
-    1. Retrieve PaymentIntent from Stripe using payment_id
-    2. Extract relevant fields such as status, amount, currency
-    3. Return current status and details to frontend
-    (No DB operations are performed here)
+    Retrieve PaymentIntent from Stripe and return minimal status.
     """
     try:
         intent = stripe.PaymentIntent.retrieve(payment_id)
         return {
             "payment_id": intent.id,
-            "status": intent.status,
-            "amount": intent.amount,
-            "currency": intent.currency,
+            "status": intent.status
         }
     except stripe.error.StripeError as e:
-        return {"error": str(e)}, 400
-
-
-@audit("capture_initiated")
-def capture_payment(payment_id: str, db: Session):
-    """
-    1. Retrieve the PaymentIntent from Stripe
-    2. Capture the held amount (manual capture)
-    3. Return confirmation details
-    """
-    try:
-        intent = stripe.PaymentIntent.capture(payment_id)
-
-        payment = db.query(Payment).filter_by(payment_id=payment_id).first()
-        if payment:
-            payment.status = intent.status
-            payment.amount = intent.amount  # or intent.amount_captured
-            db.commit()
-            db.refresh(payment)
-        
-        return {
-            "payment_id": intent.id,
-            "status": intent.status,   # should now be 'succeeded'
-            "amount_captured": intent.amount_captured,
-        }
-    except stripe.error.StripeError as e:
-        db.rollback()
         return {"error": str(e)}, 400
 
 
@@ -215,14 +198,21 @@ def refund_payment(payment_id: str, data: dict, db: Session):
         )
         db.add(refund_record)
 
-        # 3. Update payment status
+        # 3. Update payment status (Fix: include this refund)
         payment = db.query(Payment).filter_by(payment_id=payment_id).first()
         if payment:
-            # Being able to know wether it be partial refund or entire refund
-            if refund.amount == payment.amount:
-                payment.status = "refunded"
+            db.flush()
+            sum_refunded = db.query(sa_func.coalesce(sa_func.sum(Refund.amount), 0))\
+                 .filter(Refund.payment_id == payment_id)\
+                 .scalar()
+
+            total_refunded_after = int(sum_refunded or 0)
+            deposit_cents = int((payment.deposit or 0))
+
+            if total_refunded_after >= deposit_cents:
+                payment.status = "refunded"              # Deposit fully refunded
             else:
-                payment.status = "partially_refunded"
+                payment.status = "partially_refunded"    # Deposit partially refunded
 
         db.commit()
 
@@ -241,13 +231,43 @@ def refund_payment(payment_id: str, data: dict, db: Session):
         return {"error": str(e)}, 400
 
 
+@audit("payment_canceled")
+def cancel_payment(payment_id: str, db: Session):
+    """
+    Cancel a PaymentIntent on Stripe and update DB.
+    Allowed only when PaymentIntent has NOT succeeded yet.
+    """
+    try:
+        intent = stripe.PaymentIntent.retrieve(payment_id)
+        status = intent.status
+
+        # Can only cancel in these statuses; succeeded / processing / canceled are not allowed
+        cancellable_statuses = {"requires_payment_method", "requires_action", "requires_confirmation"}
+        if status not in cancellable_statuses:
+            raise HTTPException(status_code=409, detail=f"PaymentIntent status '{status}' cannot be canceled")
+
+        canceled = stripe.PaymentIntent.cancel(payment_id)
+
+        # Update DB payments.status
+        payment = db.query(Payment).filter_by(payment_id=payment_id).first()
+        if payment:
+            payment.status = "canceled"
+            db.add(payment)
+            db.commit()
+
+        log_event(db, "payment_canceled", reference_id=payment_id, actor="system")
+        return {
+            "payment_id": payment_id,
+            "status": canceled.status
+        }
+
+    except stripe.error.StripeError as e:
+        db.rollback()
+        # Convert to 400 for frontend
+        raise HTTPException(status_code=400, detail=str(e))
+
 @audit("dispute_created")
 def create_dispute(payment_id: str, data: dict, db: Session):
-    """
-    1. Create a new dispute record linked to a payment
-    2. Save to DB
-    3. Return dispute details
-    """
     dispute = Dispute(
         dispute_id=str(uuid.uuid4()),
         payment_id=payment_id,
@@ -272,36 +292,44 @@ def create_dispute(payment_id: str, data: dict, db: Session):
 
 @audit("dispute_resolved")
 def handle_dispute(payment_id: str, data: dict, db: Session):
-    """
-    Admin resolves a dispute by recording the decision in DB.
-    Actions:
-      - adjust   → partial deposit will be kept (capture later)
-      - overrule → dispute rejected, full deposit will be kept (capture later)
-    Stripe is NOT called here. Only DB is updated.
-    """
     action = data.get("action")
     note = data.get("note", "")
     deduction = data.get("deduction")
 
-    # 1. Find payment
     payment = db.query(Payment).filter_by(payment_id=payment_id).first()
     if not payment:
         return {"error": "Payment not found"}, 404
 
-    # 2. Find dispute
     dispute = db.query(Dispute).filter_by(payment_id=payment_id, status="open").first()
     if not dispute:
         return {"error": "No open dispute found"}, 404
 
-    # 3. Update based on action
     if action == "adjust":
-        if not deduction or deduction < 0:
-            return {"error": "deduction amount must be provided and > 0"}, 400
-        if payment.amount - deduction < 0:
-            return {"error": "deduction exceeds deposit amount"}, 400
-        
+        if deduction is None or int(deduction) < 0:
+            return {"error": "deduction must be provided and >= 0"}, 400
+
+        # Refundable deposit = sum of all splits.deposit_cents - already refunded
+        deposit_total = db.query(sa_func.coalesce(sa_func.sum(PaymentSplit.deposit_cents), 0))\
+            .filter(PaymentSplit.payment_id == payment_id).scalar() or 0
+        refunded_so_far = db.query(sa_func.coalesce(sa_func.sum(Refund.amount), 0))\
+            .filter(Refund.payment_id == payment_id).scalar() or 0
+        refundable = max(0, int(deposit_total) - int(refunded_so_far))
+
+        refund_amount = max(0, refundable - int(deduction))
+        if refund_amount > 0:
+            r = stripe.Refund.create(payment_intent=payment_id, amount=refund_amount)
+            db_refund = Refund(
+                refund_id=r.id,
+                payment_id=payment_id,
+                amount=refund_amount,
+                currency=r.currency,
+                status=r.status,
+                reason="dispute_adjust"
+            )
+            db.add(db_refund)
+
         dispute.status = "adjusted"
-        payment.amount -= deduction
+        dispute.note = (dispute.note or "") + f"\n[Deduction decided]: {deduction}"
 
     elif action == "overrule":
         dispute.status = "overruled"
@@ -309,9 +337,15 @@ def handle_dispute(payment_id: str, data: dict, db: Session):
     else:
         return {"error": "Invalid action"}, 400
 
-    # 4. Save admin note
     dispute.note = (dispute.note or "") + f"\n[Admin Note]: {note}"
+    db.commit()
 
+    # Update Payment status
+    sum_refunded = db.query(sa_func.coalesce(sa_func.sum(Refund.amount), 0))\
+        .filter(Refund.payment_id == payment_id).scalar() or 0
+    deposit_cents = int(payment.deposit or 0)
+    payment.status = "refunded" if int(sum_refunded) >= deposit_cents else "partially_refunded"
+    db.add(payment)
     db.commit()
 
     return {
@@ -323,28 +357,13 @@ def handle_dispute(payment_id: str, data: dict, db: Session):
     }
 
 
-
-def list_transactions():
-    # TODO: Query DB and return list of user transactions
-    return {"transactions": []}
-
-
-def get_transaction_detail(txn_id: str):
-    # TODO: Fetch details of a specific transaction from DB
-    return {"transaction_id": txn_id, "detail": {}}
-
-
 def view_logs(db: Session, limit: int):
-    """
-    Return latest admin audit logs.
-    """
     logs = (
         db.query(AuditLog)
         .order_by(AuditLog.created_at.desc())
         .limit(limit)
         .all()
     )
-
     return {
         "logs": [
             {
@@ -359,32 +378,22 @@ def view_logs(db: Session, limit: int):
         ]
     }
 
-
 @audit("donation_initiated")
 def initiate_donation(data: dict, db: Session):
-    """
-    1. Create Stripe PaymentIntent for donation
-    2. Extract client_secret
-    3. Save donation record into DB
-    4. Return client_secret to frontend
-    """
     user_id = data.get("user_id")
     amount = data.get("amount")
-    currency = data.get("currency", "usd")
+    currency = data.get("currency", "aud")
 
     try:
-        # 1. Create Stripe PaymentIntent
         intent = stripe.PaymentIntent.create(
             amount=amount,
             currency=currency,
-            capture_method="automatic",  
+            capture_method="automatic",
             metadata={"user_id": user_id, "type": "donation"},
         )
 
-        # 2. Extract client_secret
         client_secret = intent.client_secret
 
-        # 3. Save donation record in DB
         donation = Donation(
             donation_id=intent.id,
             user_id=user_id,
@@ -398,7 +407,6 @@ def initiate_donation(data: dict, db: Session):
         db.commit()
         db.refresh(donation)
 
-        # 4. Return client_secret
         return {
             "message": "Donation initiated",
             "donation_id": intent.id,
@@ -412,11 +420,7 @@ def initiate_donation(data: dict, db: Session):
         db.rollback()
         return {"error": str(e)}, 400
 
-
 def donation_history(user_id: str, db: Session):
-    """
-    Retrieve the donation history of a specific user.
-    """
     donations = (
         db.query(Donation)
         .filter_by(user_id=user_id)
@@ -438,16 +442,257 @@ def donation_history(user_id: str, db: Session):
         ]
     }
 
+# ---------- New: Payment confirmation & splits ----------
+def build_payment_splits_for_orders(db: Session, payment_id: str, orders: List[Order], currency: str = "aud"):
+    """
+    Create a PaymentSplit for each order:
+      - Purchase: transfer = sale price + shipping; service fee kept by platform
+      - Borrow: transfer = shipping (deposit kept by platform, refunded after return)
+    """
+    for order in orders:
+        owner_acct = (order.owner.stripe_account_id if order.owner else None)
+        if not owner_acct:
+            log_event(db, "owner_missing_connect", reference_id=order.id, actor="system",
+                      message=f"owner {order.owner_id} has no stripe_account_id")
+            continue
 
-async def stripe_webhook(request: Request, db: Session):
+        deposit_or_sale_cents = to_cents(order.deposit_or_sale_amount or 0)
+        shipping_cents = to_cents(order.shipping_out_fee_amount or 0)
+        service_fee_cents = to_cents(order.service_fee_amount or 0)
+
+        if order.action_type == "purchase":
+            transfer_cents = deposit_or_sale_cents + shipping_cents
+            deposit_cents = 0
+        else:
+            transfer_cents = shipping_cents
+            deposit_cents = deposit_or_sale_cents
+
+        sp = PaymentSplit(
+            payment_id=payment_id,
+            order_id=order.id,
+            owner_id=order.owner_id,
+            connected_account_id=owner_acct,
+            currency=currency or "aud",
+            deposit_cents=deposit_cents,
+            shipping_cents=shipping_cents,
+            service_fee_cents=service_fee_cents,
+            transfer_amount_cents=transfer_cents,
+        )
+        db.add(sp)
+    db.commit()
+
+def confirm_payment_and_create_orders(db: Session, payment_id: str, checkout_id: str, user_id: str):
+    """
+    1) Check PaymentIntent = succeeded
+    2) Generate orders from checkout (use OrderService)
+    3) Create payment_splits
+    """
+    intent = stripe.PaymentIntent.retrieve(payment_id)
+    status = intent.status
+    if status != "succeeded":
+        raise HTTPException(status_code=400, detail=f"Payment {payment_id} not succeeded (status={status})")
+
+    # Allow empty or missing checkout_id → fallback from PI.metadata
+    if not checkout_id:
+        meta = getattr(intent, "metadata", None) or {}
+        checkout_id = meta.get("checkout_id") or ""
+    if not checkout_id:
+        raise HTTPException(status_code=400, detail="Missing checkout_id (not provided and not found in PaymentIntent metadata)")
+
+    checkout = db.query(Checkout).filter(Checkout.checkout_id == checkout_id).first()
+    if not checkout:
+        raise HTTPException(status_code=404, detail=f"Checkout not found: {checkout_id}")
+
+    # (Optional) check if payer matches checkout owner
+    if getattr(checkout, "user_id", None) and checkout.user_id != user_id:
+        raise HTTPException(status_code=400, detail=f"User mismatch: checkout belongs to {checkout.user_id}, but confirm user is {user_id}")
+
+    from services.order_service import OrderService
+    try:
+        orders = OrderService.create_orders_data_with_validation(db, checkout=checkout, user_id=user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Create orders failed: {str(e)}")
+
+    # Initial order status after payment: pending shipment
+    OrderService.set_initial_status_after_payment(db, orders)
+
+    currency = intent.currency or "aud"
+    try:
+        build_payment_splits_for_orders(db, intent.id, orders, currency=currency)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Build payment splits failed: {str(e)}")
+
+    log_event(db, "payment_confirmed", reference_id=payment_id, actor=str(user_id), message=f"checkout_id={checkout_id}")
+
+    # --- DB: Sync Payment status to avoid relying solely on webhook updates ---
+    payment_row = db.query(Payment).filter_by(payment_id=intent.id).first()
+    if payment_row:
+        payment_row.status = intent.status or "succeeded"
+        # Use Stripe as the source of truth; fill in amount/currency while keeping existing values as fallback
+        try:
+            if getattr(intent, "amount", None):
+                payment_row.amount = int(intent.amount)
+            if getattr(intent, "currency", None):
+                payment_row.currency = str(intent.currency)
+        except Exception:
+            pass
+        payment_row.updated_at = datetime.utcnow()
+        db.add(payment_row)
+        db.commit()
+
+
+    return {
+        "payment_id": intent.id,
+        "orders_created": [o.id for o in orders]
+    }
+
+@audit("payment_status_synced")
+def sync_payment_status(payment_id: str, db: Session):
+    """
+    Read latest PaymentIntent status from Stripe and write back to payments table.
+    Useful in local testing when webhook is not available.
+    """
+    try:
+        intent = stripe.PaymentIntent.retrieve(payment_id)
+        payment_row = db.query(Payment).filter_by(payment_id=payment_id).first()
+        result = {
+            "payment_id": intent.id,
+            "stripe_status": intent.status,
+        }
+        if payment_row:
+            payment_row.status = intent.status
+            # Sync amount/currency (only overwrite if values exist)
+            if getattr(intent, "amount", None):
+                payment_row.amount = int(intent.amount)
+            if getattr(intent, "currency", None):
+                payment_row.currency = str(intent.currency)
+            payment_row.updated_at = datetime.utcnow()
+            db.add(payment_row)
+            db.commit()
+            result["db_status"] = payment_row.status
+        return result
+    except stripe.error.StripeError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def transfer_for_order(
+    db: Session,
+    order_id: str,
+    carrier: Optional[str] = None,
+    tracking_number: Optional[str] = None,
+    tracking_url: Optional[str] = None,
+):
+    """
+    Execute transfer for a single order (according to split.transfer_amount_cents).
+    - First update shipping info (borrow → BORROWING; purchase: only record shipping info)
+    - Purchase completion is decided by upper-level flow (this method is only responsible for transfer + shipping info)
+    """
+    order: Order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Update shipping information and status
+    from services.order_service import OrderService
+    order = OrderService.mark_order_shipped(
+        db,
+        order_id=order_id,
+        carrier=carrier,
+        tracking_number=tracking_number,
+        tracking_url=tracking_url,
+    )
+
+    splits = db.query(PaymentSplit).filter(PaymentSplit.order_id == order_id).all()
+    if not splits:
+        raise HTTPException(status_code=400, detail="No payment splits for this order")
+
+    performed: List[str] = []
+    for sp in splits:
+        if sp.transfer_amount_cents <= 0 or not sp.connected_account_id:
+            continue
+        tr = stripe.Transfer.create(
+            amount=sp.transfer_amount_cents,
+            currency=sp.currency or "aud",
+            destination=sp.connected_account_id,
+        )
+        sp.transfer_id = tr.id
+        sp.transfer_status = tr.status
+        db.add(sp)
+        performed.append(tr.id)
+
+    db.commit()
+    return {"order_id": order_id, "transfer_ids": performed}
+
+def refund_deposit_for_order(db: Session, order_id: str, amount_cents: Optional[int] = None):
+    """
+    Borrowing: after return, refund deposit (full or partial).
+    On successful refund, mark order as COMPLETED and set books back to 'listed'.
+    """
+    order: Order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    sp = db.query(PaymentSplit).filter(PaymentSplit.order_id == order_id).first()
+    if not sp:
+        raise HTTPException(status_code=404, detail="Payment split not found for order")
+
+    refundable = int(sp.deposit_cents or 0)
+    refund_amount = refundable if amount_cents is None else max(0, min(refundable, int(amount_cents)))
+
+    if refund_amount <= 0:
+        return {"order_id": order_id, "refunded": 0}
+
+    r = stripe.Refund.create(payment_intent=sp.payment_id, amount=refund_amount)
+    log_event(db, "refund_completed", reference_id=r.id, actor="system", message=f"{refund_amount} refunded")
+
+    # Create Refund record
+    db_refund = Refund(
+        refund_id=r.id,
+        payment_id=sp.payment_id,
+        amount=refund_amount,
+        currency=r.currency,
+        status=r.status,
+        reason=r.reason,
+    )
+    db.add(db_refund)
+    db.commit()
+
+    # Add back to orders.total_refunded_amount in dollars (your column is decimal(10,2))
+    try:
+        refunded_dollars = (refund_amount or 0) / 100.0
+        order.total_refunded_amount = (order.total_refunded_amount or 0) + refunded_dollars
+        db.add(order)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # Borrow: refund deposit = completion (including restoring book status)
+    from services.order_service import OrderService
+    OrderService.complete_borrow(db, order_id)
+
+    # Update Payment Status
+    payment = db.query(Payment).filter_by(payment_id=sp.payment_id).first()
+    if payment:
+        sum_refunded = db.query(sa_func.coalesce(sa_func.sum(Refund.amount), 0)).filter(Refund.payment_id == sp.payment_id).scalar() or 0
+        if int(sum_refunded) >= int(payment.deposit or 0):
+            payment.status = "refunded"
+        else:
+            payment.status = "partially_refunded"
+        db.add(payment)
+        db.commit()
+
+    return {"order_id": order_id, "refund_id": r.id, "amount": refund_amount}
+
+# ---------- Webhook ----------
+def stripe_webhook(payload: bytes, sig_header: str, db: Session):
     """
     Handle Stripe webhook events:
     - Verify signature
     - Process event types (payments + donations)
     - Update DB accordingly
     """
-    payload = await request.body()
-    sig_header = request.headers.get("Stripe-Signature")
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
     try:
@@ -465,9 +710,7 @@ async def stripe_webhook(request: Request, db: Session):
     event_type = event["type"]
     obj = event["data"]["object"]
 
-    # -------------------------
     # PaymentIntent succeeded
-    # -------------------------
     if event_type == "payment_intent.succeeded":
         payment_id = obj["id"]
         metadata = obj.get("metadata", {})
@@ -484,11 +727,11 @@ async def stripe_webhook(request: Request, db: Session):
             if payment:
                 payment.status = "succeeded"
                 db.commit()
+            # Important: no auto-transfer here; after /payment/confirm creates orders and splits, 
+            # event APIs will then handle transfers/refunds
             log_event(db, "payment_succeeded", reference_id=payment_id, actor="system")
 
-    # -------------------------
     # PaymentIntent failed
-    # -------------------------
     elif event_type == "payment_intent.payment_failed":
         payment_id = obj["id"]
         metadata = obj.get("metadata", {})
@@ -507,22 +750,21 @@ async def stripe_webhook(request: Request, db: Session):
                 db.commit()
             log_event(db, "payment_failed", reference_id=payment_id, actor="system")
 
-    # -------------------------
     # Charge refunded
-    # -------------------------
     elif event_type == "charge.refunded":
-        refund_id = obj["id"]
+        # obj is charge; correct refund id is in charge.refunds.data[*].id
+        refunds = (obj.get("refunds", {}) or {}).get("data", []) or []
+        for rf in refunds:
+            refund_id = rf.get("id")
+            if not refund_id:
+                continue
+            db_refund = db.query(Refund).filter_by(refund_id=refund_id).first()
+            if db_refund:
+                db_refund.status = "refunded"
+                db.commit()
+            log_event(db, "refund_completed", reference_id=refund_id, actor="system")
 
-        db_refund = db.query(Refund).filter_by(refund_id=refund_id).first()
-        if db_refund:
-            db_refund.status = "refunded"
-            db.commit()
-
-        log_event(db, "refund_completed", reference_id=refund_id, actor="system")
-
-    # -------------------------
-    # Unhandled events
-    # -------------------------
+    # Unhandled
     else:
         log_event(
             db,

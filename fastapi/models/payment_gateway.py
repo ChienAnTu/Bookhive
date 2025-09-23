@@ -1,12 +1,10 @@
+# models/payment_gateway.py
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
 from models.base import Base
 import uuid
-
-
-# --- ORM Models ---
 
 # ---------------------------
 # Payments Table
@@ -18,7 +16,7 @@ class Payment(Base):
     payment_id = Column(String(255), unique=True, nullable=False)  # Stripe PaymentIntent ID
     user_id = Column(String(255), nullable=False)
     amount = Column(Integer, nullable=False)                       # total in cents
-    currency = Column(String(10), default="usd")
+    currency = Column(String(10), default="aud")
     status = Column(String(50), default="pending")
 
     deposit = Column(Integer, default=0)
@@ -43,7 +41,7 @@ class Refund(Base):
     refund_id = Column(String(255), unique=True, nullable=False)   # Stripe Refund ID
     payment_id = Column(String(255), ForeignKey("payments.payment_id"), nullable=False)
     amount = Column(Integer, nullable=False)
-    currency = Column(String(10), default="usd")
+    currency = Column(String(10), default="aud")
     status = Column(String(50), default="succeeded")
     reason = Column(String(255), nullable=True)
 
@@ -96,27 +94,25 @@ class Donation(Base):
     donation_id = Column(String(255), unique=True, nullable=False)
     user_id = Column(String(255), nullable=False)
     amount = Column(Integer, nullable=False)
-    currency = Column(String(10), default="usd")
+    currency = Column(String(10), default="aud")
     status = Column(String(50), default="pending")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 # --- Payment Pydantic Schemas ---
-
 class PaymentInitiateRequest(BaseModel):
     user_id: str = Field(..., description="ID of the user making the payment")
-    amount: int = Field(..., description="Total amount in cents")
-    currency: str = Field(..., example="usd", description="Currency code (e.g., usd, aud)")
+    amount: Optional[int] = Field(None, description="Total amount in cents; if None, use deposit+shipping_fee+service_fee")
+    currency: str = Field("aud", example="aud", description="Currency code (e.g., aud)")
     deposit: Optional[int] = Field(0, description="Security deposit in cents")
     shipping_fee: Optional[int] = Field(0, description="Shipping fee in cents")
     service_fee: Optional[int] = Field(0, description="Platform service fee in cents")
-    lender_account_id: str = Field(..., description="Stripe connected account ID of the lender (e.g., acct_123...)")
+    checkout_id: Optional[str] = Field(None, description="Checkout ID to link orders")
 
 class PaymentStatusResponse(BaseModel):
     payment_id: str
     status: str
-
 
 class PaymentRefundRequest(BaseModel):
     amount: Optional[int] = Field(None, description="Amount to refund in cents, full if omitted")
@@ -136,35 +132,30 @@ class PaymentDisputeRequest(BaseModel):
         description="Amount in cents to keep when action=adjust"
     )
 
-
 class TransactionResponse(BaseModel):
     transaction_id: str
     type: str
     amount: int
     status: str
 
-
 # ---------------------------
 # Donation
 # ---------------------------
-
 class DonationInitiateRequest(BaseModel):
     user_id: str
     amount: int = Field(..., description="Donation amount in cents")
-    currency: str = Field(..., example="usd")
-
+    currency: str = Field("aud", example="aud")
 
 class DonationResponse(BaseModel):
     donation_id: str
     amount: int
     status: str
 
-
 # ---------------------------
 # Webhook
 # ---------------------------
-
 class StripeWebhookEvent(BaseModel):
     id: str
     type: str
     data: dict
+
