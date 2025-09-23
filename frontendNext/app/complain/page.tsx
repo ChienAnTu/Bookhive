@@ -38,7 +38,7 @@ const ComplainPage: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!isAuthenticated()) {
-        router.push("/login");
+        router.push("/auth");
         return;
       }
 
@@ -55,7 +55,7 @@ const ComplainPage: React.FC = () => {
             setComplaints([]);
           }
         } else {
-          router.push("/login");
+          router.push("/auth");
         }
       } catch (error) {
         console.error("Failed to load complaints:", error);
