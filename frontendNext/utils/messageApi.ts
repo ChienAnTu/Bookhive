@@ -40,27 +40,25 @@ export async function getConversation(otherUserEmail: string) {
 
 // Send a text message
 export async function sendMessage(receiverEmail: string, content: string) {
-  try {
-    const res = await axios.post(`${API_URL}/messages/send`, 
-      {
-        receiver_email: receiverEmail,
-        content,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        withCredentials: true,
-      }
-    );
-    return res.data;
-  } catch (err: any) {
-    if (err.response) {
-      console.error("Send message failed:", err.response.data);
-      throw new Error("Failed to send message: " + JSON.stringify(err.response.data));
-    }
-    throw new Error("Failed to send message");
+  const res = await fetch(`${API_URL}/messages/send`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      receiver_email: receiverEmail,
+      content: content
+    })
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(`Failed to send message: ${JSON.stringify(error)}`);
   }
+
+  return res.json();
 }
 
 // Mark conversation as read

@@ -8,6 +8,7 @@ import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
 import { calculateDistance } from "@/app/data/mockData";
+import { sendMessage } from "@/utils/messageApi";
 
 import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
@@ -132,13 +133,29 @@ export default function BookDetailPage() {
     }
   };
 
-  const formatKm = (km: number) =>
-    km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
+  const handleSendRequest = async () => {
+    if (!owner || !currentUser || !requestMessage.trim()) {
+      toast.error("Please fill in the message");
+      return;
+    }
 
-  const handleSendRequest = () => {
-    console.log("Sending request with message:", requestMessage);
-    setIsRequestModalOpen(false);
-    setRequestMessage("");
+    try {
+      // Add book info to message
+      const messageWithBookInfo = `Book Request: ${book.titleOr}\n\n${requestMessage}`;
+      
+      await sendMessage(owner.email, messageWithBookInfo);
+      toast.success("Message sent successfully");
+      setIsRequestModalOpen(false);
+      setRequestMessage("");
+      
+      // Redirect to messages page after short delay
+      setTimeout(() => {
+        router.push('/message');
+      }, 1500);
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast.error(error.message || "Failed to send message");
+    }
   };
 
   const handleShare = () => {
@@ -389,7 +406,21 @@ export default function BookDetailPage() {
                     <Button
                       variant="outline"
                       className="flex items-center gap-2"
-                      onClick={() => setIsRequestModalOpen(true)}
+                      onClick={() => {
+                        if (!currentUser) {
+                          toast.error("Please login to send messages");
+                          return;
+                        }
+                        if (!isProfileComplete(currentUser)) {
+                          setIsProfileModalOpen(true);
+                          return;
+                        }
+                        if (!owner?.email) {
+                          toast.error("Cannot contact owner at this time");
+                          return;
+                        }
+                        setIsRequestModalOpen(true);
+                      }}
                     >
                       <MessageCircle className="w-4 h-4" />
                       Message
