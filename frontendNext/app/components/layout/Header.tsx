@@ -231,7 +231,6 @@ const Header: React.FC = () => {
                         <Truck className="w-4 h-4 mr-3" />Shipping
                       </Link>
 
-                      {/* New Support entry */}
                       <Link
                         href="/complain"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
