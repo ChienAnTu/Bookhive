@@ -32,3 +32,11 @@ class User(Base):
     state          = Column(String(100), nullable=True)
     zip_code       = Column(String(20), nullable=True)
     profile_picture = Column(String(255), nullable=True)
+
+    # Stripe Connect (lender payouts)
+    stripe_account_id       = Column(String(64), nullable=True, index=True)  # e.g. "acct_1Pqxyz..."
+    stripe_onboarding_status = Column(String(32), nullable=True, default="not_started")
+    stripe_details_submitted = Column(String(5), nullable=True)   # "true"/"false" for portability
+    stripe_payouts_enabled   = Column(String(5), nullable=True)   # "true"/"false"
+    stripe_requirements_due  = Column(String(1000), nullable=True)  # JSON summary text from Stripe
+    bank_last4               = Column(String(10), nullable=True)

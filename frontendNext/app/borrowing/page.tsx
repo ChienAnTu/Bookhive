@@ -11,7 +11,7 @@ import Button from "../components/ui/Button";
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
 import { getCurrentUser, getUserById } from "@/utils/auth";
-import { getBorrowingOrders, type Order as ApiOrder } from "@/utils/borrowingOrders";
+import { getBorrowingOrders, type Order as ApiOrder } from "@/utils/orders";
 import { getBookById } from "@/utils/books";
 import { createComplaint, type CreateComplaintRequest } from "@/utils/complaints";
 

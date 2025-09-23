@@ -14,6 +14,8 @@ from routes.shipping import router as shipping_router  # Import shipping router
 from routes.service_fee import router as service_fee_router
 from routes.checkout import router as checkout_router  # Import checkout router
 from routes.order import router as orders_router
+from routes.payment_gateway import router as payment_gateway_router
+from routes.stripe_connect import router as stripe_connect_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -66,6 +68,12 @@ app.include_router(complaints_router, prefix="/api/v1")
 
 # order router
 app.include_router(orders_router, prefix="/api/v1/orders")
+
+# payment gateway router
+app.include_router(payment_gateway_router) 
+
+# Stripe connect account router
+app.include_router(stripe_connect_router)
 
 @app.get("/")
 async def root():
