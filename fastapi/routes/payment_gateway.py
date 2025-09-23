@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from core.config import settings
 from services import payment_gateway_service
 from sqlalchemy.orm import Session
-from database import get_db
+from core.dependencies import get_db
 from models.payment_gateway import (
     PaymentInitiateRequest,
     PaymentStatusResponse,
@@ -41,7 +41,7 @@ def initiate_payment(body: PaymentInitiateRequest, db: Session = Depends(get_db)
 
 
 @router.get("/payment/status/{payment_id}", response_model=PaymentStatusResponse, status_code=status.HTTP_200_OK)
-def get_payment_status(payment_id: str, db: Session = Depends(get_db)):
+def get_payment_status(payment_id: str):
     """
     Retrieve the status of a payment:
     - Fetch status from Stripe
@@ -49,7 +49,7 @@ def get_payment_status(payment_id: str, db: Session = Depends(get_db)):
     - Return current status
     """
     try:
-        result = payment_gateway_service.get_payment_status(payment_id, db)
+        result = payment_gateway_service.get_payment_status_service(payment_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -112,7 +112,7 @@ def handle_dispute(payment_id: str, body: PaymentDisputeRequest, db: Session = D
     - Save admin note in DB
     """
     try:
-        result = payment_gateway_service.handle_dispute(payment_id, body.dict(), db)
+        result = payment_gateway_service.handle_dispute(payment_id, body.dict(), db=db)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

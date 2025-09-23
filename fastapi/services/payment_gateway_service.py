@@ -95,8 +95,8 @@ def initiate_payment(data: dict, db: Session):
         intent = stripe.PaymentIntent.create(
             amount=total_amount,
             currency=currency,
-            payment_method_types=["card"],
             capture_method="manual",
+            automatic_payment_methods={"enabled": True},
             transfer_data={"destination": lender_account_id},
             metadata={
                 "user_id": user_id,
@@ -142,7 +142,7 @@ def initiate_payment(data: dict, db: Session):
         return {"error": str(e)}, 400
 
 
-def get_payment_status(payment_id: str):
+def get_payment_status_service(payment_id: str):
     """
     1. Retrieve PaymentIntent from Stripe using payment_id
     2. Extract relevant fields such as status, amount, currency
@@ -158,7 +158,7 @@ def get_payment_status(payment_id: str):
             "currency": intent.currency,
         }
     except stripe.error.StripeError as e:
-        return {"error": str(e)}, 400
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @audit("capture_initiated")
@@ -271,7 +271,7 @@ def create_dispute(payment_id: str, data: dict, db: Session):
 
 
 @audit("dispute_resolved")
-def handle_dispute(payment_id: str, data: dict, db: Session):
+def handle_dispute(payment_id: str, data: dict, *, db: Session):
     """
     Admin resolves a dispute by recording the decision in DB.
     Actions:
