@@ -113,9 +113,12 @@ class PaymentInitiateRequest(BaseModel):
     service_fee: Optional[int] = Field(0, description="Platform service fee in cents")
     lender_account_id: str = Field(..., description="Stripe connected account ID of the lender (e.g., acct_123...)")
 
+
 class PaymentStatusResponse(BaseModel):
     payment_id: str
     status: str
+    amount: int
+    currency: str
 
 
 class PaymentRefundRequest(BaseModel):
