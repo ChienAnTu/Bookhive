@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Search, Filter, BookOpen, MoreHorizontal } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import CoverImg from "../components/ui/CoverImg";
 import type { Book } from "@/app/types/book";
 import { getCurrentUser } from "@/utils/auth";
 import { getBooks, updateBook, deleteBook } from "@/utils/books";
@@ -108,7 +109,7 @@ export default function LendingListPage() {
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">My Lending List</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">My Shared Books</h1>
               <p className="text-gray-600">Manage your listed, unlisted, and lent out books</p>
             </div>
           </div>
@@ -220,17 +221,7 @@ export default function LendingListPage() {
 
                   {/* Cover img */}
                   <div className="w-28 h-36 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                    {book.coverImgUrl ? (
-                      <img
-                        src={book.coverImgUrl}
-                        alt={book.titleOr}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                        No Cover
-                      </div>
-                    )}
+                    <CoverImg src={book.coverImgUrl} title={book.titleOr} />
                   </div>
 
                   {/* Info */}
