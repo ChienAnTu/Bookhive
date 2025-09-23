@@ -174,7 +174,7 @@ const ProfilePage: React.FC = () => {
         {/* My Orders Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            My Orders
+            My Book Hub
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
