@@ -5,6 +5,9 @@ Configuration for the API
 import os
 from dotenv import load_dotenv
 from typing import List
+import brevo_python
+from brevo_python.rest import ApiException
+import stripe 
 
 # Load the root .env file (adjust path if your structure differs)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
@@ -43,9 +46,31 @@ class Settings:
         if not os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES'):  # Enforce presence, even with default
             print("Warning: ACCESS_TOKEN_EXPIRE_MINUTES not set in .env—using default (30)")
         
+        # Brevo (required)
+        brevo_api_key = os.getenv("BREVO_API_KEY")  # e.g. xkeysib-xxxxxxxxxxxxxxxxxxxxxxx
+        brevo_key_type = os.getenv("BREVO_KEY_TYPE", "api-key")  # Default to 'api-key', or use 'partner-key'
+
+        if not brevo_api_key:
+            raise ValueError("Missing BREVO_API_KEY in .env")
+        
+        self.brevo_config = brevo_python.Configuration()
+        self.brevo_config.api_key[brevo_key_type] = brevo_api_key
+
+        # Stripe (required)
+        stripe_api_key = os.getenv("STRIPE_SECRET_KEY")
+        if not stripe_api_key:
+            raise ValueError("Missing STRIPE_SECRET_KEY in .env")
+
+        stripe.api_key = stripe_api_key
+
         # CORS (optional, with default)
         allowed_origins_str = os.getenv('ALLOWED_ORIGINS', '*')
         self.ALLOWED_ORIGINS = [origin.strip() for origin in allowed_origins_str.split(',')]
+
+        # Public URLs for redirect defaults (dev-friendly)
+        self.FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        self.API_PUBLIC_URL = os.getenv('API_PUBLIC_URL', 'http://localhost:8000')
+
 
 # Instantiate settings (will raise errors if required vars are missing)
 settings = Settings()
