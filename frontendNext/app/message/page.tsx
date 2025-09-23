@@ -1,27 +1,245 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { getCurrentUser } from "@/utils/auth";
+import { useState, useEffect, useRef } from "react";
+import { getCurrentUser, getApiUrl } from "@/utils/auth";
 import type { ChatThread, Message, SendMessageData } from "@/app/types/message";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
+import { getConversations, getConversation, sendMessage, markConversationAsRead, sendMessageWithImage } from "@/utils/messageApi";
+
+const API_URL = getApiUrl();
+// Add WebSocket URL from environment variable
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
 
 export default function MessagesPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [loading, setLoading] = useState(true);
+  const wsRef = useRef<WebSocket | null>(null);
 
+  // Load initial data
   useEffect(() => {
-    const loadCurrentUser = async () => {
-      const user = await getCurrentUser();
-      setCurrentUser(user);
+    const loadData = async () => {
+      try {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+        
+        const conversations = await getConversations();
+        setThreads(conversations);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        setLoading(false);
+      }
     };
-    loadCurrentUser();
+    loadData();
   }, []);
+
+  // Setup WebSocket connection
+  useEffect(() => {
+    if (!currentUser) return;
+
+    
+    const token = localStorage.getItem('access_token');
+    const ws = new WebSocket(`${WS_URL}/messages/ws?token=${token}`);
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'message') {
+          // Update threads with new message
+          setThreads(prevThreads => {
+            const newMessage: Message = {
+              id: data.data.message_id,
+              content: data.data.content,
+              senderId: data.data.sender_email,
+              receiverId: data.data.receiver_email,
+              timestamp: data.data.timestamp,
+              read: false
+            };
+            const threadIndex = prevThreads.findIndex(t => 
+              t.user.id === newMessage.senderId || 
+              t.user.id === newMessage.receiverId
+            );
+
+            if (threadIndex === -1) return prevThreads;
+
+            const updatedThreads = [...prevThreads];
+            const thread = updatedThreads[threadIndex];
+            
+            updatedThreads[threadIndex] = {
+              ...thread,
+              messages: [...(thread.messages || []), newMessage],
+              lastMessage: newMessage,
+              unreadCount: currentUser?.id === newMessage.receiverId 
+                ? (thread.unreadCount + 1)
+                : thread.unreadCount
+            };
+
+            return updatedThreads;
+          });
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = (event) => {
+      console.log('WebSocket disconnected:', event.code, event.reason);
+      // Attempt to reconnect after a delay
+      setTimeout(() => {
+        if (currentUser) {
+          const token = localStorage.getItem('access_token');
+          wsRef.current = new WebSocket(`${WS_URL}/messages/ws?token=${token}`);
+        }
+      }, 5000);
+    };
+
+    wsRef.current = ws;
+
+    return () => {
+      ws.close();
+    };
+  }, [currentUser]);
+
+  // Handle thread selection
+  const handleThreadSelect = async (thread: ChatThread) => {
+    setSelectedThread(thread);
+    try {
+      await markConversationAsRead(thread.user.email);
+      // Update thread unread count
+      setThreads(prevThreads =>
+        prevThreads.map(t =>
+          t.user.id === thread.user.id ? { ...t, unreadCount: 0 } : t
+        )
+      );
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
+    }
+  };
+
+  // Add file upload handler
+  const handleFileUpload = async (file: File) => {
+    if (!selectedThread || !currentUser) return;
+
+    try {
+      const response = await sendMessageWithImage(
+        selectedThread.user.email,
+        messageInput,
+        file
+      );
+
+      // Update UI with new message
+      const newMessage: Message = {
+        id: response.message_id,
+        content: messageInput || '',
+        senderId: currentUser.id,
+        receiverId: selectedThread.user.id,
+        timestamp: new Date().toISOString(),
+        read: false,
+        imageUrl: response.image_url
+      };
+
+      setSelectedThread(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          messages: [...prev.messages, newMessage],
+          lastMessage: newMessage
+        };
+      });
+
+      // Update threads list
+      setThreads(prev => prev.map(thread =>
+        thread.user.id === selectedThread.user.id
+          ? {
+              ...thread,
+              lastMessage: newMessage
+            }
+          : thread
+      ));
+
+      setMessageInput("");
+    } catch (error) {
+      console.error('Error uploading file:', error);
+    }
+  };
+
+  // Update the file input onChange handler
+  <input
+    type="file"
+    accept="image/*"
+    className="hidden"
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+          alert('File size must be less than 5MB');
+          return;
+        }
+        handleFileUpload(file);
+      }
+    }}
+  />
+  // Handle sending message
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedThread || !currentUser) return;
+
+    try {
+      const response = await sendMessage(selectedThread.user.email, messageInput);
+      
+      // Update UI with new message
+      const newMessage = {
+        id: response.message_id,
+        content: messageInput,
+        senderId: currentUser.id,
+        receiverId: selectedThread.user.id,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      setSelectedThread(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          messages: [...prev.messages, newMessage],
+          lastMessage: newMessage
+        };
+      });
+
+      // Update threads list
+      setThreads(prev => prev.map(thread =>
+        thread.user.id === selectedThread.user.id
+          ? {
+              ...thread,
+              lastMessage: newMessage
+            }
+          : thread
+      ));
+
+      setMessageInput("");
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  }
+
 
   return (
     <div className="flex h-[calc(100vh-4rem)] pt-2 bg-white">
@@ -39,7 +257,7 @@ export default function MessagesPage() {
                   ? "bg-blue-50"
                   : "hover:bg-gray-50"
               }`}
-              onClick={() => setSelectedThread(thread)}
+              onClick={() => handleThreadSelect(thread)}
             >
               <div className="p-4 flex items-start gap-3">
                 {/* Avatar */}
@@ -115,7 +333,15 @@ export default function MessagesPage() {
                           : "bg-gray-200 text-gray-900 rounded-bl-none"
                       }`}
                     >
-                      {msg.content}
+                      {msg.content && <p>{msg.content}</p>}
+                      {msg.imageUrl && (
+                        <img 
+                          src={`${API_URL}${msg.imageUrl}`} 
+                          alt="Message attachment" 
+                          className="max-w-full rounded-lg mt-2"
+                          style={{ maxHeight: '200px' }}
+                        />
+                      )}
                       <div className="text-xs text-gray-400 mt-1">
                         {new Date(msg.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -131,17 +357,18 @@ export default function MessagesPage() {
             {/* Input Area */}
             <div className="p-4 border-t border-gray-200">
               <div className="flex gap-2 items-center">
-                {/* Upload Button*/}
+                {/* Upload Button */}
                 <label className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-md cursor-pointer hover:bg-gray-800 transition">
                   +
                   <input
                     type="file"
+                    accept="image/*"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        console.log("File selected:", file.name);
-                        // TODO: upload logic here
+                        // TODO: Implement file upload logic
+                        console.log('File selected:', file);
                       }
                     }}
                   />
@@ -151,6 +378,12 @@ export default function MessagesPage() {
                 <Input
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
                   placeholder="Type your message..."
                   className="flex-1"
                 />
@@ -158,10 +391,8 @@ export default function MessagesPage() {
                 {/* Send Button */}
                 <button
                   className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 transition"
-                  onClick={() => {
-                    // Handle send message
-                    setMessageInput("");
-                  }}
+                  onClick={handleSendMessage}
+                  disabled={!messageInput.trim()}
                 >
                   Send
                 </button>
