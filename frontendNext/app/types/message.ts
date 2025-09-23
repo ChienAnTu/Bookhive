@@ -7,6 +7,7 @@ export interface Message {
   bookId?: string;
   bookTitle?: string;
   read: boolean;
+  imageUrl?: string;
 }
 
 export interface ChatThread {
@@ -14,6 +15,7 @@ export interface ChatThread {
   user: {
     id: string;
     name: string;
+    email:string;
     avatar?: string;
   };
   lastMessage: Message;
