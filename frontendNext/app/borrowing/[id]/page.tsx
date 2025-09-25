@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Clock, Truck, ArrowLeft, AlertTriangle } from "lucide-react";
-
+import CoverImg from "@/app/components/ui/CoverImg";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 
@@ -346,16 +346,10 @@ export default function OrderDetailPage() {
           <div className="flex flex-wrap gap-4">
             {booksInOrder.map((b) => (
               <div key={b.id} className="border rounded-lg p-3 w-48">
-                <img
-                  src={b.coverUrl || "/images/placeholder-book.png"}
-                  alt={b.title}
+                <CoverImg
+                  src={b.coverUrl}
+                  title={b.title}
                   className="w-full h-32 object-cover rounded mb-2"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    if (!target.src.includes("/images/placeholder-book.png")) {
-                      target.src = "/images/placeholder-book.png";
-                    }
-                  }}
                 />
                 <h4 className="font-medium text-sm truncate">{b.title}</h4>
                 <p className="text-xs text-gray-600 truncate">{b.author}</p>
