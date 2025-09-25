@@ -3,6 +3,17 @@ import { getApiUrl, getToken } from "@/utils/auth";
 
 const API_URL = getApiUrl();
 
+export type Order = {
+  order_id: string;
+  status: string;
+  total_paid_amount: number;
+  books: Array<{
+    title: string;
+    cover?: string;
+    author?: string;
+  }>;
+};
+
 export async function createOrder(checkoutId: string) {
   const token = getToken();
   const response = await axios.post(
@@ -19,7 +30,7 @@ export async function listMyOrders(params?: {
   status?: string;
   page?: number;
   pageSize?: number;
-}) {
+}): Promise<Order[]> {
   const token = getToken();
   const response = await axios.get(`${API_URL}/api/v1/orders/`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -31,3 +42,8 @@ export async function listMyOrders(params?: {
   });
   return response.data;
 }
+
+// Alias functions for different contexts
+export const getOrders = listMyOrders;
+export const getBorrowingOrders = listMyOrders;
+export const getLendingOrders = listMyOrders;
