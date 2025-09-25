@@ -7,6 +7,8 @@ import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
 import { getUserById } from "@/utils/auth";
+import type { RatingStats, Comment } from "@/app/types/index";
+import StarRating from '@/app/components/ui/StarRating';
 
 const UserProfilePage: React.FC = () => {
   const router = useRouter();
@@ -17,6 +19,12 @@ const UserProfilePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
 
+  const [ratingStats, setRatingStats] = useState<RatingStats>({
+    averageRating: 0,
+    totalReviews: 0,
+    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    recentComments: [],
+  });
 
   useEffect(() => {
     if (!userId) return;
@@ -62,7 +70,7 @@ const UserProfilePage: React.FC = () => {
     }
   };
 
-
+// TODO: Review API
 
   if (isLoading) {
     return <div className="p-8 text-gray-500">Loading user profile...</div>;
@@ -120,16 +128,10 @@ const UserProfilePage: React.FC = () => {
 
                 {/* Rating */}
                 <div className="flex items-center mb-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-4 h-4 ${star <= Math.floor(user.rating || 0)
-                        ? "text-yellow-400 fill-current"
-                        : "text-gray-300"
-                        }`}
-                    />
-                  ))}
-                  <span className="ml-2 text-sm text-gray-600">{user.rating}</span>
+                  <StarRating rating={ratingStats.averageRating} readonly size="sm" />
+                  <span className="ml-2 text-sm text-gray-600">
+                    {ratingStats.averageRating.toFixed(1)} ({ratingStats.totalReviews} reviews)
+                  </span>
                 </div>
 
                 {/* Address */}
@@ -157,51 +159,28 @@ const UserProfilePage: React.FC = () => {
               Reviews for {user.firstName}
             </h2>
 
-            {user.reviews && user.reviews.length > 0 ? (
+            {ratingStats.recentComments.length > 0 ? (
               <div className="space-y-4">
-                {user.reviews.map((review, idx) => (
-                  <div
-                    key={idx}
-                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  >
-                    {/* Reviewer name */}
+                {ratingStats.recentComments.map((review) => (
+                  <div key={review.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-800">
-                        {review.reviewerName}
+                        Reviewer: {review.reviewerId}
                       </span>
                       <span className="text-xs text-gray-500">
                         {new Date(review.createdAt).toLocaleDateString("en-US")}
                       </span>
                     </div>
-
-                    {/* Rating */}
-                    <div className="flex items-center mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
-                            ? "text-yellow-400 fill-current"
-                            : "text-gray-300"
-                            }`}
-                        />
-                      ))}
-                      <span className="ml-2 text-sm text-gray-600">
-                        {review.rating}
-                      </span>
-                    </div>
-
-                    {/* Comment */}
-                    <p className="text-gray-700 text-sm">{review.comment}</p>
+                    <StarRating rating={review.rating} readonly size="sm" />
+                    <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
+                    <p className="text-gray-700 text-sm">{review.content}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">
-                No reviews yet for this user.
-              </p>
+              <p className="text-gray-500 text-sm">No reviews yet for this user.</p>
             )}
           </div>
-
         </div>
       </div>
     );

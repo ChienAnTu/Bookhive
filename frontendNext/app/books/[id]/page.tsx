@@ -20,6 +20,8 @@ import ProfileIncompleteModal from "@/app/components/ui/ProfileIncompleteModal";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
+import StarRating from "@/app/components/ui/StarRating";
+
 import { toast } from 'sonner';
 
 
@@ -417,24 +419,14 @@ export default function BookDetailPage() {
                         <div>
                           {distance > 0 ? ` • ${formatKm(distance)} away from you` : ""}
                         </div>
-
                       </div>
                       <div className="flex items-center mt-2">
-                        <div className="flex items-center mr-3">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-4 h-4 ${star <= Math.floor(owner.rating)
-                                ? "text-yellow-400 fill-current"
-                                : "text-gray-300"
-                                }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm text-gray-600">
-                          {owner.rating}
+                        <StarRating rating={(owner as any).rating ?? 0} readonly size="sm" />
+                        <span className="ml-2 text-sm text-gray-600">
+                          {(owner as any).rating ?? 0}
                         </span>
                       </div>
+
                     </div>
                     <Button
                       variant="outline"
