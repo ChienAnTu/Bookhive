@@ -14,8 +14,19 @@ from core.security import decode_access_token
 from services.message_service import MessageService
 from models.message import Message
 from models.user import User
+from pydantic import BaseModel
+from typing import Optional
+from database.connection import SessionLocal
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
+
+class UserPublicProfile(BaseModel):
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+    name: str | None = None
+    bio: str | None = None
+    avatar: str | None = None
 
 class MessageCreate(BaseModel):
     receiver_email: str
@@ -49,15 +60,27 @@ class ConnectionManager:
         if user_id in self.active_connections:
             await self.active_connections[user_id].send_json(message)
 
+# This prevents accidentally leaking sensitive information like password hashes.
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    avatar_url: Optional[str] = None
+    # Add any other fields you need for the chat header, e.g., avatar_url
+    # avatar_url: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
 manager = ConnectionManager()
 
 async def get_current_user_ws(
     websocket: WebSocket,
-    token: str = Query(...),
-    db: Session = Depends(get_db)
+    token: str = Query(...)
 ):
     """Authenticate user for WebSocket connection"""
     credential_exception = WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+    db = SessionLocal()
     try:
         payload = decode_access_token(token)
         email: str = payload.get("sub")
@@ -67,8 +90,33 @@ async def get_current_user_ws(
         if user is None:
             raise credential_exception
         return user
-    except:
+    except Exception:
+        # It's good practice to catch specific exceptions, but this will work for now
         raise credential_exception
+    finally:
+        db.close()
+    
+@router.get("/users/by-email/{email}", response_model=UserResponse)
+def get_user_by_email(
+    email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) # Keep this for security
+):
+    """
+    Get public user profile information by email.
+    Ensures that only logged-in users can fetch this data.
+    """
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Manually construct the response to ensure you only send public data
+    return UserResponse(
+        id=user.user_id,
+        name=user.name,
+        email=user.email,
+        avatar_url=user.avatar
+    )
 
 @router.post("/send", response_model=MessageResponse)
 async def send_message(
@@ -87,7 +135,11 @@ async def send_message(
     ws_message = {
         "type": "message",
         "data": {
+            "message_id": message.message_id,
+            "sender_id": message.sender_id,
+            "receiver_id": message.receiver_id,
             "sender_email": current_user.email,
+            "receiver_email": receiver.email,
             "content": message.content,
             "image_url": message.image_path,
             "timestamp": message.timestamp.isoformat()
@@ -137,7 +189,41 @@ def get_conversations(
     """Get list of all users that current user has had conversations with"""
     service = MessageService(db)
     partners = service.get_user_conversations(current_user.user_id)
-    return [{"email": p.email, "name": p.name} for p in partners if p]
+    
+    threads = []
+    for partner in partners:
+        if not partner:
+            continue
+        
+        last_message = service.get_last_message(current_user.user_id, partner.user_id)
+        unread_count = service.get_unread_count_by_sender(current_user.user_id, partner.user_id)
+        
+        if last_message:
+            threads.append({
+                "user": {
+                    "id": partner.user_id,
+                    "first_name": partner.first_name,
+                    "last_name": partner.last_name,
+                    "name": partner.name,
+                    "email": partner.email,
+                    "profile_image": partner.avatar  # Assuming you have this field
+                },
+                "lastMessage": {
+                    "id": last_message.message_id,
+                    "content": last_message.content,
+                    "senderId": last_message.sender_id,
+                    "receiverId": last_message.receiver_id,
+                    "timestamp": last_message.timestamp.isoformat(),
+                    "read": last_message.is_read,
+                    "imageUrl": last_message.image_path
+                },
+                "unreadCount": unread_count
+            })
+            
+    # Sort threads by the timestamp of the last message
+    threads.sort(key=lambda t: t['lastMessage']['timestamp'], reverse=True)
+    
+    return threads
 
 @router.put("/mark-read/{message_id}")
 def mark_message_as_read(
@@ -264,7 +350,11 @@ async def send_message_with_image(
     ws_message = {
         "type": "message",
         "data": {
+            "message_id": message.message_id,
+            "sender_id": message.sender_id,
+            "receiver_id": message.receiver_id,
             "sender_email": current_user.email,
+            "receiver_email": receiver.email,
             "content": message.content,
             "image_url": message.image_path,
             "timestamp": message.timestamp.isoformat()
