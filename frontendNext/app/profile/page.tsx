@@ -4,21 +4,17 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, MapPin, Calendar, Book, Edit } from "lucide-react";
 import { getCurrentUser, isAuthenticated } from "../../utils/auth";
-// import {
-//   getUserLendingOrders,
-//   getUserBorrowingOrders,
-//   mockOrders,
-// } from "../data/mockData";  
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
-
 
 const ProfilePage: React.FC = () => {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  console.log("adrress:", currentUser?.streetAddress);
+  const [activeTab, setActiveTab] = useState<"Received" | "Given">("Received");
+  const tabs: ("Received" | "Given")[] = ["Received", "Given"];
+
 
   // Check authentication and load user data
   useEffect(() => {
@@ -67,9 +63,6 @@ const ProfilePage: React.FC = () => {
     );
   }
 
-  // // Get user's orders (using mock data for now)
-  // const lendingOrders = getUserLendingOrders(currentUser.id);
-  // const borrowingOrders = getUserBorrowingOrders(currentUser.id);
 
   // Format join date from createdAt
   const joinDate = new Date(currentUser.createdAt).toLocaleDateString("en-US", {
@@ -78,7 +71,7 @@ const ProfilePage: React.FC = () => {
   });
 
   // Use default values for rating and books if not provided by API
-  const rating = currentUser.rating || 0;
+  const rating = (currentUser as any).rating || 0;
 
 
   // Calculate star rating display
@@ -113,14 +106,13 @@ const ProfilePage: React.FC = () => {
                 <span className="text-sm">{currentUser.email}</span>
               </div>
 
-
               {/* Renting stars */}
               <div className="flex items-center mt-2 mb-2">
                 <div className="flex items-center mr-3">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
-                      className={`w-4 h-4 ${star <= Math.floor(currentUser.rating)
+                      className={`w-4 h-4 ${star <= Math.floor(rating)
                         ? "text-yellow-400 fill-current"
                         : "text-gray-300"
                         }`}
@@ -128,14 +120,12 @@ const ProfilePage: React.FC = () => {
                   ))}
                 </div>
                 <span className="text-sm text-gray-600">
-                  {currentUser.rating}
+                  {rating.toFixed(1)}
                 </span>
               </div>
 
               {/* Location */}
               <div className="flex items-center text-gray-600 mb-2">
-
-
                 <MapPin className="w-4 h-4 mr-2" />
                 <p>
                   {[
@@ -147,22 +137,19 @@ const ProfilePage: React.FC = () => {
                 </p>
               </div>
 
-
               {/* Member Since */}
               <div className="flex items-center text-gray-600">
                 <Calendar className="w-4 h-4 mr-2" />
                 <span className="text-sm">Member since {joinDate}</span>
               </div>
-
             </div>
           </div>
         </div>
 
-
         {/* My Orders Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            My Orders
+            My Book Hub
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -203,10 +190,106 @@ const ProfilePage: React.FC = () => {
               <div className="text-sm font-medium text-orange-800">
                 Books in transit
               </div>
-
             </Link>
           </div>
         </div>
+
+        {/* Review Summary Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+            Review Summary
+          </h2>
+
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 mb-4">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-medium ${activeTab === tab
+                    ? "border-b-2 border-black text-black"
+                    : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                {tab === "Received" ? "Reviews I Received" : "Reviews I Gave"}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === "Received" ? (
+            currentUser.receivedReviews && currentUser.receivedReviews.length > 0 ? (
+              <div className="space-y-4">
+                {currentUser.receivedReviews.map((review, idx) => (
+                  <div
+                    key={idx}
+                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-800">
+                        {review.reviewerName}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(review.createdAt).toLocaleDateString("en-US")}
+                      </span>
+                    </div>
+                    <div className="flex items-center mb-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
+                              ? "text-yellow-400 fill-current"
+                              : "text-gray-300"
+                            }`}
+                        />
+                      ))}
+                      <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
+                    </div>
+                    <p className="text-gray-700 text-sm">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No reviews received yet.</p>
+            )
+          ) : (
+            currentUser.givenReviews && currentUser.givenReviews.length > 0 ? (
+              <div className="space-y-4">
+                {currentUser.givenReviews.map((review, idx) => (
+                  <div
+                    key={idx}
+                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-800">
+                        To: {review.targetUserName}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(review.createdAt).toLocaleDateString("en-US")}
+                      </span>
+                    </div>
+                    <div className="flex items-center mb-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
+                              ? "text-yellow-400 fill-current"
+                              : "text-gray-300"
+                            }`}
+                        />
+                      ))}
+                      <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
+                    </div>
+                    <p className="text-gray-700 text-sm">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No reviews given yet.</p>
+            )
+          )}
+        </div>
+
       </div>
     </div>
   );
