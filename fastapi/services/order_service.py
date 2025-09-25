@@ -262,6 +262,17 @@ class OrderService:
                 "order_id": order.id,
                 "status": order.status,
                 "total_paid_amount": float(order.total_paid_amount),
-                "books": books_info    
+                "books": books_info,
+                "create_at": order.created_at,
+                "due_at": order.due_at,
             })
         return result
+    
+    @staticmethod
+    def get_order_detail(db: Session, order_id: str) -> Optional[Dict]:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            return None
+        return order.to_dict(include_books = True)
+
+        
