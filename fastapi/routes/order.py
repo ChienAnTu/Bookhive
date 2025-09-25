@@ -7,10 +7,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from schemas.order import OrderSummary
+from schemas.order import OrderSummary, OrderDetail
 from typing import List
 from services.order_service import OrderService
 from models.user import User
+# from models.order import Order
 from models.checkout import Checkout
 from core.dependencies import get_db, get_current_user
 
@@ -67,3 +68,16 @@ def list_my_orders(
         limit=page_size
     )
     return orders
+
+@router.get("/{order_id}", response_model=OrderDetail)
+async def get_order_detail(
+    order_id: str,
+    db: Session = Depends(get_db)
+):
+    """get order details"""
+    order_detail = OrderService.get_order_detail(db, order_id)
+    
+    if not order_detail:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    return order_detail

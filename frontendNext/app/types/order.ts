@@ -67,3 +67,46 @@ export interface Order {
 
   notes?: string;
 }
+
+
+export interface ApiOrder {
+  id: string;
+  ownerId: string;
+  borrowerId: string;
+  status: OrderStatus;
+  actionType: string;
+  shippingMethod: string;
+  depositOrSaleAmount: number;
+  serviceFeeAmount: number;
+  shippingOutFeeAmount: number;
+  totalPaidAmount: number;
+  contactName: string;
+  phone: string;
+  street: string;
+  city: string;
+  postcode: string;
+  country: string;
+  createdAt: string;
+  updatedAt: string;
+  dueAt: string | null;
+  startAt: string | null;
+  returnedAt: string | null;
+  completedAt: string | null;
+  canceledAt: string | null;
+  shippingOutTrackingNumber: string | null;
+  shippingOutTrackingUrl: string | null;
+  shippingReturnTrackingNumber: string | null;
+  shippingReturnTrackingUrl: string | null;
+  lateFeeAmount: number;
+  damageFeeAmount: number;
+  totalRefundedAmount: number;
+  books: ApiBook[];
+}
+
+export interface ApiBook {
+  bookId: string;
+  titleEn: string;
+  titleOr: string;
+  author: string;
+  coverImgUrl: string;
+}
