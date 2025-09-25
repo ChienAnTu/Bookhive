@@ -47,7 +47,9 @@ class MessageService:
         ).order_by(Message.timestamp.desc())
         
         offset = (page - 1) * page_size
-        return query.offset(offset).limit(page_size).all()
+        messages = query.offset(offset).limit(page_size).all()
+        
+        return messages[::-1]
 
     def get_user_conversations(self, user_id: str):
         """Get list of all users that the given user has exchanged messages with"""

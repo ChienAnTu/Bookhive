@@ -64,8 +64,9 @@ class ConnectionManager:
 class UserResponse(BaseModel):
     id: str
     name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     email: str
-    avatar_url: Optional[str] = None
     # Add any other fields you need for the chat header, e.g., avatar_url
     # avatar_url: Optional[str] = None
 
@@ -114,8 +115,9 @@ def get_user_by_email(
     return UserResponse(
         id=user.user_id,
         name=user.name,
+        first_name=user.first_name,
+        last_name=user.last_name,
         email=user.email,
-        avatar_url=user.avatar
     )
 
 @router.post("/send", response_model=MessageResponse)
