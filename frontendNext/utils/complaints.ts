@@ -84,7 +84,8 @@ export async function getComplaint(complaintId: string): Promise<Complaint> {
   const response = await axios.get(`${API_URL}/api/v1/complaints/${complaintId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return response.data;
+  // 后端返回格式: {"complaint": {...}, "messages": [...]}
+  return response.data.complaint;
 }
 
 // 添加投诉消息
@@ -106,6 +107,32 @@ export async function resolveComplaint(complaintId: string): Promise<any> {
   const response = await axios.post(
     `${API_URL}/api/v1/complaints/${complaintId}/resolve`,
     {},
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data;
+}
+
+// 更新投诉信息 (通过添加消息的方式记录信息)
+export async function updateComplaint(complaintId: string, updateData: { deductionAmount?: string; note?: string }): Promise<any> {
+  const token = getToken();
+  
+  // 构建消息内容，包含扣除金额和备注信息
+  let messageBody = "[Admin Update]\n";
+  if (updateData.deductionAmount) {
+    messageBody += `Deduction from deposit: ${updateData.deductionAmount}\n`;
+  }
+  if (updateData.note) {
+    messageBody += `Note: ${updateData.note}\n`;
+  }
+  
+  // 使用添加消息的API来记录更新信息
+  const response = await axios.post(
+    `${API_URL}/api/v1/complaints/${complaintId}/messages`,
+    {
+      body: messageBody.trim()
+    },
     {
       headers: { Authorization: `Bearer ${token}` },
     }
