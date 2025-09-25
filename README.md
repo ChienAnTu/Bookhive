@@ -143,6 +143,97 @@ Runs backend API at [http://localhost:8000](http://localhost:8000)
 
 ---
 
+# 📚 Bookhive Deployment Guide
+
+## 🚀 How to Start
+
+### Production (VPS)
+```bash
+make up
+```
+- Deploys using `compose.yaml` + `compose.prod.yaml`
+- Runs with HTTPS (TLS via Certbot) and security block rules enabled
+- Accessible at: `https://bookborrow.org`
+
+### Development (Local)
+```bash
+make up-dev
+```
+- Deploys using `compose.yaml` + `compose.dev.yaml`
+- No TLS, no block rules (simplified for local testing)
+- Accessible at: `http://localhost`
+
+---
+
+## 🛠 Prerequisites
+
+- **Docker & Docker Compose** (required in all environments)  
+- **make** (for simplified commands)
+
+### Installing `make`
+
+#### macOS
+```bash
+brew install make
+```
+(macOS may already include `make`; check with `make --version`.)
+
+#### Windows
+1. Install [Chocolatey](https://chocolatey.org/install)  
+   - Open PowerShell as Administrator  
+   - Run:  
+     ```powershell
+     Set-ExecutionPolicy Bypass -Scope Process -Force; `
+     [System.Net.ServicePointManager]::SecurityProtocol = `
+     [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; `
+     iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+     ```
+
+2. Install make:  
+   ```powershell
+   choco install make
+   ```
+
+3. Restart the terminal and confirm:  
+   ```powershell
+   make --version
+   ```
+
+---
+
+## 📝 Notes
+- The `.env` file is **not committed** – each environment must create and maintain its own.
+- Certificates (`nginx/letsencrypt/`) and logs are **VPS-only** and must never be pushed to GitHub.
+- Development does not require HTTPS (use `http://localhost`).
+- ⚠️ **PLEASE DO NOT PUSH ANY CODES FROM THE PRODUCTION SERVER**  
+  Production is managed **only via GitHub Actions**.  
+  Manual edits or commits made directly on the VPS will break deployment consistency.
+
+---
+
+## 🔧 Useful Commands
+
+### Production
+```bash
+make up        # start containers in production mode
+make down      # stop containers
+make build     # rebuild containers
+make logs      # follow logs (nginx, frontend, backend)
+```
+
+### Development
+```bash
+make up-dev    # start containers in development mode
+make down-dev  # stop containers
+make build-dev # rebuild containers
+make logs-dev  # follow logs (nginx, frontend, backend)
+```
+
+### Clean-up
+```bash
+make clean     # prune unused Docker images, networks, volumes
+```
+
 ## 🔒 License
 
 This project is for academic purposes (University Capstone Project).
