@@ -3,18 +3,23 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { getCurrentUser, getApiUrl } from "@/utils/auth";
+import { useSearchParams } from 'next/navigation';
 import type { ChatThread, Message, SendMessageData } from "@/app/types/message";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
-import { getConversations, getConversation, sendMessage, markConversationAsRead, sendMessageWithImage } from "@/utils/messageApi";
+import { getConversations, getConversation, sendMessage, markConversationAsRead, sendMessageWithImage, getUserByEmail } from "@/utils/messageApi";
 
 const API_URL = getApiUrl();
 // Add WebSocket URL from environment variable
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
 
 export default function MessagesPage() {
+  const searchParams = useSearchParams();
+  const initialRecipientEmail = searchParams.get('to');
+  const initialBookId = searchParams.get('bookId');
+  const initialBookTitle = searchParams.get('bookTitle');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [messageInput, setMessageInput] = useState("");
@@ -31,14 +36,60 @@ export default function MessagesPage() {
         
         const conversations = await getConversations();
         setThreads(conversations);
+
+        // If we have an initial recipient, find or create their thread
+        if (initialRecipientEmail) {
+          const existingThread = conversations.find(
+            (thread: { user: { email: string; }; }) => thread.user.email === initialRecipientEmail
+          );
+          
+          if (existingThread) {
+            handleThreadSelect(existingThread);
+          } else {
+            // If no existing thread, fetch the recipient's user data and create a new, temporary thread.
+            try {
+              const recipientUser = await getUserByEmail(initialRecipientEmail);
+              
+              const newThread: ChatThread = {
+                user: recipientUser,
+                messages: [],
+                // Create a placeholder lastMessage to avoid type errors and provide context
+                lastMessage: {
+                  id: `temp-${Date.now()}`,
+                  content: `Start a conversation about "${initialBookTitle || 'this book'}"...`,
+                  senderId: '',
+                  receiverId: '',
+                  timestamp: new Date().toISOString(),
+                  read: true,
+                  bookTitle: initialBookTitle || undefined,
+                  bookId: initialBookId || undefined,
+                },
+                unreadCount: 0,
+                id: ""
+              };
+              // Add the new thread to the list and select it
+              setThreads(prevThreads => [newThread, ...prevThreads]);
+              setSelectedThread(newThread);
+            } catch (apiError) {
+              console.error(`Failed to fetch user details for ${initialRecipientEmail}:`, apiError);
+              // Optionally, show an error message to the user
+            }
+          }
+          // If we have book info, automatically set up the message
+          if (initialBookId && initialBookTitle) {
+            setMessageInput(`Book Request: ${initialBookTitle}\n\nHi! I am interested in this book. When would be a good time to arrange pickup/delivery?`);
+          }
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('Error loading initial data:', error);
+        
         setLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [initialRecipientEmail, initialBookId, initialBookTitle]);
 
   // Setup WebSocket connection
   useEffect(() => {
@@ -46,7 +97,7 @@ export default function MessagesPage() {
 
     
     const token = localStorage.getItem('access_token');
-    const ws = new WebSocket(`${WS_URL}/messages/ws?token=${token}`);
+    const ws = new WebSocket(`${WS_URL}/api/v1/messages/ws?token=${token}`);
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -56,22 +107,40 @@ export default function MessagesPage() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'message') {
+          const isMessageForSelectedThread = selectedThread && 
+            (data.data.sender_email === selectedThread.user.email || 
+            data.data.receiver_email === selectedThread.user.email);
           // Update threads with new message
           setThreads(prevThreads => {
             const newMessage: Message = {
               id: data.data.message_id,
               content: data.data.content,
-              senderId: data.data.sender_email,
-              receiverId: data.data.receiver_email,
+              senderId: data.data.sender_id,
+              receiverId: data.data.receiver_id,
               timestamp: data.data.timestamp,
-              read: false
+              read: false,
+              imageUrl: data.data.image_url
             };
+
+            // Determine the other participant's email based on who sent/received
+            const otherParticipantEmail = data.data.sender_email === currentUser?.email 
+                                          ? data.data.receiver_email 
+                                          : data.data.sender_email;
+
+
             const threadIndex = prevThreads.findIndex(t => 
-              t.user.id === newMessage.senderId || 
-              t.user.id === newMessage.receiverId
+              t.user.email === otherParticipantEmail
             );
 
-            if (threadIndex === -1) return prevThreads;
+            if (threadIndex === -1) {
+              // If no existing thread, it might be a new conversation.
+              // You might need to fetch the user details for `otherParticipantEmail`
+              // and create a new thread object to add to `prevThreads`.
+              console.warn(`New message from/to ${otherParticipantEmail}, but no existing thread found.`);
+              // For now, we'll just return previous threads, but in a real app,
+              // you'd typically want to create a new thread entry here.
+              return prevThreads;
+            }
 
             const updatedThreads = [...prevThreads];
             const thread = updatedThreads[threadIndex];
@@ -80,13 +149,40 @@ export default function MessagesPage() {
               ...thread,
               messages: [...(thread.messages || []), newMessage],
               lastMessage: newMessage,
-              unreadCount: currentUser?.id === newMessage.receiverId 
+              unreadCount: currentUser.email === data.data.receiver_email && !isMessageForSelectedThread 
                 ? (thread.unreadCount + 1)
                 : thread.unreadCount
             };
 
+            updatedThreads.sort((a, b) => 
+              new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+            );
+
             return updatedThreads;
           });
+          // If the message is for the currently selected thread, append it there too
+          if (isMessageForSelectedThread) {
+            setSelectedThread(prev => {
+              if (!prev) return null;
+              const newMessage: Message = {
+                id: data.data.message_id,
+                content: data.data.content,
+                senderId: data.data.sender_id,
+                receiverId: data.data.receiver_id,
+                timestamp: data.data.timestamp,
+                read: true, // Mark as read immediately if in active conversation
+                imageUrl: data.data.image_url
+              };
+              return {
+                ...prev,
+                messages: [...(prev.messages || []), newMessage],
+                lastMessage: newMessage,
+                unreadCount: 0 // Clear unread count for the active thread
+              };
+          });
+            // Mark the conversation as read via API if it's the active thread
+            markConversationAsRead(data.data.sender_email);
+          }
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -95,30 +191,31 @@ export default function MessagesPage() {
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
+      ws.close();
     };
 
-    ws.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.code, event.reason);
-      // Attempt to reconnect after a delay
-      setTimeout(() => {
-        if (currentUser) {
-          const token = localStorage.getItem('access_token');
-          wsRef.current = new WebSocket(`${WS_URL}/messages/ws?token=${token}`);
-        }
-      }, 5000);
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
     };
 
     wsRef.current = ws;
+  
 
     return () => {
       ws.close();
     };
-  }, [currentUser]);
+  }, [currentUser, selectedThread]);
 
   // Handle thread selection
   const handleThreadSelect = async (thread: ChatThread) => {
     setSelectedThread(thread);
     try {
+      // Fetch the full conversation history for the selected user
+      const messageHistory = await getConversation(thread.user.email);
+
+      setSelectedThread({ ...thread, messages: messageHistory });
+
+      if (thread.unreadCount > 0) { // Only mark as read if there are unread messages
       await markConversationAsRead(thread.user.email);
       // Update thread unread count
       setThreads(prevThreads =>
@@ -126,8 +223,9 @@ export default function MessagesPage() {
           t.user.id === thread.user.id ? { ...t, unreadCount: 0 } : t
         )
       );
-    } catch (error) {
-      console.error('Error marking conversation as read:', error);
+    } 
+  } catch (error) {
+    console.error('Error marking conversation as read:', error);
     }
   };
 
@@ -148,7 +246,7 @@ export default function MessagesPage() {
         content: messageInput || '',
         senderId: currentUser.id,
         receiverId: selectedThread.user.id,
-        timestamp: new Date().toISOString(),
+        timestamp: response.timestamp, // Use timestamp from response
         read: false,
         imageUrl: response.image_url
       };
@@ -163,37 +261,33 @@ export default function MessagesPage() {
       });
 
       // Update threads list
-      setThreads(prev => prev.map(thread =>
-        thread.user.id === selectedThread.user.id
+      setThreads(prev => {
+        const updatedThreads = prev.map(thread =>
+          thread.user.id === selectedThread.user.id
           ? {
               ...thread,
-              lastMessage: newMessage
+              lastMessage: newMessage,
+              unreadCount: thread.user.id === newMessage.receiverId && thread.user.id !== currentUser.id 
+              ? thread.unreadCount + 1 
+              : thread.unreadCount
             }
           : thread
-      ));
+      );
+
+      // Re-sort to bring the updated thread to the top
+        updatedThreads.sort((a, b) => 
+          new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+        );
+        return updatedThreads;
+      });
 
       setMessageInput("");
     } catch (error) {
       console.error('Error uploading file:', error);
+      alert('Failed to send image. Please try again.');
     }
   };
 
-  // Update the file input onChange handler
-  <input
-    type="file"
-    accept="image/*"
-    className="hidden"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-          alert('File size must be less than 5MB');
-          return;
-        }
-        handleFileUpload(file);
-      }
-    }}
-  />
   // Handle sending message
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedThread || !currentUser) return;
@@ -202,12 +296,12 @@ export default function MessagesPage() {
       const response = await sendMessage(selectedThread.user.email, messageInput);
       
       // Update UI with new message
-      const newMessage = {
+      const newMessage: Message = {
         id: response.message_id,
         content: messageInput,
         senderId: currentUser.id,
         receiverId: selectedThread.user.id,
-        timestamp: new Date().toISOString(),
+        timestamp: response.timestamp,
         read: false
       };
 
@@ -220,19 +314,31 @@ export default function MessagesPage() {
         };
       });
 
-      // Update threads list
-      setThreads(prev => prev.map(thread =>
-        thread.user.id === selectedThread.user.id
-          ? {
-              ...thread,
-              lastMessage: newMessage
-            }
-          : thread
-      ));
+     // Update threads list
+      setThreads(prev => {
+        const updatedThreads = prev.map(thread =>
+          thread.user.id === selectedThread.user.id
+            ? {
+                ...thread,
+                lastMessage: newMessage,
+                // Ensure the unread count isn't incorrectly incremented for self-sent messages
+                unreadCount: thread.user.id === newMessage.receiverId && thread.user.id !== currentUser.id 
+                  ? thread.unreadCount + 1 
+                  : thread.unreadCount
+              }
+            : thread
+        );
+        // Re-sort to bring the updated thread to the top
+        updatedThreads.sort((a, b) => 
+          new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+        );
+        return updatedThreads;
+      });
 
-      setMessageInput("");
+      setMessageInput(""); // Clear message input after sending
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
     }
   };
 
@@ -367,9 +473,13 @@ export default function MessagesPage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        // TODO: Implement file upload logic
-                        console.log('File selected:', file);
+                        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                          alert('File size must be less than 5MB');
+                          return;
+                        }
+                        handleFileUpload(file); // Correctly call handleFileUpload
                       }
+                      e.target.value = ''; // Clear the input field to allow selecting the same file again
                     }}
                   />
                 </label>
