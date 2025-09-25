@@ -8,6 +8,8 @@ import { calculateDistance } from "@/app/data/mockData";
 import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
 import { getCurrentUser, getUserById } from "@/utils/auth";
+import StarRating from "@/app/components/ui/StarRating";
+
 
 export interface BookCardProps {
   book: Book;
@@ -143,15 +145,12 @@ const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
             </span> */}
           </div>
 
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center">
-              <Star className="w-4 h-4 mr-1 text-yellow-400 fill-current flex-shrink-0" />
-              <span className="font-medium">{ownerUser?.rating || "N/A"}</span>
-            </div>
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span>Up to {book.maxLendingDays} days</span>
-            </div>
+          {/* Rating */}
+          <div className="flex items-center">
+            <StarRating rating={(ownerUser as any)?.rating ?? 0} readonly size="sm" />
+            <span className="ml-1 text-sm text-gray-600">
+              {(ownerUser as any)?.rating?.toFixed?.(1) ?? "0"}
+            </span>
           </div>
 
           <div className="flex items-center text-sm text-gray-500">

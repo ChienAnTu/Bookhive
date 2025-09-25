@@ -7,6 +7,8 @@ import { getCurrentUser, isAuthenticated } from "../../utils/auth";
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
+import type { RatingStats, Comment } from "@/app/types/index";
+import StarRating from '@/app/components/ui/StarRating';
 
 const ProfilePage: React.FC = () => {
   const router = useRouter();
@@ -15,6 +17,15 @@ const ProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"Received" | "Given">("Received");
   const tabs: ("Received" | "Given")[] = ["Received", "Given"];
 
+  const [ratingStats, setRatingStats] = useState<RatingStats>({
+    averageRating: 0,
+    totalReviews: 0,
+    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    recentComments: [],
+  });
+
+  const receivedReviews: any[] = [];
+  const givenReviews: any[] = [];
 
   // Check authentication and load user data
   useEffect(() => {
@@ -70,13 +81,7 @@ const ProfilePage: React.FC = () => {
     month: "long",
   });
 
-  // Use default values for rating and books if not provided by API
-  const rating = (currentUser as any).rating || 0;
-
-
-  // Calculate star rating display
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 !== 0;
+  // TODO: Review API
 
   return (
     <div className="flex-1 bg-gray-50 py-8">
@@ -107,20 +112,10 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Renting stars */}
-              <div className="flex items-center mt-2 mb-2">
-                <div className="flex items-center mr-3">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-4 h-4 ${star <= Math.floor(rating)
-                        ? "text-yellow-400 fill-current"
-                        : "text-gray-300"
-                        }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm text-gray-600">
-                  {rating.toFixed(1)}
+              <div className="flex items-center mb-2">
+                <StarRating rating={ratingStats.averageRating} readonly size="sm" />
+                <span className="ml-2 text-sm text-gray-600">
+                  {ratingStats.averageRating.toFixed(1)} ({ratingStats.totalReviews} reviews)
                 </span>
               </div>
 
@@ -207,8 +202,8 @@ const ProfilePage: React.FC = () => {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-sm font-medium ${activeTab === tab
-                    ? "border-b-2 border-black text-black"
-                    : "text-gray-500 hover:text-gray-700"
+                  ? "border-b-2 border-black text-black"
+                  : "text-gray-500 hover:text-gray-700"
                   }`}
               >
                 {tab === "Received" ? "Reviews I Received" : "Reviews I Gave"}
@@ -218,9 +213,9 @@ const ProfilePage: React.FC = () => {
 
           {/* Tab Content */}
           {activeTab === "Received" ? (
-            currentUser.receivedReviews && currentUser.receivedReviews.length > 0 ? (
+            receivedReviews && receivedReviews.length > 0 ? (
               <div className="space-y-4">
-                {currentUser.receivedReviews.map((review, idx) => (
+                {receivedReviews.map((review, idx) => (
                   <div
                     key={idx}
                     className="border border-gray-200 rounded-lg p-4 bg-gray-50"
@@ -233,18 +228,13 @@ const ProfilePage: React.FC = () => {
                         {new Date(review.createdAt).toLocaleDateString("en-US")}
                       </span>
                     </div>
+
+                    {/* ⭐ 用 StarRating 替换手写的星星 */}
                     <div className="flex items-center mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-300"
-                            }`}
-                        />
-                      ))}
+                      <StarRating rating={review.rating} readonly size="sm" />
                       <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
                     </div>
+
                     <p className="text-gray-700 text-sm">{review.comment}</p>
                   </div>
                 ))}
@@ -253,9 +243,9 @@ const ProfilePage: React.FC = () => {
               <p className="text-gray-500 text-sm">No reviews received yet.</p>
             )
           ) : (
-            currentUser.givenReviews && currentUser.givenReviews.length > 0 ? (
+            givenReviews && givenReviews.length > 0 ? (
               <div className="space-y-4">
-                {currentUser.givenReviews.map((review, idx) => (
+                {givenReviews.map((review, idx) => (
                   <div
                     key={idx}
                     className="border border-gray-200 rounded-lg p-4 bg-gray-50"
@@ -268,18 +258,13 @@ const ProfilePage: React.FC = () => {
                         {new Date(review.createdAt).toLocaleDateString("en-US")}
                       </span>
                     </div>
+
+                    {/* ⭐ 用 StarRating 替换手写的星星 */}
                     <div className="flex items-center mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-300"
-                            }`}
-                        />
-                      ))}
+                      <StarRating rating={review.rating} readonly size="sm" />
                       <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
                     </div>
+
                     <p className="text-gray-700 text-sm">{review.comment}</p>
                   </div>
                 ))}
@@ -288,6 +273,7 @@ const ProfilePage: React.FC = () => {
               <p className="text-gray-500 text-sm">No reviews given yet.</p>
             )
           )}
+
         </div>
 
       </div>
