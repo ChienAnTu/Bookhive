@@ -4,18 +4,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Filter, Package, Clock, AlertTriangle } from "lucide-react";
+import CoverImg from "../components/ui/CoverImg";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 
 import type { Order, OrderStatus } from "@/app/types/order";
 import type { Book } from "@/app/types/book";
-import { getCurrentUser, getUserById } from "@/utils/auth";
+import { getCurrentUser } from "@/utils/auth";
 import {
   getBorrowingOrders,
   type Order as ApiOrder,
 } from "@/utils/borrowingOrders";
-import { getBookById } from "@/utils/books";
 import {
   createComplaint,
   type CreateComplaintRequest,
@@ -87,10 +87,7 @@ export default function OrderListPage() {
               title: book.title,
               titleOr: book.title || "Untitled",
               author: "", // API doesn't provide author
-              coverImgUrl:
-                book.cover && book.cover !== "string"
-                  ? book.cover
-                  : "/images/placeholder-book.png",
+              coverImgUrl: book.cover
             };
           });
         });
@@ -273,14 +270,10 @@ export default function OrderListPage() {
                       {/* Book cover display */}
                       <div className="relative w-28 h-36 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
                         {first?.coverImgUrl || first?.coverUrl ? (
-                          <img
+                          <CoverImg
                             src={first.coverImgUrl || first.coverUrl}
-                            alt={first.titleOr || first.title || "Book cover"}
+                            title={first.titleOr || first.title}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/images/placeholder-book.png";
-                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
