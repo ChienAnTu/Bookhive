@@ -255,13 +255,76 @@ class OrderService:
                 if ob.book:
                     books_info.append({
                         "title": ob.book.title_or,
-                        "cover": ob.book.cover_img_url
+                        "cover": ob.book.cover_img_url,
                     })
 
             result.append({
                 "order_id": order.id,
                 "status": order.status,
                 "total_paid_amount": float(order.total_paid_amount),
-                "books": books_info    
+                "books": books_info,
+                "create_at": order.created_at,
+                "due_at": order.due_at,
             })
         return result
+    
+    @staticmethod
+    def get_order_detail(db: Session, order_id: str) -> Optional[Dict]:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            return None
+        return order.to_dict(include_books = True)
+
+        
+    @staticmethod
+    def cancel_order(db: Session, order_id: str, user_id: str) -> bool:
+        """
+        Cancel an order if it's in a cancellable state
+        
+        Args:
+            db: Database session
+            order_id: Order ID to cancel
+            user_id: User ID performing the cancellation (for authorization)
+            
+        Returns:
+            bool: True if cancellation was successful
+            
+        Raises:
+            HTTPException: If order not found, unauthorized, or not cancellable
+        """
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(
+                status_code=404,
+                detail="Order not found"
+            )
+        
+        # Check authorization - only borrower can cancel their order
+        if order.borrower_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to cancel this order"
+            )
+        
+        # Check if order can be cancelled
+        cancellable_statuses = ["PENDING_PAYMENT", "PENDING_SHIPMENT"]
+        if order.status not in cancellable_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot cancel order with status '{order.status}'. Only orders with status {cancellable_statuses} can be cancelled."
+            )
+        
+        # Update order status to CANCELED
+        order.status = "CANCELED"
+        order.canceled_at = datetime.now(timezone.utc)
+        
+        # Restore book availability - set books back to 'listed' status
+        for order_book in order.books:
+            if order_book.book:
+                book = db.query(Book).filter(Book.id == order_book.book_id).first()
+                if book.status == "unlisted":
+                    book.status = "listed"
+        
+        db.commit()
+        return True
