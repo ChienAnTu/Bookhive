@@ -1,7 +1,7 @@
 export interface Message {
   id: string;
-  senderId: string;
-  receiverId: string;
+  sender_email: string;
+  receiver_email: string;
   content: string;
   timestamp: string;
   bookId?: string;
