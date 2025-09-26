@@ -15,6 +15,19 @@ const API_URL = getApiUrl();
 // Add WebSocket URL from environment variable
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
 
+const formatPerthTime = (timestamp: string) => {
+  // Create a date object from the UTC timestamp
+  const utcDate = new Date(timestamp + 'Z'); // Adding 'Z' to explicitly mark as UTC
+
+  // Format the date for Perth timezone
+  return utcDate.toLocaleTimeString('en-AU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false, // Use 24-hour format
+    timeZone: 'Australia/Perth'
+  });
+};
+
 export default function MessagesPage() {
   const searchParams = useSearchParams();
   const initialRecipientEmail = searchParams.get('to');
@@ -376,7 +389,9 @@ export default function MessagesPage() {
                       {thread.user.name}
                     </h3>
                     <span className="text-xs text-gray-500">
-                      {new Date(thread.lastMessage.timestamp).toLocaleDateString()}
+                      {new Date(thread.lastMessage.timestamp + 'Z').toLocaleDateString('en-AU', {
+                        timeZone: 'Australia/Perth'
+                      })}
                     </span>
                   </div>
                   {thread.lastMessage.bookTitle && (
@@ -451,10 +466,7 @@ export default function MessagesPage() {
                         />
                       )}
                       <div className="text-xs text-gray-400 mt-1">
-                        {new Date(msg.timestamp).toLocaleTimeString(['en-US'], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatPerthTime(msg.timestamp)}
                       </div>
                     </div>
                   </div>
