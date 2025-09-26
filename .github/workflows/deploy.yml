@@ -24,7 +24,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd ~/capstone15/Bookhive
             git pull origin master
+            docker compose down
             docker compose up -d --build
+            docker compose ps
+            git log -1 --oneline
+            echo "🚀 Deployment complete!"
           EOF
 
   deploy-staging:
@@ -40,7 +44,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd ~/capstone15/Bookhive
             git pull origin infra/github-actions-deploy
+            docker compose down
             docker compose up -d --build
+            docker compose ps
+            git log -1 --oneline
+            echo "🚀 Deployment complete!"
           EOF
 
 
