@@ -8,6 +8,10 @@ class BookSummary(BaseModel):
     title: str
     cover: Optional[str]  
 
+class UserSummary(BaseModel):
+    id: str
+    name: str   
+
 class OrderSummary(BaseModel):
     order_id: str
     status: str
@@ -26,8 +30,8 @@ class BookDetail(BaseModel):
 class OrderDetail(BaseModel):
     # basic info
     id: str
-    ownerId: str
-    borrowerId: str
+    owner: UserSummary
+    borrower: UserSummary
     status: str
     actionType: str
     shippingMethod: str
