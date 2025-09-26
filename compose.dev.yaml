@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  backend:
+    image: fastapi:latest
+    build: ./fastapi              # Path to backend Dockerfile
+    container_name: fastapi-backend
+    expose:
+      - "8000"
+    env_file:
+      - ./.env
+    networks:
+      - mynetwork
+
+  frontend:
+    image: frontendnext:latest
+    build: ./frontendNext
+    container_name: next-frontend
+    expose:
+      - "3000"
+    depends_on:
+      - backend
+    networks:
+      - mynetwork
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
