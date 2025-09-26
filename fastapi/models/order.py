@@ -125,8 +125,14 @@ class Order(Base):
 
         return {
             "id": self.id,
-            "ownerId": self.owner_id,
-            "borrowerId": self.borrower_id,
+            "owner": {
+                "id": self.owner.user_id if self.owner else None,
+                "name": self.owner.name if self.owner else None,
+            },
+            "borrower": {
+                "id": self.borrower.user_id if self.borrower else None,
+                "name": self.borrower.name if self.borrower else None,
+            },
             "status": self.status,
             "actionType": self.action_type,
             "shippingMethod": self.shipping_method,

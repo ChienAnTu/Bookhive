@@ -5,21 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Filter, Package, Clock, AlertTriangle } from "lucide-react";
 import CoverImg from "../components/ui/CoverImg";
-
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-
-import type { Order, OrderStatus } from "@/app/types/order";
-import type { Book } from "@/app/types/book";
-import { getCurrentUser } from "@/utils/auth";
-import {
-  getBorrowingOrders,
-  type Order as ApiOrder,
-} from "@/utils/borrowingOrders";
-import {
-  createComplaint,
-  type CreateComplaintRequest,
-} from "@/utils/complaints";
+import type { OrderStatus } from "@/app/types/order";
+import { getBorrowingOrders, type Order } from "@/utils/borrowingOrders";
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -33,18 +22,10 @@ const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
 
 export default function OrderListPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [booksMap, setBooksMap] = useState<Record<string, Book>>({});
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [search, setSearch] = useState("");
-  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [complaintType, setComplaintType] = useState<
-    "book-condition" | "delivery" | "user-behavior" | "overdue" | "other"
-  >("book-condition");
-  const [complaintDescription, setComplaintDescription] = useState("");
-  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -52,49 +33,10 @@ export default function OrderListPage() {
       try {
         setLoading(true);
         const apiOrders = await getBorrowingOrders();
-
-        // Convert API orders to app Order format based on the actual API schema
-        const convertedOrders: Order[] = apiOrders.map((apiOrder) => ({
-          id: apiOrder.order_id,
-          status: apiOrder.status as OrderStatus,
-          totalPaid: { amount: apiOrder.total_paid_amount },
-          items: apiOrder.books.map((book, index) => ({
-            id: `${apiOrder.order_id}-book-${index}`, // Generate ID since API doesn't provide book ID
-            title: book.title,
-            author: "", // API doesn't provide author info
-            coverUrl: book.cover,
-          })),
-          bookIds: apiOrder.books.map(
-            (book, index) => `${apiOrder.order_id}-book-${index}`
-          ),
-          // Add fields from the updated API
-          createdAt: apiOrder.create_at, // Note: changed from created_at to create_at
-          dueAt: apiOrder.due_at,
-          // These fields are no longer provided by the API
-          borrowedAt: undefined,
-          returnedAt: undefined,
-        }));
-
-        setOrders(convertedOrders);
-
-        // Create books map for easy lookup - using generated IDs since API doesn't provide book IDs
-        const newBooksMap: Record<string, Book> = {};
-        apiOrders.forEach((apiOrder) => {
-          apiOrder.books.forEach((book, index) => {
-            const generatedId = `${apiOrder.order_id}-book-${index}`;
-            newBooksMap[generatedId] = {
-              id: generatedId,
-              title: book.title,
-              titleOr: book.title || "Untitled",
-              author: "", // API doesn't provide author
-              coverImgUrl: book.cover
-            };
-          });
-        });
-        setBooksMap(newBooksMap);
+        setOrders(apiOrders);
       } catch (error) {
         console.error("Failed to load orders:", error);
-        setErr("Failed to load orders. Please try again.");
+        setError("Failed to load orders. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -103,7 +45,7 @@ export default function OrderListPage() {
     loadData();
   }, []);
 
-  // search and filter
+  // Search and filter
   const filteredOrders = useMemo(() => {
     let list = orders;
     if (statusFilter !== "all") {
@@ -112,12 +54,10 @@ export default function OrderListPage() {
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((o) => {
-        const bookMatched = o.items.some(
-          (b) =>
-            (b.title || "").toLowerCase().includes(q) ||
-            (b.author || "").toLowerCase().includes(q)
+        const bookMatched = o.books.some((book) =>
+          book.title.toLowerCase().includes(q)
         );
-        return bookMatched || o.id.toLowerCase().includes(q);
+        return bookMatched || o.order_id.toLowerCase().includes(q);
       });
     }
     return list;
@@ -155,12 +95,6 @@ export default function OrderListPage() {
     }
   };
 
-  const isActionable = (o: Order) =>
-    o.status === "PENDING_SHIPMENT" ||
-    o.status === "BORROWING" ||
-    o.status === "RETURNED" ||
-    o.status === "OVERDUE";
-
   return (
     <div className="flex h-full">
       <div className="flex-1 overflow-y-auto">
@@ -184,7 +118,7 @@ export default function OrderListPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search by book title, author, or order ID..."
+                  placeholder="Search by book title or order ID..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -217,9 +151,9 @@ export default function OrderListPage() {
           </div>
 
           {/* Error / Loading */}
-          {err && (
+          {error && (
             <Card>
-              <div className="p-4 text-red-600">{err}</div>
+              <div className="p-4 text-red-600">{error}</div>
             </Card>
           )}
           {loading && (
@@ -229,7 +163,7 @@ export default function OrderListPage() {
           )}
 
           {/* Order list */}
-          {!loading && !err && (
+          {!loading && !error && (
             <div className="space-y-4">
               {filteredOrders.length === 0 ? (
                 <Card>
@@ -244,35 +178,26 @@ export default function OrderListPage() {
                   </div>
                 </Card>
               ) : (
-                filteredOrders.map((o) => {
-                  const booksInOrder = o.bookIds
-                    .map((id) => booksMap[id])
-                    .filter(Boolean) as Book[];
-                  const first = booksInOrder[0] || o.items[0]; // Fallback to items if booksMap is empty
-                  const ownerName = "Book Owner"; // TODO: Fetch owner name from API
-
-                  const extra = Math.max(
-                    0,
-                    Math.max(booksInOrder.length, o.items.length) - 1
-                  );
-
-                  const meta = STATUS_META[o.status];
-                  const isOverdueBadge =
-                    o.status === "BORROWING" &&
-                    o.dueAt &&
-                    new Date(o.dueAt).getTime() < Date.now();
+                filteredOrders.map((order) => {
+                  const firstBook = order.books[0];
+                  const extra = Math.max(0, order.books.length - 1);
+                  const meta = STATUS_META[order.status];
+                  const isOverdue =
+                    order.status === "BORROWING" &&
+                    order.due_at &&
+                    new Date(order.due_at).getTime() < Date.now();
 
                   return (
                     <Card
-                      key={o.id}
+                      key={order.order_id}
                       className="relative overflow-visible flex gap-4 p-4 border border-gray-200 rounded-xl hover:shadow-md transition"
                     >
                       {/* Book cover display */}
                       <div className="relative w-28 h-36 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                        {first?.coverImgUrl || first?.coverUrl ? (
+                        {firstBook?.cover ? (
                           <CoverImg
-                            src={first.coverImgUrl || first.coverUrl}
-                            title={first.titleOr || first.title}
+                            src={firstBook.cover}
+                            title={firstBook.title}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -291,21 +216,18 @@ export default function OrderListPage() {
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between flex-wrap gap-2">
-                            {/* title*/}
+                            {/* Title */}
                             <div>
                               <h3
                                 className="text-lg font-semibold text-black cursor-pointer hover:underline"
                                 onClick={() =>
-                                  router.push(`/borrowing/${o.id}`)
+                                  router.push(`/borrowing/${order.order_id}`)
                                 }
-                                title={booksInOrder
-                                  .map((b) => b?.titleOr || b?.title)
-                                  .filter(Boolean)
+                                title={order.books
+                                  .map((b) => b.title)
                                   .join(" · ")}
                               >
-                                {first?.titleOr ||
-                                  first?.title ||
-                                  "Untitled Book"}
+                                {firstBook?.title || "Untitled Book"}
                                 {extra > 0 && (
                                   <span className="text-gray-500">
                                     {" "}
@@ -313,26 +235,9 @@ export default function OrderListPage() {
                                   </span>
                                 )}
                               </h3>
-                              <p className="text-sm text-gray-500">
-                                {first?.author ? (
-                                  <>
-                                    Author:{" "}
-                                    <span className="font-medium">
-                                      {first.author}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <>
-                                    Owner:{" "}
-                                    <span className="font-medium">
-                                      {ownerName}
-                                    </span>
-                                  </>
-                                )}
-                              </p>
                             </div>
 
-                            {/* status */}
+                            {/* Status */}
                             <div className="flex items-center gap-2">
                               <span
                                 className={`text-lg font-medium ${meta.className}`}
@@ -342,16 +247,16 @@ export default function OrderListPage() {
                             </div>
                           </div>
 
-                          {/* times - showing only available fields from API */}
+                          {/* Times */}
                           <div className="text-sm text-gray-500 mt-1 flex flex-col gap-1">
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span>Created: {fmtDate(o.createdAt)}</span>
+                              <span>Created: {fmtDate(order.create_at)}</span>
                             </div>
-                            {o.dueAt && (
+                            {order.due_at && (
                               <div className="flex text-black font-medium items-center gap-1">
                                 <Clock className="w-4 h-4" />
-                                <span>Due: {fmtDate(o.dueAt)}</span>
-                                {isOverdueBadge && (
+                                <span>Due: {fmtDate(order.due_at)}</span>
+                                {isOverdue && (
                                   <span className="inline-flex items-center gap-1 text-sm font-medium text-red-600">
                                     <AlertTriangle className="w-4 h-4" />{" "}
                                     Overdue
@@ -362,48 +267,18 @@ export default function OrderListPage() {
                           </div>
                         </div>
 
-                        {/* actions */}
+                        {/* Actions */}
                         <div className="flex gap-2 mt-3 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
                             className="border-black text-black hover:bg-black hover:text-white"
-                            onClick={() => router.push(`/borrowing/${o.id}`)}
+                            onClick={() =>
+                              router.push(`/borrowing/${order.order_id}`)
+                            }
                           >
                             View Detail
                           </Button>
-
-                          {/* Message */}
-                          {o.status !== "COMPLETED" &&
-                            o.status !== "CANCELED" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-black text-black hover:bg-black hover:text-white"
-                                onClick={() =>
-                                  router.push(`/messages?orderId=${o.id}`)
-                                }
-                              >
-                                Message Owner
-                              </Button>
-                            )}
-
-                          {/* Create Complaint */}
-                          {(o.status === "BORROWING" ||
-                            o.status === "OVERDUE" ||
-                            o.status === "RETURNED") && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white"
-                              onClick={() => {
-                                setSelectedOrder(o);
-                                setIsComplaintModalOpen(true);
-                              }}
-                            >
-                              Create Complaint
-                            </Button>
-                          )}
                         </div>
                       </div>
                     </Card>
@@ -414,114 +289,6 @@ export default function OrderListPage() {
           )}
         </div>
       </div>
-
-      {/* Complaint Modal */}
-      {isComplaintModalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-semibold mb-4">
-              Create Complaint - Order #{selectedOrder.id}
-            </h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Complaint Type
-                </label>
-                <select
-                  value={complaintType}
-                  onChange={(e) =>
-                    setComplaintType(
-                      e.target.value as
-                        | "book-condition"
-                        | "delivery"
-                        | "user-behavior"
-                        | "overdue"
-                        | "other"
-                    )
-                  }
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="book-condition">Book Condition</option>
-                  <option value="delivery">Delivery Issue</option>
-                  <option value="user-behavior">User Behavior</option>
-                  <option value="overdue">Overdue Issue</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={complaintDescription}
-                  onChange={(e) => setComplaintDescription(e.target.value)}
-                  placeholder="Please describe the issue in detail..."
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  rows={4}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsComplaintModalOpen(false);
-                  setSelectedOrder(null);
-                  setComplaintDescription("");
-                  setComplaintType("book-condition");
-                }}
-                disabled={isSubmittingComplaint}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (!complaintDescription.trim()) return;
-
-                  setIsSubmittingComplaint(true);
-                  try {
-                    const user = await getCurrentUser();
-                    if (!user) throw new Error("User not authenticated");
-
-                    const complaintData: CreateComplaintRequest = {
-                      subject: `Complaint for Order ${selectedOrder?.id}`,
-                      orderId: selectedOrder?.id || "",
-                      type: complaintType,
-                      description: complaintDescription.trim(),
-                      source: "order",
-                    };
-
-                    await createComplaint(complaintData);
-
-                    // Close modal and reset form
-                    setIsComplaintModalOpen(false);
-                    setSelectedOrder(null);
-                    setComplaintDescription("");
-                    setComplaintType("book-condition");
-
-                    // Show success message (you might want to add a toast notification here)
-                    alert("Complaint submitted successfully!");
-                  } catch (error) {
-                    console.error("Failed to create complaint:", error);
-                    alert("Failed to submit complaint. Please try again.");
-                  } finally {
-                    setIsSubmittingComplaint(false);
-                  }
-                }}
-                disabled={!complaintDescription.trim() || isSubmittingComplaint}
-                className="flex-1 bg-orange-500 hover:bg-orange-600"
-              >
-                {isSubmittingComplaint ? "Submitting..." : "Submit Complaint"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

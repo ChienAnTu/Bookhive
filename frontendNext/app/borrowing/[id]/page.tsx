@@ -7,54 +7,19 @@ import { Clock, Truck, ArrowLeft, AlertTriangle } from "lucide-react";
 import CoverImg from "@/app/components/ui/CoverImg";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
+import { toast } from "sonner";
 
-import type { OrderStatus } from "@/app/types/order";
-import type { Book } from "@/app/types/book";
-import BookThumbnailCard from "@/app/components/common/BookThumbnailCard";
-import { mockUsers } from "@/app/data/mockData";
+import type { OrderStatus, ApiOrder } from "@/app/types/order";
 import type { User } from "@/app/types/user";
 import { getCurrentUser } from "@/utils/auth";
 
-// Updated Order interface to match API response
-interface ApiOrder {
-  id: string;
-  ownerId: string;
-  borrowerId: string;
-  status: OrderStatus;
-  actionType: string;
-  shippingMethod: string;
-  depositOrSaleAmount: number;
-  serviceFeeAmount: number;
-  shippingOutFeeAmount: number;
-  totalPaidAmount: number;
-  contactName: string;
-  phone: string;
-  street: string;
-  city: string;
-  postcode: string;
-  country: string;
-  createdAt: string;
-  updatedAt: string;
-  dueAt: string | null;
-  startAt: string | null;
-  returnedAt: string | null;
-  completedAt: string | null;
-  canceledAt: string | null;
-  shippingOutTrackingNumber: string | null;
-  shippingOutTrackingUrl: string | null;
-  shippingReturnTrackingNumber: string | null;
-  shippingReturnTrackingUrl: string | null;
-  lateFeeAmount: number;
-  damageFeeAmount: number;
-  totalRefundedAmount: number;
-  books: Array<{
-    bookId: string;
-    titleEn: string;
-    titleOr: string;
-    author: string;
-    coverImgUrl: string;
-  }>;
-}
+// Get API URL for this page specifically
+const getOrderApiUrl = () => {
+  if (process.env.NODE_ENV === "production") {
+    return "https://your-production-api.com";
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+};
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -73,12 +38,13 @@ const fmtAUD = (amount?: number) =>
 // Format date
 const fmtDate = (v?: string | null) => (v ? new Date(v).toLocaleString() : "—");
 
-// API function to fetch order details
+// API function to fetch order details using correct environment variable
 const fetchOrderDetails = async (orderId: string): Promise<ApiOrder | null> => {
   try {
-    const response = await fetch(
-      `http://localhost:8000/api/v1/orders/${orderId}`
-    );
+    const apiUrl = getOrderApiUrl();
+    const fullUrl = `${apiUrl}/api/v1/orders/${orderId}`;
+
+    const response = await fetch(fullUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch order: ${response.status}`);
     }
@@ -107,7 +73,6 @@ export default function OrderDetailPage() {
 
       const orderData = await fetchOrderDetails(id);
       if (orderData) {
-        console.log("Loaded order data:", orderData); // Debug log
         setOrder(orderData);
       } else {
         setError("Failed to load order details");
@@ -144,7 +109,7 @@ export default function OrderDetailPage() {
       borrowPrice: { amount: 0 },
       salePrice: { amount: 0 },
       deposit: { amount: 0 },
-      ownerId: order.ownerId,
+      ownerId: order.owner.id,
       createdAt: "",
       updatedAt: "",
     }));
@@ -165,8 +130,8 @@ export default function OrderDetailPage() {
     })();
   }, []);
 
-  const isOwner = user?.id === order?.ownerId;
-  const isBorrower = user?.id === order?.borrowerId;
+  const isOwner = user?.id === order?.owner.id;
+  const isBorrower = user?.id === order?.borrower.id;
 
   if (loading) {
     return (
@@ -232,16 +197,12 @@ export default function OrderDetailPage() {
           <div className="text-sm text-gray-500 mt-3 flex flex-col gap-1">
             <div>
               Owner:{" "}
-              <span className="text-black font-medium">
-                {mockUsers.find((u) => u.id === order.ownerId)?.name ||
-                  `User ${order.ownerId.substring(0, 8)}`}
-              </span>
+              <span className="text-black font-medium">{order.owner.name}</span>
             </div>
             <div>
               Borrower:{" "}
               <span className="text-black font-medium">
-                {mockUsers.find((u) => u.id === order.borrowerId)?.name ||
-                  `User ${order.borrowerId.substring(0, 8)}`}
+                {order.borrower.name}
               </span>
             </div>
 
@@ -451,11 +412,57 @@ export default function OrderDetailPage() {
             )}
 
           {/* Cancel Order */}
-          {order.status === "PENDING_PAYMENT" && (
+          {(isBorrower || isOwner) && order.status === "PENDING_PAYMENT" && (
             <Button
               variant="outline"
               className="border-red-600 text-red-600 hover:bg-red-50"
-              onClick={() => alert("TODO: Cancel order API")}
+              onClick={async () => {
+                if (!user) {
+                  toast.error("Please login first");
+                  router.push("/auth");
+                  return;
+                }
+
+                const confirmCancel = window.confirm(
+                  "Are you sure you want to cancel this order? This action cannot be undone."
+                );
+                if (!confirmCancel) return;
+
+                try {
+                  const token = localStorage.getItem("access_token"); // 使用 access_token
+                  if (!token) {
+                    toast.error(
+                      "Authentication required. Please log in again."
+                    );
+                    router.push("/auth");
+                    return;
+                  }
+
+                  const res = await fetch(
+                    `${getOrderApiUrl()}/api/v1/orders/${order.id}/cancel`,
+                    {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`, // 添加JWT token
+                      },
+                    }
+                  );
+
+                  if (!res.ok) throw new Error("Failed to cancel order");
+
+                  toast.success("Order cancelled successfully");
+
+                  // Reload the order data to show updated status
+                  const updatedOrder = await fetchOrderDetails(id);
+                  if (updatedOrder) {
+                    setOrder(updatedOrder);
+                  }
+                } catch (err) {
+                  console.error("Cancel order error:", err);
+                  toast.error("Failed to cancel order");
+                }
+              }}
             >
               Cancel Order
             </Button>
@@ -478,7 +485,14 @@ export default function OrderDetailPage() {
             <Button
               variant="outline"
               className="border-black text-black hover:bg-black hover:text-white"
-              onClick={() => router.push(`/messages?orderId=${order.id}`)}
+              onClick={() => {
+                if (!user) {
+                  toast.error("Please login first");
+                  router.push("/auth");
+                  return;
+                }
+                router.push(`/messages?orderId=${order.id}`);
+              }}
             >
               Message
             </Button>
@@ -486,12 +500,18 @@ export default function OrderDetailPage() {
 
           {/* Support */}
           {order.status !== "COMPLETED" &&
-            order.status !== "PENDING_PAYMENT" &&
-            order.status !== "CANCELED" && (
+            order.status !== "PENDING_PAYMENT" && (
               <Button
                 variant="outline"
                 className="border-black text-black hover:bg-black hover:text-white"
-                onClick={() => router.push(`/complain?orderId=${order.id}`)}
+                onClick={() => {
+                  if (!user) {
+                    toast.error("Please login first");
+                    router.push("/auth");
+                    return;
+                  }
+                  router.push(`/complain?orderId=${order.id}`);
+                }}
               >
                 Support
               </Button>
@@ -501,9 +521,26 @@ export default function OrderDetailPage() {
           {order.status === "COMPLETED" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
-              onClick={() => router.push(`/orders/${order.id}/review`)}
+              onClick={() => {
+                if (!user) {
+                  toast.error("Please login first");
+                  router.push("/auth");
+                  return;
+                }
+                router.push(`/orders/${order.id}/review`);
+              }}
             >
               Write Review
+            </Button>
+          )}
+
+          {/* Login Button for unauthenticated users */}
+          {!user && (
+            <Button
+              className="bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => router.push("/auth")}
+            >
+              Login to View Actions
             </Button>
           )}
         </div>

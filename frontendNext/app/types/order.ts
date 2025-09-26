@@ -28,8 +28,8 @@ export interface ShippingRef {
 /** Core order structure (ultra simplified) */
 export interface Order {
   id: string;
-  ownerId: string;      // Lender
-  borrowerId: string;   // Borrower
+  ownerId: string; // Lender
+  borrowerId: string; // Borrower
 
   // books (multi)
   bookIds: string[];
@@ -37,8 +37,8 @@ export interface Order {
   status: OrderStatus;
 
   // Time tracking
-  startAt?: string;     // When BORROWING starts
-  dueAt?: string;       // = startAt + max(books[].maxLendingDays)
+  startAt?: string; // When BORROWING starts
+  dueAt?: string; // = startAt + max(books[].maxLendingDays)
   returnedAt?: string;
   completedAt?: string;
   canceledAt?: string;
@@ -62,17 +62,22 @@ export interface Order {
   damageFee?: Money;
 
   // Totals
-  totalPaid: Money;        // Initial payment (deposit + serviceFee + shippingOutFee + salePrice)
-  totalRefunded?: Money;   // What borrower got back (deposit - fees)
+  totalPaid: Money; // Initial payment (deposit + serviceFee + shippingOutFee + salePrice)
+  totalRefunded?: Money; // What borrower got back (deposit - fees)
 
   notes?: string;
 }
 
-
 export interface ApiOrder {
   id: string;
-  ownerId: string;
-  borrowerId: string;
+  owner: {
+    id: string;
+    name: string;
+  };
+  borrower: {
+    id: string;
+    name: string;
+  };
   status: OrderStatus;
   actionType: string;
   shippingMethod: string;
