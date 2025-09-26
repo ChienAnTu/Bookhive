@@ -237,5 +237,5 @@ make clean     # prune unused Docker images, networks, volumes
 ## 🔒 License
 
 This project is for academic purposes (University Capstone Project).
-All rights reserved to the project contributors.
+All rights reserved to the project contributors. 
 
