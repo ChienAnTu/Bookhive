@@ -10,6 +10,7 @@ from core.security import create_access_token, verify_password, get_password_has
 from core.dependencies import get_db, get_current_user
 from services.auth_service import AuthService
 from models.user import User
+from models.ban import Ban
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -94,7 +95,15 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    # Check if user is banned
+    active_ban = db.query(Ban).filter(Ban.user_id == user.user_id, Ban.is_active == True).first()
+    if active_ban:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account is banned: {active_ban.reason}"
+        )
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires

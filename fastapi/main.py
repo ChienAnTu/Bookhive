@@ -14,6 +14,8 @@ from routes.shipping import router as shipping_router  # Import shipping router
 from routes.service_fee import router as service_fee_router
 from routes.checkout import router as checkout_router  # Import checkout router
 from routes.order import router as orders_router
+from routes.bans import router as bans_router
+from routes.blacklists import router as blacklists_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -66,6 +68,12 @@ app.include_router(complaints_router, prefix="/api/v1")
 
 # order router
 app.include_router(orders_router, prefix="/api/v1/orders")
+
+# bans router
+app.include_router(bans_router, prefix="/api/v1")
+
+# blacklists router
+app.include_router(blacklists_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
