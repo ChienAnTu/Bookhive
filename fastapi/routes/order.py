@@ -81,3 +81,13 @@ async def get_order_detail(
         raise HTTPException(status_code=404, detail="Order not found")
     
     return order_detail
+
+@router.put("/{order_id}/cancel")
+def cancel_order(
+    order_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    success = OrderService.cancel_order(db, order_id, current_user.user_id)
+    if success:
+        return {"message": "Order cancelled successfully"}
