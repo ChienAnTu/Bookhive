@@ -57,8 +57,8 @@ export default function MessagesPage() {
                 lastMessage: {
                   id: `temp-${Date.now()}`,
                   content: `Start a conversation about "${initialBookTitle || 'this book'}"...`,
-                  senderId: '',
-                  receiverId: '',
+                  sender_email: '',
+                  receiver_email: '',
                   timestamp: new Date().toISOString(),
                   read: true,
                   bookTitle: initialBookTitle || undefined,
@@ -115,8 +115,8 @@ export default function MessagesPage() {
             const newMessage: Message = {
               id: data.data.message_id,
               content: data.data.content,
-              senderId: data.data.sender_id,
-              receiverId: data.data.receiver_id,
+              sender_email: data.data.sender_email,
+              receiver_email: data.data.receiver_id,
               timestamp: data.data.timestamp,
               read: false,
               imageUrl: data.data.image_url
@@ -167,8 +167,8 @@ export default function MessagesPage() {
               const newMessage: Message = {
                 id: data.data.message_id,
                 content: data.data.content,
-                senderId: data.data.sender_id,
-                receiverId: data.data.receiver_id,
+                sender_email: data.data.sender_email,
+                receiver_email: data.data.receiver_id,
                 timestamp: data.data.timestamp,
                 read: true, // Mark as read immediately if in active conversation
                 imageUrl: data.data.image_url
@@ -244,8 +244,8 @@ export default function MessagesPage() {
       const newMessage: Message = {
         id: response.message_id,
         content: messageInput || '',
-        senderId: currentUser.id,
-        receiverId: selectedThread.user.id,
+        sender_email: currentUser.id,
+        receiver_email: selectedThread.user.email,
         timestamp: response.timestamp, // Use timestamp from response
         read: false,
         imageUrl: response.image_url
@@ -267,7 +267,7 @@ export default function MessagesPage() {
           ? {
               ...thread,
               lastMessage: newMessage,
-              unreadCount: thread.user.id === newMessage.receiverId && thread.user.id !== currentUser.id 
+              unreadCount: thread.user.id === newMessage.receiver_email && thread.user.id !== currentUser.id 
               ? thread.unreadCount + 1 
               : thread.unreadCount
             }
@@ -299,8 +299,8 @@ export default function MessagesPage() {
       const newMessage: Message = {
         id: response.message_id,
         content: messageInput,
-        senderId: currentUser.id,
-        receiverId: selectedThread.user.id,
+        sender_email: currentUser.email,
+        receiver_email: selectedThread.user.email,
         timestamp: response.timestamp,
         read: false
       };
@@ -322,7 +322,7 @@ export default function MessagesPage() {
                 ...thread,
                 lastMessage: newMessage,
                 // Ensure the unread count isn't incorrectly incremented for self-sent messages
-                unreadCount: thread.user.id === newMessage.receiverId && thread.user.id !== currentUser.id 
+                unreadCount: thread.user.id === newMessage.receiver_email && thread.user.id !== currentUser.id 
                   ? thread.unreadCount + 1 
                   : thread.unreadCount
               }
@@ -426,19 +426,21 @@ export default function MessagesPage() {
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {selectedThread.messages?.map((msg) => {
-                const isOwn = msg.senderId === currentUser?.id;
+                const isOwn = (msg.sender_email === currentUser?.email);
+                console.log('Rendering message:', msg, 'isOwn:', isOwn);
+                console.log('Current user ID:', currentUser?.email);
                 return (
                   <div
                     key={msg.id}
                     className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${
-                        isOwn
+                      className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${isOwn
                           ? "bg-black text-white rounded-br-none"
                           : "bg-gray-200 text-gray-900 rounded-bl-none"
                       }`}
                     >
+                      {isOwn}
                       {msg.content && <p>{msg.content}</p>}
                       {msg.imageUrl && (
                         <img 
@@ -449,7 +451,7 @@ export default function MessagesPage() {
                         />
                       )}
                       <div className="text-xs text-gray-400 mt-1">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                        {new Date(msg.timestamp).toLocaleTimeString(['en-US'], {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
