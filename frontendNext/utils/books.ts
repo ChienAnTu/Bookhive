@@ -138,3 +138,42 @@ export const deleteBook = async (bookId: string): Promise<boolean> => {
     return false;
   }
 };
+
+export interface SearchParams {
+  q?: string;
+  lang?: string;
+  status?: 'listed' | 'unlisted' | 'lent' | 'sold';
+  canRent?: boolean;
+  canSell?: boolean;
+  delivery?: 'post' | 'pickup' | 'both' | 'any';
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: 'relevance' | 'newest' | 'price_asc' | 'price_desc';
+  page?: number;
+  pageSize?: number;
+}
+
+export async function searchBooks(params: SearchParams) {
+  const API_URL = getApiUrl();
+  const token = getToken();
+  
+  const searchParams = new URLSearchParams();
+  
+  // Add non-null parameters to query string
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, value.toString());
+    }
+  });
+
+  try {
+    const response = await axios.get(`${API_URL}/api/v1/books/search?${searchParams.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("Search Books API failed:", error);
+    throw new Error('Failed to search books');
+  }
+}
