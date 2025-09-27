@@ -1,4 +1,7 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import RecentAdded from "@/app/components/common/RecentAdded";
 
 function getGreeting(): string {
@@ -16,6 +19,15 @@ function getGreeting(): string {
 
 export default function HomePage() {
   const greeting = getGreeting();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/books?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -37,16 +49,21 @@ export default function HomePage() {
             BookBorrow — where every book finds a new friend.
           </p>
 
-          <div className="relative w-full max-w-2xl">
+          <form onSubmit={handleSearch} className="relative w-full max-w-2xl">
             <input
               type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Find your next reading.."
               className="w-full px-6 py-4 text-lg rounded-xl bg-white text-gray-900 shadow focus:ring-2 focus:ring-black focus:outline-none"
             />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2 bg-black text-white px-6 py-2 rounded-lg  border-black hover:bg-black hover:text-white transition">
+            <button
+              type="submit"
+              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black text-white px-6 py-2 rounded-lg border-black hover:bg-gray-800 transition"
+            >
               Search
             </button>
-          </div>
+          </form>
         </div>
       </div>
 
