@@ -121,7 +121,7 @@ const Header: React.FC = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      console.log("Searching:", searchQuery);
+                      router.push(`/books?q=${encodeURIComponent(searchQuery)}`);
                     }
                   }}
                   className="w-full"
