@@ -16,6 +16,7 @@ from routes.checkout import router as checkout_router  # Import checkout router
 from routes.order import router as orders_router
 from routes.bans import router as bans_router
 from routes.blacklists import router as blacklists_router
+from routes.review import router as review_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -33,6 +34,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+#service review router
+app.include_router(review_router, prefix="/api/v1")
 
 #service checkout router
 app.include_router(checkout_router, prefix="/api/v1")
