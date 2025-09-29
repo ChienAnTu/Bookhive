@@ -192,10 +192,10 @@ export default function BooksPage() {
           {/* Books grid */}
           {loading ? (
             <div className="text-center py-20">Loading books...</div>
-          ) : books.length > 0 ? (
+          ) : filteredBooks.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {books.map((book) => (
+                {sortedBooks.map((book) => (
                   <BookCard
                     key={book.id}
                     book={book}
