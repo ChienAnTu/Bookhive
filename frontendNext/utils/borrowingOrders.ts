@@ -1,17 +1,20 @@
 import axios from "axios";
 import { getApiUrl, getToken } from "@/utils/auth";
+import type { OrderStatus } from "@/app/types/order";
 
 const API_URL = getApiUrl();
 
 export type Order = {
   order_id: string;
-  status: string;
+  status: OrderStatus;
   total_paid_amount: number;
   books: Array<{
     title: string;
     cover?: string;
     author?: string;
   }>;
+  create_at: string;
+  due_at: string | null;
 };
 
 export async function createOrder(checkoutId: string) {
