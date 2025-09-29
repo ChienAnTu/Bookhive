@@ -527,7 +527,7 @@ export default function OrderDetailPage() {
                   router.push("/auth");
                   return;
                 }
-                router.push(`/orders/${order.id}/review`);
+                router.push(`/borrowing/${order.id}/review`);
               }}
             >
               Write Review
