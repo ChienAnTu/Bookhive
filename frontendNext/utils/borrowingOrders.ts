@@ -46,6 +46,14 @@ export async function listMyOrders(params?: {
   return response.data;
 }
 
+export async function getOrderById(orderId: string) {
+  const res = await axios.get(`${API_URL}/api/v1/orders/${orderId}`, {
+    withCredentials: true,
+  });
+  return res.data;
+}
+
+
 // Alias functions for different contexts
 export const getOrders = listMyOrders;
 export const getBorrowingOrders = listMyOrders;
