@@ -2,13 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Star, MapPin, Calendar, Ban } from "lucide-react";
+import { MapPin, Calendar, Ban } from "lucide-react";
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
 import { getUserById } from "@/utils/auth";
 import type { RatingStats, Comment } from "@/app/types/index";
 import StarRating from '@/app/components/ui/StarRating';
+import {
+  getUserRatingSummary,
+  getReviewsByUser,
+} from "@/utils/review";
 
 const UserProfilePage: React.FC = () => {
   const router = useRouter();
@@ -23,8 +27,9 @@ const UserProfilePage: React.FC = () => {
     averageRating: 0,
     totalReviews: 0,
     ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-    recentComments: [],
   });
+
+  const [receivedComments, setReceivedComments] = useState<Comment[]>([]);
 
   useEffect(() => {
     if (!userId) return;
@@ -34,7 +39,7 @@ const UserProfilePage: React.FC = () => {
         if (data) {
           setUser(data);
         } else {
-          router.push("/404"); // 用户不存在时跳404
+          router.push("/404");
         }
       } catch (err) {
         console.error(err);
@@ -45,6 +50,44 @@ const UserProfilePage: React.FC = () => {
     };
     loadUser();
   }, [userId, router]);
+
+  // get reviews
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadReviewsAndStats = async () => {
+      try {
+        const [stats, comments] = await Promise.all([
+          getUserRatingSummary(userId),
+          getReviewsByUser(userId),
+        ]);
+
+        // reviewerName
+        const commentsWithNames = await Promise.all(
+          comments.map(async (r) => {
+            try {
+              const reviewer = await getUserById(r.reviewerId);
+              return {
+                ...r,
+                reviewerName: reviewer
+                  ? `${reviewer.firstName} ${reviewer.lastName}`
+                  : r.reviewerId,
+              };
+            } catch {
+              return { ...r, reviewerName: r.reviewerId };
+            }
+          })
+        );
+
+        setRatingStats(stats);
+        setReceivedComments(commentsWithNames);
+      } catch (err) {
+        console.error("Failed to load reviews:", err);
+      }
+    };
+
+    loadReviewsAndStats();
+  }, [userId]);
 
 
   const handleBlockUser = async (userId: string) => {
@@ -69,8 +112,6 @@ const UserProfilePage: React.FC = () => {
       alert("Failed to unblock user.");
     }
   };
-
-// TODO: Review API
 
   if (isLoading) {
     return <div className="p-8 text-gray-500">Loading user profile...</div>;
@@ -159,13 +200,16 @@ const UserProfilePage: React.FC = () => {
               Reviews for {user.firstName}
             </h2>
 
-            {ratingStats.recentComments.length > 0 ? (
+            {receivedComments.length > 0 ? (
               <div className="space-y-4">
-                {ratingStats.recentComments.map((review) => (
-                  <div key={review.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                {receivedComments.map((review) => (
+                  <div
+                    key={review.id}
+                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-800">
-                        Reviewer: {review.reviewerId}
+                        Reviewer: {review.reviewerName}
                       </span>
                       <span className="text-xs text-gray-500">
                         {new Date(review.createdAt).toLocaleDateString("en-US")}
@@ -173,7 +217,9 @@ const UserProfilePage: React.FC = () => {
                     </div>
                     <StarRating rating={review.rating} readonly size="sm" />
                     <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
-                    <p className="text-gray-700 text-sm">{review.content}</p>
+                    {review.comment && (
+                      <p className="text-gray-700 text-sm">{review.comment}</p>
+                    )}
                   </div>
                 ))}
               </div>
