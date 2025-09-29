@@ -147,7 +147,7 @@ const Header: React.FC = () => {
                     router.push("/lending/add"); // when profile is complete
                   }}
                 >
-                  Start Lending
+                  Share My Book
                 </Button>
               )}
 
