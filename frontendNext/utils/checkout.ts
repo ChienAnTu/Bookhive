@@ -62,7 +62,7 @@ export async function createCheckout(payload: any) {
 export async function rebuildCheckout(
   user: User,
   items: any[],
-  shipping: Record<string, "delivery" | "pickup"> = {},
+  shipping: Record<string, "post" | "pickup"> = {},
   selectedQuotes: Record<string, any> = {}
 ) {
   // 1. get current checkout id
@@ -97,7 +97,7 @@ export async function rebuildCheckout(
         bookId,
         ownerId: it.ownerId,
         actionType: (it.mode || it.actionType)?.toUpperCase(), // default BORROW
-        price: mode === "purchase" ? it.salePrice : undefined, // Sale Price
+        price: mode === "purchase" ? (it.salePrice || it.price) : undefined, // Sale Price
         deposit: mode === "borrow" ? it.deposit : undefined,
         shippingMethod:
           shipping[bookId] ||
