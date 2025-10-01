@@ -1,17 +1,20 @@
 import axios from "axios";
 import { getApiUrl, getToken } from "@/utils/auth";
+import type { OrderStatus } from "@/app/types/order";
 
 const API_URL = getApiUrl();
 
 export type Order = {
   order_id: string;
-  status: string;
+  status: OrderStatus;
   total_paid_amount: number;
   books: Array<{
     title: string;
     cover?: string;
     author?: string;
   }>;
+  create_at: string;
+  due_at: string | null;
 };
 
 export async function createOrder(checkoutId: string) {
@@ -42,6 +45,14 @@ export async function listMyOrders(params?: {
   });
   return response.data;
 }
+
+export async function getOrderById(orderId: string) {
+  const res = await axios.get(`${API_URL}/api/v1/orders/${orderId}`, {
+    withCredentials: true,
+  });
+  return res.data;
+}
+
 
 // Alias functions for different contexts
 export const getOrders = listMyOrders;
