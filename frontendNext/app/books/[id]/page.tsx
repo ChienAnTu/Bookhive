@@ -10,6 +10,7 @@ import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
 import { calculateDistance } from "@/app/data/mockData";
+import { sendMessage } from "@/utils/messageApi";
 
 import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
@@ -140,10 +141,30 @@ export default function BookDetailPage() {
   const formatKm = (km: number) =>
     km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
 
-  const handleSendRequest = () => {
-    console.log("Sending request with message:", requestMessage);
-    setIsRequestModalOpen(false);
-    setRequestMessage("");
+  const handleSendRequest = async () => {
+    if (!owner || !currentUser || !requestMessage.trim()) {
+      toast.error("Please fill in the message");
+      return;
+    }
+    try {
+      // Add book info to message
+      const messageWithBookInfo = `Book Request: ${book.titleOr}\n\n${requestMessage}`;
+      console.log("Attempting to send message to owner email:", owner.email);
+      await sendMessage(owner.email, messageWithBookInfo);
+      toast.success("Message sent successfully");
+      setIsRequestModalOpen(false);
+      setRequestMessage("");
+
+      // Redirect to the messages page and specify which conversation to open.
+      // The timeout is kept to allow the user to see the success message.
+      setTimeout(() => {
+        router.push(`/message?to=${owner.email}`);
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast.error(error.message || "Failed to send message");
+    }
   };
 
   const handleShare = () => {
@@ -431,7 +452,9 @@ export default function BookDetailPage() {
                     <Button
                       variant="outline"
                       className="flex items-center gap-2"
-                      onClick={() => setIsRequestModalOpen(true)}
+                      onClick={() => {
+                        setIsRequestModalOpen(true);
+                      }}
                     >
                       <MessageCircle className="w-4 h-4" />
                       Message
