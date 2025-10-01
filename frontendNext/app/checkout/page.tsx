@@ -20,7 +20,7 @@ import { createOrder } from "@/utils/borrowingOrders";
 // Changing the address or modifying the shipping method → Rebuild the checkout (delete + create anew)
 // Clicking to place order → Submit the checkout
 
-type DeliveryChoice = "delivery" | "pickup"; // delivery == post
+type DeliveryChoice = "post" | "pickup"; // delivery == post
 
 type ShippingQuote = {
   id: string;
@@ -44,7 +44,7 @@ interface CheckoutItem {
   price?: number;
   deposit?: number;
   deliveryMethod?: "post" | "pickup" | "both";
-  shippingMethod?: "delivery" | "pickup";
+  shippingMethod?: "post" | "pickup";
 }
 
 
@@ -60,7 +60,7 @@ export default function CheckoutPage() {
   const [fullItems, setFullItems] = useState<any[]>([]);
 
   // Per-item shipping choice (default by book capability)
-  const [itemShipping, setItemShipping] = useState<Record<string, "delivery" | "pickup" | "">>({});
+  const [itemShipping, setItemShipping] = useState<Record<string, "post" | "pickup" | "">>({});
 
   // Quotes per owner for DELIVERY (post)
   const [quotesByOwner, setQuotesByOwner] = useState<Record<string, ShippingQuote[]>>({});
@@ -146,7 +146,7 @@ const checkoutFields = [
       const next: Record<string, DeliveryChoice | ""> = {};
       for (const b of results) {
         if (b.deliveryMethod === "post") {
-          next[b.bookId] = "delivery";
+          next[b.bookId] = "post";
         } else if (b.deliveryMethod === "pickup") {
           next[b.bookId] = "pickup";
         } else {
@@ -178,7 +178,7 @@ const checkoutFields = [
 
     if (Object.keys(itemShipping).length > 0) return;
 
-    const next: Record<string, "delivery" | "pickup" | ""> = {};
+    const next: Record<string, "post" | "pickup" | ""> = {};
     for (const b of items) {
       next[b.bookId] = ""; // default empty
     }
@@ -216,7 +216,7 @@ const checkoutFields = [
 
     const deliveryGroups: Record<string, any[]> = {};
     for (const b of items) {
-      if (itemShipping[b.bookId] === "delivery") {
+      if (itemShipping[b.bookId] === "post") {
         (deliveryGroups[b.ownerId] ||= []).push(b);
       }
     }
@@ -344,7 +344,7 @@ const checkoutFields = [
 
     // if choose delivery，must get shipping quotes
     for (const it of checkoutToUse.items) {
-      if (it.shippingMethod === "delivery" && !it.shippingQuote) {
+      if (it.shippingMethod === "post" && !it.shippingQuote) {
         alert("Please select delivery shipping quote.");
         return;
       }
@@ -451,11 +451,11 @@ const checkoutFields = [
                             </div>
                           </div>
 
-                          {/* Delivery / Pickup select */}
+                          {/* Post / Pickup select */}
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-700">Delivery Method:</span>
                             {b.deliveryMethod === "post" && (
-                              <span className="px-4 py-1 rounded bg-black text-white text-sm">Delivery</span>
+                              <span className="px-4 py-1 rounded bg-black text-white text-sm">Post</span>
                             )}
                             {b.deliveryMethod === "pickup" && (
                               <span className="px-4 py-1 rounded bg-black text-white text-sm">Pickup</span>
@@ -467,7 +467,7 @@ const checkoutFields = [
                                 className="px-3 py-1 border rounded bg-white text-sm"
                               >
                                 <option value="" disabled>-- Select option --</option>
-                                <option value="delivery">Delivery</option>
+                                <option value="post">Post</option>
                                 <option value="pickup">Pickup</option>
                               </select>
                             )}
@@ -481,7 +481,7 @@ const checkoutFields = [
                           </p>
                         )}
                         {/* Delivery hint */}
-                        {itemShipping[b.bookId] === "delivery" && (
+                        {itemShipping[b.bookId] === "post" && (
                           <p className="text-sm text-orange-700 mt-2">
                             Shipping fees will be calculated after Save Delivery Method.
                           </p>
@@ -492,7 +492,7 @@ const checkoutFields = [
                     ))}
                   </div>
                   {/* Shipping Quotes（if chose delivery, display under this owner） */}
-                  {ownerItems.some((b) => itemShipping[b.bookId] === "delivery") &&
+                  {ownerItems.some((b) => itemShipping[b.bookId] === "post") &&
                     quotesByOwner[ownerId]?.length > 0 && (
                       <div className="mt-4 p-4 rounded-md border bg-white">
                         <h4 className="text-sm font-semibold mb-2 text-gray-800">
@@ -566,7 +566,7 @@ const checkoutFields = [
             <span>${checkouts[0]?.bookFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Shipping</span>
+            <span>Shipping Fee</span>
             <span>${checkouts[0]?.shippingFee?.toFixed(2) || "0.00"}</span>
           </div>
           <div className="flex justify-between text-sm">

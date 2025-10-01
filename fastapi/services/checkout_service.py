@@ -22,7 +22,7 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
     # Group items by owner
     grouped = {}
     for item in items:
-        if item.shippingMethod and item.shippingMethod.lower() == "delivery":
+        if item.shippingMethod and item.shippingMethod.lower() == "post":
             grouped.setdefault(item.ownerId, []).append(item)
 
     async with httpx.AsyncClient(timeout=10.0) as client:
