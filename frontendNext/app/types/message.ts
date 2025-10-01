@@ -1,19 +1,23 @@
 export interface Message {
   id: string;
-  senderId: string;
-  receiverId: string;
+  sender_email: string;
+  receiver_email: string;
   content: string;
   timestamp: string;
   bookId?: string;
   bookTitle?: string;
   read: boolean;
+  imageUrl?: string;
 }
 
 export interface ChatThread {
   id: string;
   user: {
     id: string;
+    firstName?: string;
+    lastName?: string;
     name: string;
+    email:string;
     avatar?: string;
   };
   lastMessage: Message;
