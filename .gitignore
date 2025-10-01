@@ -89,6 +89,10 @@ celerybeat-schedule
 .venv
 env/
 venv/
+.pytest_cache
+.vscode
+.idea
+
 ENV/
 env.bak/
 venv.bak/

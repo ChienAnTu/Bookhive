@@ -113,7 +113,7 @@ class Order(Base):
         """
         books_list = []
         if include_books:
-            for ob in self.books:  # 假设 Order 有 relationship 'order_books'
+            for ob in self.books: 
                 if ob.book:
                     books_list.append({
                         "bookId": ob.book.id,
@@ -125,8 +125,14 @@ class Order(Base):
 
         return {
             "id": self.id,
-            "ownerId": self.owner_id,
-            "borrowerId": self.borrower_id,
+            "owner": {
+                "id": self.owner.user_id if self.owner else None,
+                "name": self.owner.name if self.owner else None,
+            },
+            "borrower": {
+                "id": self.borrower.user_id if self.borrower else None,
+                "name": self.borrower.name if self.borrower else None,
+            },
             "status": self.status,
             "actionType": self.action_type,
             "shippingMethod": self.shipping_method,
@@ -143,7 +149,21 @@ class Order(Base):
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "dueAt": self.due_at.isoformat() if getattr(self, "due_at", None) else None,
-            "books": books_list
+            "books": books_list,
+
+            "startAt": self.start_at.isoformat() if self.start_at else None,
+            "returnedAt": self.returned_at.isoformat() if self.returned_at else None,
+            "completedAt": self.completed_at.isoformat() if self.completed_at else None,
+            "canceledAt": self.canceled_at.isoformat() if self.canceled_at else None,
+            
+            "shippingOutTrackingNumber": self.shipping_out_tracking_number,
+            "shippingOutTrackingUrl": self.shipping_out_tracking_url,
+            "shippingReturnTrackingNumber": self.shipping_return_tracking_number,
+            "shippingReturnTrackingUrl": self.shipping_return_tracking_url,
+            
+            "lateFeeAmount": float(self.late_fee_amount or 0),
+            "damageFeeAmount": float(self.damage_fee_amount or 0),
+            "totalRefundedAmount": float(self.total_refunded_amount or 0),
         }
 
 class OrderBook(Base):

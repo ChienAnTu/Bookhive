@@ -17,6 +17,7 @@ from models.user import User
 from pydantic import BaseModel
 from typing import Optional
 from database.connection import SessionLocal
+from services.blacklist_service import BlacklistService
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
@@ -130,6 +131,8 @@ async def send_message(
     receiver = db.query(User).filter(User.email == message_data.receiver_email).first()
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
+    if BlacklistService.is_blocked(db, receiver.user_id, current_user.user_id):
+        raise HTTPException(status_code=403, detail="You are blocked by this user")
     service = MessageService(db)
     message = service.send_message(current_user.user_id, receiver.user_id, message_data.content)
     

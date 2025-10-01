@@ -3,10 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, MapPin, Calendar, Book, Edit } from "lucide-react";
-import { getCurrentUser, isAuthenticated } from "../../utils/auth";
+import { getCurrentUser, isAuthenticated, getUserById } from "../../utils/auth";
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
+import type { RatingStats, Comment } from "@/app/types/index";
+import StarRating from '@/app/components/ui/StarRating';
+import {
+  getUserRatingSummary,
+  getReviewsByUser,
+  getReviewsByReviewer,
+} from "@/utils/review";
 
 const ProfilePage: React.FC = () => {
   const router = useRouter();
@@ -15,6 +22,14 @@ const ProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"Received" | "Given">("Received");
   const tabs: ("Received" | "Given")[] = ["Received", "Given"];
 
+  const [ratingStats, setRatingStats] = useState<RatingStats>({
+    averageRating: 0,
+    totalReviews: 0,
+    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+
+  const [receivedReviews, setReceivedReviews] = useState<Comment[]>([]);
+  const [givenReviews, setGivenReviews] = useState<Comment[]>([]);
 
   // Check authentication and load user data
   useEffect(() => {
@@ -26,14 +41,22 @@ const ProfilePage: React.FC = () => {
       }
 
       try {
-        // Get user data from API
         const userData = await getCurrentUser();
-        if (userData) {
-          setCurrentUser(userData);
-        } else {
-          // If getCurrentUser returns null, redirect to login
+        if (!userData) {
           router.push("/login");
+          return;
         }
+        setCurrentUser(userData);
+
+        const [stats, received, given] = await Promise.all([
+          getUserRatingSummary(userData.id),
+          getReviewsByUser(userData.id),
+          getReviewsByReviewer(userData.id),
+        ]);
+
+        setRatingStats(stats);
+        setReceivedReviews(received);
+        setGivenReviews(given);
       } catch (error) {
         console.error("Failed to load user data:", error);
         router.push("/auth");
@@ -44,6 +67,34 @@ const ProfilePage: React.FC = () => {
 
     loadUserData();
   }, [router]);
+
+
+  useEffect(() => {
+    const enrichReviews = async () => {
+      const [receivedWithNames, givenWithNames] = await Promise.all([
+        Promise.all(
+          receivedReviews.map(async (r) => {
+            const reviewer = await getUserById(r.reviewerId);
+            return { ...r, reviewerName: reviewer?.firstName + " " + reviewer?.lastName };
+          })
+        ),
+        Promise.all(
+          givenReviews.map(async (r) => {
+            const reviewee = await getUserById(r.revieweeId);
+            return { ...r, revieweeName: reviewee?.firstName + " " + reviewee?.lastName };
+          })
+        ),
+      ]);
+
+      setReceivedReviews(receivedWithNames);
+      setGivenReviews(givenWithNames);
+    };
+
+    if (receivedReviews.length > 0 || givenReviews.length > 0) {
+      enrichReviews();
+    }
+  }, [receivedReviews, givenReviews]);
+
 
   // Show loading state
   if (isLoading) {
@@ -69,14 +120,6 @@ const ProfilePage: React.FC = () => {
     year: "numeric",
     month: "long",
   });
-
-  // Use default values for rating and books if not provided by API
-  const rating = (currentUser as any).rating || 0;
-
-
-  // Calculate star rating display
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 !== 0;
 
   return (
     <div className="flex-1 bg-gray-50 py-8">
@@ -107,20 +150,12 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Renting stars */}
-              <div className="flex items-center mt-2 mb-2">
-                <div className="flex items-center mr-3">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-4 h-4 ${star <= Math.floor(rating)
-                        ? "text-yellow-400 fill-current"
-                        : "text-gray-300"
-                        }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm text-gray-600">
-                  {rating.toFixed(1)}
+              <div className="flex items-center mb-2">
+                <StarRating rating={ratingStats.averageRating} readonly size="sm" />
+                <span className="ml-2 text-sm text-gray-600">
+                  {ratingStats.totalReviews > 0
+                    ? `${ratingStats.averageRating.toFixed(1)} (${ratingStats.totalReviews} reviews)`
+                    : "No reviews yet"}
                 </span>
               </div>
 
@@ -159,10 +194,10 @@ const ProfilePage: React.FC = () => {
               className="block bg-blue-50 border border-blue-200 rounded-lg p-4 text-center hover:bg-blue-100 transition"
             >
               <div className="text-xl font-bold text-blue-600 mb-1">
-                Lending
+                Sharing
               </div>
               <div className="text-sm font-medium text-blue-800">
-                Books you’re sharing
+                Books I'm sharing
               </div>
             </Link>
 
@@ -175,7 +210,7 @@ const ProfilePage: React.FC = () => {
                 Borrowing
               </div>
               <div className="text-sm font-medium text-green-800">
-                Your borrowed books
+                My borrowed books
               </div>
             </Link>
 
@@ -207,8 +242,8 @@ const ProfilePage: React.FC = () => {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-sm font-medium ${activeTab === tab
-                    ? "border-b-2 border-black text-black"
-                    : "text-gray-500 hover:text-gray-700"
+                  ? "border-b-2 border-black text-black"
+                  : "text-gray-500 hover:text-gray-700"
                   }`}
               >
                 {tab === "Received" ? "Reviews I Received" : "Reviews I Gave"}
@@ -218,78 +253,65 @@ const ProfilePage: React.FC = () => {
 
           {/* Tab Content */}
           {activeTab === "Received" ? (
-            currentUser.receivedReviews && currentUser.receivedReviews.length > 0 ? (
+            receivedReviews.length > 0 ? (
               <div className="space-y-4">
-                {currentUser.receivedReviews.map((review, idx) => (
-                  <div
-                    key={idx}
-                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  >
+                {receivedReviews.map((review) => (
+                  <div key={review.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-800">
-                        {review.reviewerName}
+                        Reviewer:{" "}
+                        <Link
+                          href={`/profile/${review.reviewerId}`}
+                          className="text-black hover:underline"
+                        >
+                          {review.reviewerName || review.reviewerId}
+                        </Link>
                       </span>
                       <span className="text-xs text-gray-500">
                         {new Date(review.createdAt).toLocaleDateString("en-US")}
                       </span>
                     </div>
                     <div className="flex items-center mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-300"
-                            }`}
-                        />
-                      ))}
+                      <StarRating rating={review.rating} readonly size="sm" />
                       <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
                     </div>
-                    <p className="text-gray-700 text-sm">{review.comment}</p>
+                    {review.comment && <p className="text-gray-700 text-sm">{review.comment}</p>}
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-gray-500 text-sm">No reviews received yet.</p>
             )
-          ) : (
-            currentUser.givenReviews && currentUser.givenReviews.length > 0 ? (
-              <div className="space-y-4">
-                {currentUser.givenReviews.map((review, idx) => (
-                  <div
-                    key={idx}
-                    className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-800">
-                        To: {review.targetUserName}
+          ) : givenReviews.length > 0 ? (
+            <div className="space-y-4">
+              {givenReviews.map((review) => (
+                <div key={review.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-800">
+                        To:{" "}
+                        <Link
+                          href={`/profile/${review.revieweeId}`}
+                          className="text-black hover:underline"
+                        >
+                          {review.revieweeName}
+                        </Link>
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(review.createdAt).toLocaleDateString("en-US")}
-                      </span>
-                    </div>
-                    <div className="flex items-center mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${star <= Math.floor(review.rating)
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-300"
-                            }`}
-                        />
-                      ))}
-                      <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
-                    </div>
-                    <p className="text-gray-700 text-sm">{review.comment}</p>
+                    <span className="text-xs text-gray-500">
+                      {new Date(review.createdAt).toLocaleDateString("en-US")}
+                    </span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No reviews given yet.</p>
-            )
+                  <div className="flex items-center mb-2">
+                    <StarRating rating={review.rating} readonly size="sm" />
+                    <span className="ml-2 text-sm text-gray-600">{review.rating}</span>
+                  </div>
+                  {review.comment && <p className="text-gray-700 text-sm">{review.comment}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">No reviews given yet.</p>
           )}
         </div>
-
       </div>
     </div>
   );
