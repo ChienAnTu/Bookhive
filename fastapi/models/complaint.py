@@ -3,7 +3,7 @@ from sqlalchemy.sql import func
 from models.base import Base
 
 COMPLAINT_STATUS_ENUM = ("pending", "investigating", "resolved", "closed")
-COMPLAINT_TYPE_ENUM   = ("book-condition", "delivery", "user-behavior", "other")
+COMPLAINT_TYPE_ENUM   = ("book-condition", "delivery", "user-behavior", "other", "overdue")
 
 class Complaint(Base):
     __tablename__ = "complaint"
@@ -19,6 +19,10 @@ class Complaint(Base):
 
     status          = Column(Enum(*COMPLAINT_STATUS_ENUM, name="complaint_status_enum"), nullable=False, default="pending", index=True)
     admin_response  = Column(Text, nullable=True)
+    
+    # Deposit deduction fields
+    deducted_amount = Column(String(20), nullable=True)  # Amount deducted from deposit
+    deduction_reason = Column(Text, nullable=True)       # Reason for deduction
 
     created_at      = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     updated_at      = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

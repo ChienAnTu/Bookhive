@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   MessageSquare, 
   AlertTriangle, 
@@ -22,18 +22,37 @@ import {
 
 const ComplainPage: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"mine" | "admin">("mine");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newComplaint, setNewComplaint] = useState({
-    type: "other" as const,
+    type: "other" as "book-condition" | "delivery" | "user-behavior" | "other" | "overdue",
     subject: "",
     description: "",
     orderId: "",
     respondentId: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadComplaints = async (userData: any) => {
+    try {
+      const isAdminView = viewMode === "admin" && userData.is_admin;
+      const complaintsData = await getComplaints(isAdminView);
+      // 确保 complaintsData 是数组
+      if (Array.isArray(complaintsData)) {
+        setComplaints(complaintsData);
+      } else {
+        console.error("Invalid complaints data format:", complaintsData);
+        setComplaints([]);
+      }
+    } catch (error) {
+      console.error("Failed to load complaints:", error);
+      setComplaints([]); // 确保在错误时设置为空数组
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -46,14 +65,7 @@ const ComplainPage: React.FC = () => {
         const userData = await getCurrentUser();
         if (userData) {
           setCurrentUser(userData);
-          const complaintsData = await getComplaints();
-          // 确保 complaintsData 是数组
-          if (Array.isArray(complaintsData)) {
-            setComplaints(complaintsData);
-          } else {
-            console.error("Invalid complaints data format:", complaintsData);
-            setComplaints([]);
-          }
+          loadComplaints(userData);
         } else {
           router.push("/auth");
         }
@@ -66,7 +78,20 @@ const ComplainPage: React.FC = () => {
     };
 
     loadData();
-  }, [router]);
+    
+    // Check for pre-filled order ID from URL
+    const orderId = searchParams.get("orderId");
+    if (orderId) {
+      setNewComplaint(prev => ({ ...prev, orderId }));
+      setIsCreateModalOpen(true);
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadComplaints(currentUser);
+    }
+  }, [viewMode, currentUser]);
 
   const handleCreateComplaint = async () => {
     if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
@@ -119,6 +144,16 @@ const ComplainPage: React.FC = () => {
     }
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "pending": return "Open";
+      case "investigating": return "In Progress";
+      case "resolved": return "Resolved";
+      case "closed": return "Closed";
+      default: return status;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 bg-gray-50 py-8 flex items-center justify-center">
@@ -132,16 +167,48 @@ const ComplainPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Support & Complaints</h1>
-            <p className="text-gray-600">Submit and track your complaints</p>
+            <div className="flex items-center space-x-3 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900">Support & Complaints</h1>
+              {currentUser?.is_admin && (
+                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                  Admin
+                </span>
+              )}
+            </div>
+            <p className="text-gray-600">
+              {currentUser?.is_admin 
+                ? "Manage and resolve user complaints" 
+                : "Submit and track your complaints"
+              }
+            </p>
           </div>
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Complaint
-          </Button>
+          <div className="flex items-center space-x-3">
+            {currentUser?.is_admin && (
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant={viewMode === "mine" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("mine")}
+                >
+                  My Complaints
+                </Button>
+                <Button
+                  variant={viewMode === "admin" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("admin")}
+                >
+                  All Complaints (Admin)
+                </Button>
+              </div>
+            )}
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Complaint
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -193,7 +260,9 @@ const ComplainPage: React.FC = () => {
         </div>
 
         <Card className="shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">Your Complaints</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            {viewMode === "admin" && currentUser?.is_admin ? "All Complaints (Admin View)" : "Your Complaints"}
+          </h2>
           
           {complaints.length === 0 ? (
             <div className="text-center py-8">
@@ -203,20 +272,45 @@ const ComplainPage: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {complaints.map((complaint) => (
-                <Card key={complaint.id} className="border border-gray-200 shadow-sm">
+                <Card 
+                  key={complaint.id} 
+                  className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/complain/${complaint.id}`)}
+                >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
                         {getStatusIcon(complaint.status)}
                         <h3 className="font-semibold">{complaint.subject}</h3>
-                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(complaint.status)}`}>
-                          {complaint.status.replace("_", " ")}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(complaint.status)}`}>
+                          {getStatusText(complaint.status)}
                         </span>
                       </div>
-                      <p className="text-gray-600 mb-2">{complaint.description}</p>
-                      <p className="text-sm text-gray-500">
-                        Created: {new Date(complaint.createdAt).toLocaleDateString()}
-                      </p>
+                      <p className="text-gray-600 mb-2 line-clamp-2">{complaint.description}</p>
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col">
+                          <p className="text-sm text-gray-500">
+                            Created: {new Date(complaint.createdAt).toLocaleDateString()}
+                          </p>
+                          {viewMode === "admin" && currentUser?.is_admin && (
+                            <p className="text-xs text-gray-400">
+                              Complainant: {complaint.complainantId}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end">
+                          {complaint.orderId && (
+                            <p className="text-sm text-blue-600">
+                              Order: {complaint.orderId}
+                            </p>
+                          )}
+                          {complaint.deductedAmount && (
+                            <p className="text-xs text-red-600">
+                              Deducted: ${complaint.deductedAmount}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -245,7 +339,21 @@ const ComplainPage: React.FC = () => {
                     <option value="book-condition">Book Condition</option>
                     <option value="delivery">Delivery Issue</option>
                     <option value="user-behavior">User Behavior</option>
+                    <option value="overdue">Overdue (System)</option>
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Related Order ID (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newComplaint.orderId}
+                    onChange={(e) => setNewComplaint({...newComplaint, orderId: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter order ID if complaint is related to a specific order"
+                  />
                 </div>
                 
                 <div>

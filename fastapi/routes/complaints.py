@@ -7,7 +7,7 @@ from models.user import User as UserModel
 from models.complaint import Complaint, ComplaintMessage
 from services.complaint_service import ComplaintService
 
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
 router = APIRouter(prefix="/complaints", tags=["Complaint"])
@@ -24,6 +24,8 @@ def _to_read(c: Complaint) -> dict:
         "description": c.description,
         "status": c.status,
         "adminResponse": c.admin_response,
+        "deductedAmount": c.deducted_amount,
+        "deductionReason": c.deduction_reason,
         "createdAt": c.created_at,
         "updatedAt": c.updated_at,
     }
@@ -41,17 +43,21 @@ def _msg_to_read(m: ComplaintMessage) -> dict:
 class ComplaintCreateBody(BaseModel):
     orderId: Optional[str] = None
     respondentId: Optional[str] = None
-    type: Literal["book-condition","delivery","user-behavior","other"]
-    subject: constr(min_length=1, max_length=255)
-    description: constr(min_length=1)
+    type: Literal["book-condition","delivery","user-behavior","other","overdue"]
+    subject: str = Field(min_length=1, max_length=255)
+    description: str = Field(min_length=1)
 
 class MessageCreate(BaseModel):
-    body: constr(min_length=1)
+    body: str = Field(min_length=1)
 
 
 class AdminResolveBody(BaseModel):
     status: Optional[Literal["resolved","closed","investigating"]] = None
     adminResponse: Optional[str] = None
+
+class DeductDepositBody(BaseModel):
+    amount: float = Field(gt=0, description="Amount to deduct from deposit")
+    reason: Optional[str] = None
 
 @router.post("", status_code=201)
 def create_complaint(
@@ -94,9 +100,9 @@ def list_complaints(
     - If role=admin, it shows all complaints (requires admin user). -> You need admin account for this.
     You can filter by status (pending, investigating, resolved, closed).
     """
-    if role == "admin" and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
-        raise HTTPException(status_code=403, detail="Admin only")
-    if role == "admin":                              # TODO: Change the admin to a proper judging logic
+    if role == "admin" and not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if role == "admin":
         items = ComplaintService.list_all(db, status=status)
     else:
         items = ComplaintService.list_for_user(db, user_id=user.user_id, status=status)
@@ -118,7 +124,7 @@ def get_complaint(
     """
 
     c = ComplaintService.get(db, complaint_id)
-    if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if user.user_id not in (c.complainant_id, c.respondent_id) and not user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
     msgs = ComplaintService.list_messages(db, complaint_id=complaint_id)
     return {"complaint": _to_read(c), "messages": [_msg_to_read(m) for m in msgs]}
@@ -139,7 +145,7 @@ def add_message(
     """
 
     c = ComplaintService.get(db, complaint_id)
-    if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if user.user_id not in (c.complainant_id, c.respondent_id) and not user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
     m = ComplaintService.add_message(
         db, complaint_id=complaint_id, sender_id=user.user_id, body=body.body
@@ -163,8 +169,8 @@ def resolve_complaint(
     - complaint_id is auto-generated ID of this complaint.
     """
 
-    if user.user_id != "admin":                 # TODO: Change the admin to a proper judging logic
-        raise HTTPException(status_code=403, detail="Admin only")
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     c = ComplaintService.admin_update(
         db,
         complaint_id=complaint_id,
@@ -173,3 +179,70 @@ def resolve_complaint(
     )
     return _to_read(c)
 
+
+# ------ Deposit Deduction ------
+@router.post("/{complaint_id}/deduct-deposit")
+def deduct_deposit(
+    complaint_id: str,
+    body: DeductDepositBody,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    """
+    Use this API for admin users to deduct amount from borrower's deposit.
+    Only admins can access this endpoint.
+    Amount is recorded in the complaint for tracking.
+
+    - complaint_id is auto-generated ID of this complaint.
+    """
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    c = ComplaintService.deduct_deposit(
+        db,
+        complaint_id=complaint_id,
+        amount=str(body.amount),
+        reason=body.reason or f"Deposit deduction of ${body.amount}"
+    )
+    return _to_read(c)
+
+
+# ------ System Auto-Creation ------
+class AutoComplaintBody(BaseModel):
+    orderId: str = Field(..., description="Order ID that is overdue")
+    borrowerId: str = Field(..., description="Borrower user ID")
+    lenderId: str = Field(..., description="Lender user ID")
+
+@router.post("/auto-create-overdue")
+def auto_create_overdue_complaint(
+    body: AutoComplaintBody,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    """
+    System API to automatically create overdue complaints.
+    This should be called by the system when an order is overdue.
+    Only admin/system can call this endpoint.
+    """
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check if complaint already exists for this order
+    existing = db.query(Complaint).filter(
+        Complaint.order_id == body.orderId,
+        Complaint.type == "overdue"
+    ).first()
+    
+    if existing:
+        return {"message": "Overdue complaint already exists", "complaint": _to_read(existing)}
+    
+    c = ComplaintService.create(
+        db,
+        complainant_id="system",  # System-generated complaint
+        respondent_id=body.borrowerId,
+        order_id=body.orderId,
+        type="overdue",
+        subject=f"Overdue Return - Order {body.orderId}",
+        description=f"This order is overdue. The borrower has not returned the book on time. System will automatically deduct 20% of deposit every 7 days until resolved."
+    )
+    return _to_read(c)

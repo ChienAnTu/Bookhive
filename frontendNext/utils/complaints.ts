@@ -8,11 +8,13 @@ export type Complaint = {
   orderId?: string;
   complainantId: string;
   respondentId?: string;
-  type: "book-condition" | "delivery" | "user-behavior" | "other";
+  type: "book-condition" | "delivery" | "user-behavior" | "other" | "overdue";
   subject: string;
   description: string;
   status: "pending" | "investigating" | "resolved" | "closed";
   adminResponse?: string;
+  deductedAmount?: string;
+  deductionReason?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -20,7 +22,7 @@ export type Complaint = {
 export type CreateComplaintRequest = {
   orderId?: string;
   respondentId?: string;
-  type: "book-condition" | "delivery" | "user-behavior" | "other";
+  type: "book-condition" | "delivery" | "user-behavior" | "other" | "overdue";
   subject: string;
   description: string;
 };
@@ -29,8 +31,8 @@ export type MessageCreate = {
   body: string;
 };
 
-// 获取所有投诉
-export async function getComplaints(): Promise<Complaint[]> {
+// 获取投诉列表
+export async function getComplaints(isAdmin: boolean = false): Promise<Complaint[]> {
   try {
     const token = getToken();
     if (!token) {
@@ -38,7 +40,8 @@ export async function getComplaints(): Promise<Complaint[]> {
       return [];
     }
     
-    const response = await axios.get(`${API_URL}/api/v1/complaints`, {
+    const role = isAdmin ? "admin" : "mine";
+    const response = await axios.get(`${API_URL}/api/v1/complaints?role=${role}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     
@@ -100,12 +103,35 @@ export async function addComplaintMessage(complaintId: string, messageData: Mess
   return response.data;
 }
 
-// 解决投诉
-export async function resolveComplaint(complaintId: string): Promise<any> {
+// 管理员更新投诉状态
+export async function updateComplaintStatus(
+  complaintId: string, 
+  status?: "investigating" | "resolved" | "closed",
+  adminResponse?: string
+): Promise<Complaint> {
   const token = getToken();
   const response = await axios.post(
     `${API_URL}/api/v1/complaints/${complaintId}/resolve`,
-    {},
+    {
+      status,
+      adminResponse
+    },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data;
+}
+
+// 押金扣除 (需要后端实现)
+export async function deductDeposit(
+  complaintId: string,
+  amount: number
+): Promise<any> {
+  const token = getToken();
+  const response = await axios.post(
+    `${API_URL}/api/v1/complaints/${complaintId}/deduct-deposit`,
+    { amount },
     {
       headers: { Authorization: `Bearer ${token}` },
     }
