@@ -29,6 +29,20 @@ const Header: React.FC = () => {
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+    // Add this effect to clear search when route changes
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setSearchQuery("");
+    };
+
+    // Subscribe to route changes
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, []);
+
   // Check authentication status on component mount and when auth changes
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -91,6 +105,14 @@ const Header: React.FC = () => {
     router.push("/register");
   };
 
+  // Update the search handler to clear query after navigation
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      router.push(`/books?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery(""); // Clear the search input after navigation
+    }
+  };
+
 
   return (
     <>
@@ -119,11 +141,7 @@ const Header: React.FC = () => {
                   placeholder="Search books, authors, tags..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      console.log("Searching:", searchQuery);
-                    }
-                  }}
+                  onKeyDown={handleSearch}
                   className="w-full"
                 />
               </div>
