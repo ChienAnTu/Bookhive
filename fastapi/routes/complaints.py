@@ -94,9 +94,9 @@ def list_complaints(
     - If role=admin, it shows all complaints (requires admin user). -> You need admin account for this.
     You can filter by status (pending, investigating, resolved, closed).
     """
-    if role == "admin" and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if role == "admin" and not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
-    if role == "admin":                              # TODO: Change the admin to a proper judging logic
+    if role == "admin":
         items = ComplaintService.list_all(db, status=status)
     else:
         items = ComplaintService.list_for_user(db, user_id=user.user_id, status=status)
@@ -118,7 +118,7 @@ def get_complaint(
     """
 
     c = ComplaintService.get(db, complaint_id)
-    if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if user.user_id not in (c.complainant_id, c.respondent_id) and not user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
     msgs = ComplaintService.list_messages(db, complaint_id=complaint_id)
     return {"complaint": _to_read(c), "messages": [_msg_to_read(m) for m in msgs]}
@@ -139,7 +139,7 @@ def add_message(
     """
 
     c = ComplaintService.get(db, complaint_id)
-    if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if user.user_id not in (c.complainant_id, c.respondent_id) and not user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
     m = ComplaintService.add_message(
         db, complaint_id=complaint_id, sender_id=user.user_id, body=body.body
@@ -163,7 +163,7 @@ def resolve_complaint(
     - complaint_id is auto-generated ID of this complaint.
     """
 
-    if user.user_id != "admin":                 # TODO: Change the admin to a proper judging logic
+    if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
     c = ComplaintService.admin_update(
         db,
