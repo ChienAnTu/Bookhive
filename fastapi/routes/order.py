@@ -3,7 +3,7 @@ Order API routes - FastAPI implementation
 Clean routes with business logic delegated to service layer
 """
 
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -22,6 +22,10 @@ router = APIRouter(tags=["orders"])
 # API Models
 class CreateOrderRequest(BaseModel):
     checkout_id: str
+
+class TrackingNumbersResponse(BaseModel):
+    shipping_out_tracking_number: List[str]
+    shipping_return_tracking_number: List[str]
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -69,18 +73,31 @@ def list_my_orders(
     )
     return orders
 
+@router.get("/tracking", response_model=Dict[str, List[str]])
+def get_user_tracking_numbers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    user_id: Optional[str] = None
+):
+    """
+    Get AUPOST tracking numbers for a user's orders.
+    
+    Args:
+        user_id: Optional user ID (admin only, defaults to current user)
+    
+    Returns:
+        Dictionary with shipping_out and shipping_return tracking numbers
+    """
+    return OrderService.get_user_tracking_numbers(db, current_user, user_id)
+
 @router.get("/{order_id}", response_model=OrderDetail)
 async def get_order_detail(
     order_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """get order details"""
-    order_detail = OrderService.get_order_detail(db, order_id)
-    
-    if not order_detail:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    return order_detail
+    return OrderService.get_order_detail(db, order_id, current_user)
 
 @router.put("/{order_id}/cancel")
 def cancel_order(
@@ -88,6 +105,8 @@ def cancel_order(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    success = OrderService.cancel_order(db, order_id, current_user.user_id)
+    success = OrderService.cancel_order(db, order_id, current_user)
     if success:
         return {"message": "Order cancelled successfully"}
+    
+

@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
 from models.service_fee import ServiceFee
-from sqlalchemy import or_
 
 class OrderService:
     """
@@ -241,7 +240,14 @@ class OrderService:
         skip: int = 0, 
         limit: int = 20
     ) -> List[dict]:
-        query = db.query(Order).filter(Order.borrower_id == user_id)
+        
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if user.is_admin:
+            query = db.query(Order)
+        else:
+            query = db.query(Order).filter(Order.borrower_id == user_id)
 
         if status:
             query = query.filter(Order.status == status)
@@ -269,22 +275,24 @@ class OrderService:
         return result
     
     @staticmethod
-    def get_order_detail(db: Session, order_id: str) -> Optional[Dict]:
+    def get_order_detail(db: Session, order_id: str, current_user: User) -> Optional[Dict]:
         order = db.query(Order).filter(Order.id == order_id).first()
         if not order:
-            return None
+            return None    
+        if not current_user.is_admin and order.borrower_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this order")
         return order.to_dict(include_books = True)
 
         
     @staticmethod
-    def cancel_order(db: Session, order_id: str, user_id: str) -> bool:
+    def cancel_order(db: Session, order_id: str, current_user: User) -> bool:
         """
         Cancel an order if it's in a cancellable state
         
         Args:
             db: Database session
             order_id: Order ID to cancel
-            user_id: User ID performing the cancellation (for authorization)
+            current_user: User
             
         Returns:
             bool: True if cancellation was successful
@@ -301,7 +309,7 @@ class OrderService:
             )
         
         # Check authorization - only borrower can cancel their order
-        if order.borrower_id != user_id:
+        if order.borrower_id != current_user.user_id and not current_user.is_admin:
             raise HTTPException(
                 status_code=403,
                 detail="Not authorized to cancel this order"
@@ -328,3 +336,53 @@ class OrderService:
         
         db.commit()
         return True
+
+    @staticmethod
+    def get_user_tracking_numbers(
+        db: Session,
+        current_user: User,
+        target_user_id: Optional[str] = None
+    ) -> Dict[str, List[str]]:
+        """
+        Return shipping out and return AUPOST tracking numbers for a user.
+        
+        Returns:
+            {
+                "shipping_out_tracking_number": [...],
+                "shipping_return_tracking_number": [...]
+            }
+
+        Example:
+            >>> get_user_tracking_numbers(db, "user123")
+            {
+                "shipping_out_tracking_number": [
+                    "OUT123456789",
+                    "OUT987654321"
+                ],
+                "shipping_return_tracking_number": [
+                    "RET123456789",
+                    "RET987654321"
+                ]
+            }
+        """
+        user_id = target_user_id or current_user.user_id
+        # authorization check: allow if admin or user querying themselves
+        if not current_user.is_admin and current_user.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        orders = db.query(Order).filter(Order.borrower_id == user_id).all()
+
+        shipping_out_numbers = []
+        shipping_return_numbers = []
+
+        for order in orders:
+            # Only include tracking numbers for AUPOST orders
+            if order.shipping_out_tracking_number and order.shipping_out_carrier == "AUSPOST":
+                shipping_out_numbers.append(order.shipping_out_tracking_number)
+            if order.shipping_return_tracking_number and order.shipping_return_carrier == "AUSPOST":
+                shipping_return_numbers.append(order.shipping_return_tracking_number)
+        
+        return {
+            "shipping_out_tracking_number": shipping_out_numbers,
+            "shipping_return_tracking_number": shipping_return_numbers
+        }
