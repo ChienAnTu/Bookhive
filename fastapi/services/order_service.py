@@ -342,47 +342,40 @@ class OrderService:
         db: Session,
         current_user: User,
         target_user_id: Optional[str] = None
-    ) -> Dict[str, List[str]]:
+    ) -> List[Dict[str, Optional[str]]]:
         """
-        Return shipping out and return AUPOST tracking numbers for a user.
-        
-        Returns:
-            {
-                "shipping_out_tracking_number": [...],
-                "shipping_return_tracking_number": [...]
-            }
+        Return AUPOST shipping out and return tracking numbers per order for a user.
+        Each item includes order_id and tracking numbers (or None if not AUPOST).
 
         Example:
-            >>> get_user_tracking_numbers(db, "user123")
+        [
             {
-                "shipping_out_tracking_number": [
-                    "OUT123456789",
-                    "OUT987654321"
-                ],
-                "shipping_return_tracking_number": [
-                    "RET123456789",
-                    "RET987654321"
-                ]
-            }
+                "order_id": "ORD123",
+                "shipping_out_tracking_number": "OUT123",
+                "shipping_return_tracking_number": "RET123"
+            },
+            ...
+        ]
         """
         user_id = target_user_id or current_user.user_id
+
         # authorization check: allow if admin or user querying themselves
         if not current_user.is_admin and current_user.user_id != user_id:
             raise HTTPException(status_code=403, detail="Not authorized")
-        
+
         orders = db.query(Order).filter(Order.borrower_id == user_id).all()
 
-        shipping_out_numbers = []
-        shipping_return_numbers = []
-
+        result = []
         for order in orders:
-            # Only include tracking numbers for AUPOST orders
-            if order.shipping_out_tracking_number and order.shipping_out_carrier == "AUSPOST":
-                shipping_out_numbers.append(order.shipping_out_tracking_number)
-            if order.shipping_return_tracking_number and order.shipping_return_carrier == "AUSPOST":
-                shipping_return_numbers.append(order.shipping_return_tracking_number)
-        
-        return {
-            "shipping_out_tracking_number": shipping_out_numbers,
-            "shipping_return_tracking_number": shipping_return_numbers
-        }
+            out_num = order.shipping_out_tracking_number if order.shipping_out_carrier == "AUSPOST" else None
+            return_num = order.shipping_return_tracking_number if order.shipping_return_carrier == "AUSPOST" else None
+
+            # Only include if at least one AUPOST tracking number exists
+            if out_num or return_num:
+                result.append({
+                    "order_id": order.id,
+                    "shipping_out_tracking_number": out_num,
+                    "shipping_return_tracking_number": return_num,
+                })
+
+        return result
