@@ -7,6 +7,7 @@ from core.dependencies import get_db,get_current_user
 from models.user import User
 from models.user import User as UserModel
 from sqlalchemy.orm import Session
+from services.blacklist_service import BlacklistService
 
 
 router = APIRouter(prefix="/user", tags=["User"])
@@ -121,6 +122,11 @@ def get_user_by_id_login_only(
     u = db.query(UserModel).filter(UserModel.user_id == user_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if target has blacklisted the current user
+    if BlacklistService.is_blocked(db, user_id, _.user_id):
+        raise HTTPException(status_code=403, detail="Access denied: You are blacklisted by this user")
+
     return _to_user_response(u)
 
 

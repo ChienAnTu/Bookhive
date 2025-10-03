@@ -16,7 +16,6 @@ export async function addItemToCart(payload: AddCartItemPayload) {
   if (!token) throw new Error("No auth token");
 
   const API_URL = getApiUrl();
-  // 只把有值的字段发出去（避免 undefined → null 的歧义）
   const body: Record<string, any> = {
     bookId: payload.bookId,
     ownerId: payload.ownerId,
@@ -32,7 +31,7 @@ export async function addItemToCart(payload: AddCartItemPayload) {
     return res.data;
   } catch (err: any) {
     if (err.response) {
-      console.error("❌ Add to cart failed:", err.response.data);
+      console.error("Add to cart failed:", err.response.data);
     }
     throw err;
   }

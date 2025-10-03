@@ -3,26 +3,35 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+
 import { Star, MapPin, Clock, Share2, MessageCircle, Package, Shield, ShoppingBag, Book as BookIcon, Languages } from "lucide-react";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
 import { calculateDistance } from "@/app/data/mockData";
+import { sendMessage } from "@/utils/messageApi";
 
 import { getBookById } from "@/utils/books";
 import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
-import { getUserById } from "@/utils/auth";
+import { getUserById, getCurrentUser } from "@/utils/auth";
+import { isProfileComplete } from "@/utils/profileValidation";
+import ProfileIncompleteModal from "@/app/components/ui/ProfileIncompleteModal";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
+import StarRating from "@/app/components/ui/StarRating";
+
 import { toast } from 'sonner';
+
 
 export default function BookDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bookId = params.id as string;
 
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
 
@@ -46,7 +55,7 @@ export default function BookDetailPage() {
     );
   }, [owner, currentUser]);
 
-  // pull cart firt
+  // pull cart first
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
@@ -77,7 +86,13 @@ export default function BookDetailPage() {
     })();
   }, [bookId]);
 
-
+  // 拉取当前用户
+  useEffect(() => {
+    (async () => {
+      const u = await getCurrentUser();
+      setCurrentUser(u);
+    })();
+  }, []);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center">Loading...</div>;
@@ -126,17 +141,37 @@ export default function BookDetailPage() {
   const formatKm = (km: number) =>
     km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
 
-  const handleSendRequest = () => {
-    console.log("Sending request with message:", requestMessage);
-    setIsRequestModalOpen(false);
-    setRequestMessage("");
+  const handleSendRequest = async () => {
+    if (!owner || !currentUser || !requestMessage.trim()) {
+      toast.error("Please fill in the message");
+      return;
+    }
+    try {
+      // Add book info to message
+      const messageWithBookInfo = `Book Request: ${book.titleOr}\n\n${requestMessage}`;
+      console.log("Attempting to send message to owner email:", owner.email);
+      await sendMessage(owner.email, messageWithBookInfo);
+      toast.success("Message sent successfully");
+      setIsRequestModalOpen(false);
+      setRequestMessage("");
+
+      // Redirect to the messages page and specify which conversation to open.
+      // The timeout is kept to allow the user to see the success message.
+      setTimeout(() => {
+        router.push(`/message?to=${owner.email}`);
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast.error(error.message || "Failed to send message");
+    }
   };
 
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
         title: book.titleOr,
-        text: `Check out "${book.titleOr}" by ${book.author} on BookHive`,
+        text: `Check out "${book.titleOr}" by ${book.author} on BookBorrow`,
         url: window.location.href,
       });
     } else {
@@ -181,13 +216,18 @@ export default function BookDetailPage() {
                 </div>
 
                 {/* Request This Book */}
-                {/* Request This Book */}
                 <div className="p-4 space-y-3">
                   <Button
                     onClick={async () => {
                       if (!book) return;
 
-                      // 已在购物车
+                      // check current user profile if is complete
+                      if (!currentUser || !isProfileComplete(currentUser)) {
+                        setIsProfileModalOpen(true);
+                        return;
+                      }
+
+                      // Already in cart
                       if (alreadyInCart) {
                         toast.error("This book is already in your cart");
                         return;
@@ -266,70 +306,110 @@ export default function BookDetailPage() {
                 </div>
 
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                  <p className="text-gray-700 leading-relaxed">
+                  {/* Description */}
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+                  <p className="text-gray-700 leading-relaxed mb-3">
                     {book.description}
                   </p>
-                </div>
 
-                <h4 className="font-semibold text-gray-900 mb-3">Book Information</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                  <div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 flex items-center gap-1">
-                          <BookIcon className="w-4 h-4" />
-                          Category:</span>
-                        <span className="font-medium">{book.category}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 flex items-center gap-1">
-                          <Languages className="w-4 h-4" />
-                          Language:</span>
-                        <span className="font-medium">{book.originalLanguage}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 flex items-center gap-1">
-                          <ShoppingBag className="w-4 h-4" />
-                          Trading Way:</span>
-                        <span className="font-medium">
-                          {book.canRent ? "Borrow" : ""}
-                          {book.canSell ? (book.canRent ? " / Buy" : "Buy") : ""}
-                          {(!book.canRent && !book.canSell) && "Unavailable"}
-                        </span>
-                      </div>
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 flex items-center gap-1">
+                        <BookIcon className="w-4 h-4" />
+                        Category:
+                      </span>
+                      <span className="font-medium">{book.category}</span>
                     </div>
-                  </div>
-
-                  <div>
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          Max lending:
-                        </span>
-                        <span className="font-medium">{book.maxLendingDays} days</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 flex items-center gap-1">
-                          <Package className="w-4 h-4" />
-                          Delivery:
-                        </span>
-                        <span className="font-medium">{getDeliveryLabel(book.deliveryMethod)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 flex items-center gap-1">
-                          <Shield className="w-4 h-4" />
-                          Deposit:
-                        </span>
-                        <span className="font-medium">${book.deposit}</span>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 flex items-center gap-1">
+                        <Languages className="w-4 h-4" />
+                        Language:
+                      </span>
+                      <span className="font-medium">{book.originalLanguage}</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Trading Info */}
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                  Trading Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-1 mb-6 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <ShoppingBag className="w-4 h-4" />
+                      Trading Way:
+                    </span>
+                    <span className="font-medium">
+                      {book.canRent ? "Borrow" : ""}
+                      {book.canSell ? (book.canRent ? " / Purchase" : "Purchase") : ""}
+                      {!book.canRent && !book.canSell && "Unavailable"}
+                    </span>
+                  </div>
+
+                  {book.canRent && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Max lending:
+                      </span>
+                      <span className="font-medium">{book.maxLendingDays} days</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <Package className="w-4 h-4" />
+                      Delivery Method:
+                    </span>
+                    <span className="font-medium">{getDeliveryLabel(book.deliveryMethod)}</span>
+                  </div>
+                </div>
+
+                {/* Price Info (only show if applicable) */}
+                {(book.canRent || book.canSell) && (
+                  <>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">Price</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-2 mb-6 text-sm">
+                      {book.canRent && (
+                        <div className="flex flex-col">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <Shield className="w-4 h-4" />
+                              Deposit:
+                            </span>
+                            <span className="font-bold text-orange-600">
+                              {book.deposit ? `$${book.deposit}` : "N/A"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            * Deposit is refundable upon timely return of the book in good condition.
+                          </p>
+                        </div>
+                      )}
+
+                      {book.canSell && (
+                        <div className="flex flex-col">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <Shield className="w-4 h-4" />
+                              Sale Price:
+                            </span>
+                            <span className="font-bold text-orange-600">
+                              {book.salePrice ? `$${book.salePrice}` : "N/A"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            * Sale Price is the final purchase price (non-refundable).
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+
               </Card>
 
               {/* owner info */}
@@ -340,7 +420,14 @@ export default function BookDetailPage() {
                     <Avatar user={owner} size={64} />
 
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{owner.name}</h4>
+                      <h4 className="font-semibold text-gray-900">
+                        <Link
+                          href={`/profile/${owner.id}`}
+                          className="hover:underline hover:text-black transition"
+                        >
+                          {owner.firstName} {owner.lastName}
+                        </Link>
+                      </h4>
                       <div className="flex items-center text-gray-600 text-sm mt-1">
                         <MapPin className="w-4 h-4 mr-1" />
                         <p>
@@ -353,29 +440,21 @@ export default function BookDetailPage() {
                         <div>
                           {distance > 0 ? ` • ${formatKm(distance)} away from you` : ""}
                         </div>
-
                       </div>
                       <div className="flex items-center mt-2">
-                        <div className="flex items-center mr-3">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-4 h-4 ${star <= Math.floor(owner.rating)
-                                ? "text-yellow-400 fill-current"
-                                : "text-gray-300"
-                                }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm text-gray-600">
-                          {owner.rating}
+                        <StarRating rating={(owner as any).rating ?? 0} readonly size="sm" />
+                        <span className="ml-2 text-sm text-gray-600">
+                          {(owner as any).rating ?? 0}
                         </span>
                       </div>
+
                     </div>
                     <Button
                       variant="outline"
                       className="flex items-center gap-2"
-                      onClick={() => setIsRequestModalOpen(true)}
+                      onClick={() => {
+                        setIsRequestModalOpen(true);
+                      }}
                     >
                       <MessageCircle className="w-4 h-4" />
                       Message
@@ -423,6 +502,11 @@ export default function BookDetailPage() {
           </div>
         </div>
       </Modal>
+
+      <ProfileIncompleteModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </div>
   );
 }

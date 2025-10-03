@@ -4,6 +4,7 @@
 import { useState } from "react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
+import Select from "@/app/components/ui/Select";
 import { Book } from "@/app/types/book";
 import { createBook, uploadFile } from "@/utils/books";
 import { getCurrentUser } from "@/utils/auth";
@@ -250,33 +251,36 @@ export default function AddBook() {
           <div className="lg:w-1/2 lg:pr-8 space-y-6">
 
             {/* Title + Language */}
-            <div className="flex gap-2 items-start">
-              <Input
-                label="Title (Original Language)*"
-                name="titleOr"
-                value={form.titleOr}
-                onChange={handleChange}
-                required
-              />
-              <div className="w-40">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Language
-                </label>
-                <select
-                  name="originalLanguage"
-                  value={form.originalLanguage}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  required
-                >
-                  <option value="">Select</option>
-                  <option value="English">English</option>
-                  <option value="Chinese">Chinese</option>
-                  <option value="Japanese">Japanese</option>
-                </select>
+            <Select
+              label="Original Language"
+              name="originalLanguage"
+              value={form.originalLanguage}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select the book's original language</option>
+              <option value="English">English</option>
+              <option value="Chinese">Chinese</option>
+              <option value="Hindi">Hindi</option>
+              <option value="Japanese">Japanese</option>
+            </Select>
 
-              </div>
-            </div>
+            <Input
+              label="Title (Original Language)*"
+              name="titleOr"
+              value={form.titleOr}
+              onChange={handleChange}
+              required
+              placeholder={
+                form.originalLanguage === "Chinese"
+                  ? "例如：《红楼梦》"
+                  : form.originalLanguage === "Hindi"
+                    ? "उदाहरण: गीता"
+                    : form.originalLanguage === "Japanese"
+                      ? "例：吾輩は猫である"
+                      : "e.g., Harry Potter and the Philosopher's Stone"
+              }
+            />
 
             {/* Title En */}
             <Input
@@ -297,23 +301,26 @@ export default function AddBook() {
             />
 
             {/* Category */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category*
-              </label>
-              <select
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                required
-              >
-                <option value="">Please choose a category</option>
-                <option value="Fiction">Fiction</option>
-                <option value="Sci-Fi">Sci-Fi</option>
-                <option value="Non-Fiction">Non-Fiction</option>
-              </select>
-            </div>
+            <Select
+              label="Category*"
+              name="category"
+              value={form.category}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Please choose a category</option>
+              <option value="Fiction">Fiction</option>
+              <option value="Non-Fiction">Non-Fiction</option>
+              <option value="Sci-Fi">Sci-Fi</option>
+              <option value="Fantasy">Fantasy</option>
+              <option value="Biography">Biography & Memoir</option>
+              <option value="History">History</option>
+              <option value="Science">Science & Technology</option>
+              <option value="Self-Help">Self-Help & Personal Development</option>
+              <option value="Education">Education & Textbook</option>
+              <option value="Children">Children & Young Adult</option>
+              <option value="Comics">Comics & Graphic Novels</option>
+            </Select>
 
             <Input
               label="Tags (separate by ,)"
@@ -321,7 +328,6 @@ export default function AddBook() {
               type="text"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-
             />
 
             {/* ISBN */}
@@ -406,23 +412,18 @@ export default function AddBook() {
             </div>
 
             {/* Condition */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Condition*
-              </label>
-              <select
-                name="condition"
-                value={form.condition}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                required
-              >
-                <option value="new">New</option>
-                <option value="like-new">Like New</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
-              </select>
-            </div>
+            <Select
+              label="Condition*"
+              name="condition"
+              value={form.condition}
+              onChange={handleChange}
+              required
+            >
+              <option value="new">New</option>
+              <option value="like-new">Like New</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+            </Select>
 
             {/* Condition Photos */}
             <div>
@@ -509,7 +510,7 @@ export default function AddBook() {
                   )}
                 </div>
 
-                {/* Rent 区块 */}
+                {/* Rent */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2">
                     <input
@@ -521,7 +522,7 @@ export default function AddBook() {
                     Lend Out
                   </label>
 
-                  {/* 仅当 canRent = true 时显示 & 必填 */}
+                  {/* canRent = true */}
                   {form.canRent && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input

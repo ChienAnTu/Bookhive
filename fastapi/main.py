@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from routes.upload import router as upload_router
 from routes.books import router as books_router
+from routes.messages import router as message_router
 from routes.cart import router as cart_router
 from routes.complaints import router as complaints_router  # routes/complaints
 from routes.shipping import router as shipping_router  # Import shipping router
@@ -14,6 +15,10 @@ from routes.service_fee import router as service_fee_router
 from routes.checkout import router as checkout_router  # Import checkout router
 from routes.mail import router as mail_router
 from routes.payment_gateway import router as payment_gateway_router
+from routes.order import router as orders_router
+from routes.bans import router as bans_router
+from routes.blacklists import router as blacklists_router
+from routes.review import router as review_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -28,9 +33,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+#service review router
+app.include_router(review_router, prefix="/api/v1")
 
 #service checkout router
 app.include_router(checkout_router, prefix="/api/v1")
@@ -56,18 +63,28 @@ app.include_router(user_router, prefix="/api/v1")
 
 # books router
 app.include_router(books_router)
+app.include_router(message_router, prefix="/api/v1")
 
 # cart router
 app.include_router(cart_router, prefix="/api/v1")
 
 # complaints router
-app.include_router(complaints_router)
+app.include_router(complaints_router, prefix="/api/v1")
 
 # mail router
 app.include_router(mail_router) 
 
 # payment gateway router
 app.include_router(payment_gateway_router) 
+
+# order router
+app.include_router(orders_router, prefix="/api/v1/orders")
+
+# bans router
+app.include_router(bans_router, prefix="/api/v1")
+
+# blacklists router
+app.include_router(blacklists_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

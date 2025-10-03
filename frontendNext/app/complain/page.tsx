@@ -1,72 +1,105 @@
-// app/complain/page.tsx
-"use client";
+﻿"use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   MessageSquare, 
   AlertTriangle, 
   Clock, 
   CheckCircle, 
   XCircle,
-  Plus,
-  Calendar,
-  Filter,
-  Search,
-  FileText
+  Plus
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import Modal from "../components/ui/Modal";
+import { getCurrentUser, isAuthenticated } from "@/utils/auth";
 import { 
-  getCurrentUser,
-  mockComplaints,
-  mockBooks,
-  getUserById,
-  complaintTypes
-} from "@/app/data/mockData";
+  getComplaints, 
+  createComplaint, 
+  type Complaint,
+  type CreateComplaintRequest
+} from "@/utils/complaints";
 
-type ComplaintStatus = "pending" | "investigating" | "resolved" | "closed";
-type ComplaintType = "book-condition" | "delivery" | "user-behavior" | "other";
-type FilterStatus = "all" | ComplaintStatus;
-
-export default function ComplainPage() {
-  const [selectedFilter, setSelectedFilter] = useState<FilterStatus>("all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isNewComplaintModalOpen, setIsNewComplaintModalOpen] = useState(false);
+const ComplainPage: React.FC = () => {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newComplaint, setNewComplaint] = useState({
-    type: "book-condition" as ComplaintType,
+    type: "other" as const,
     subject: "",
     description: "",
-    orderId: ""
+    orderId: "",
+    respondentId: ""
   });
-  
-  const currentUser = getCurrentUser();
-  
-  // Get user's complaints
-  const userComplaints = useMemo(() => {
-    return mockComplaints.filter(complaint => 
-      complaint.complainantId === currentUser.id
-    );
-  }, [currentUser.id]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredComplaints = useMemo(() => {
-    let filtered = userComplaints;
-    
-    if (selectedFilter !== "all") {
-      filtered = filtered.filter(complaint => complaint.status === selectedFilter);
-    }
-    
-    if (searchTerm) {
-      filtered = filtered.filter(complaint => 
-        complaint.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        complaint.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [userComplaints, selectedFilter, searchTerm]);
+  useEffect(() => {
+    const loadData = async () => {
+      if (!isAuthenticated()) {
+        router.push("/auth");
+        return;
+      }
 
-  const getStatusIcon = (status: ComplaintStatus) => {
+      try {
+        const userData = await getCurrentUser();
+        if (userData) {
+          setCurrentUser(userData);
+          const complaintsData = await getComplaints();
+          // 确保 complaintsData 是数组
+          if (Array.isArray(complaintsData)) {
+            setComplaints(complaintsData);
+          } else {
+            console.error("Invalid complaints data format:", complaintsData);
+            setComplaints([]);
+          }
+        } else {
+          router.push("/auth");
+        }
+      } catch (error) {
+        console.error("Failed to load complaints:", error);
+        setComplaints([]); // 确保在错误时设置为空数组
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [router]);
+
+  const handleCreateComplaint = async () => {
+    if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const complaintData: CreateComplaintRequest = {
+        type: newComplaint.type,
+        subject: newComplaint.subject,
+        description: newComplaint.description,
+        orderId: newComplaint.orderId || undefined,
+        respondentId: newComplaint.respondentId || undefined
+      };
+      
+      const createdComplaint = await createComplaint(complaintData);
+      if (createdComplaint) {
+        setComplaints([createdComplaint, ...complaints]);
+        setIsCreateModalOpen(false);
+        setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
+      } else {
+        alert("Failed to submit complaint. Please try again.");
+      }
+    } catch (error) {
+      console.error("Failed to create complaint:", error);
+      alert("Failed to submit complaint. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending": return <Clock className="w-5 h-5 text-yellow-500" />;
       case "investigating": return <AlertTriangle className="w-5 h-5 text-orange-500" />;
@@ -76,292 +109,196 @@ export default function ComplainPage() {
     }
   };
 
-  const getStatusColor = (status: ComplaintStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending": return "text-yellow-700 bg-yellow-50 border-yellow-200";
-      case "investigating": return "text-orange-700 bg-orange-50 border-orange-200";
-      case "resolved": return "text-green-700 bg-green-50 border-green-200";
-      case "closed": return "text-gray-700 bg-gray-50 border-gray-200";
-      default: return "text-gray-700 bg-gray-50 border-gray-200";
+      case "pending": return "bg-yellow-100 text-yellow-800";
+      case "investigating": return "bg-orange-100 text-orange-800";
+      case "resolved": return "bg-green-100 text-green-800";
+      case "closed": return "bg-gray-100 text-gray-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
 
-  const getTypeLabel = (type: ComplaintType) => {
-    switch (type) {
-      case "book-condition": return "Book Condition";
-      case "delivery": return "Delivery Issue";
-      case "user-behavior": return "User Behavior";
-      case "other": return "Other";
-      default: return "Other";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
-
-  const handleSubmitComplaint = () => {
-    if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
-      return;
-    }
-    
-    // Here you would typically send the complaint to your backend
-    console.log("Submitting complaint:", newComplaint);
-    
-    // Reset form and close modal
-    setNewComplaint({
-      type: "book-condition",
-      subject: "",
-      description: "",
-      orderId: ""
-    });
-    setIsNewComplaintModalOpen(false);
-  };
-
-  const filterOptions = [
-    { value: "all", label: "All", count: userComplaints.length },
-    { value: "pending", label: "Pending", count: userComplaints.filter(c => c.status === "pending").length },
-    { value: "investigating", label: "Investigating", count: userComplaints.filter(c => c.status === "investigating").length },
-    { value: "resolved", label: "Resolved", count: userComplaints.filter(c => c.status === "resolved").length },
-    { value: "closed", label: "Closed", count: userComplaints.filter(c => c.status === "closed").length }
-  ];
-
-  const complaintTypeOptions: { value: ComplaintType; label: string }[] = [
-    { value: "book-condition", label: "Book Condition" },
-    { value: "delivery", label: "Delivery Issue" },
-    { value: "user-behavior", label: "User Behavior" },
-    { value: "other", label: "Other" }
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex-1 bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-gray-500">Loading complaints...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-6">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Support</h1>
-              <p className="text-gray-600">Submit and track your complaints or support requests</p>
-            </div>
-            <Button
-              onClick={() => setIsNewComplaintModalOpen(true)}
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              New Support
-            </Button>
+    <div className="flex-1 bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Support & Complaints</h1>
+            <p className="text-gray-600">Submit and track your complaints</p>
           </div>
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Complaint
+          </Button>
+        </div>
 
-          {/* Search and Filters */}
-          <div className="mb-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search complaints by subject or description..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="shadow-sm">
+            <div className="flex items-center">
+              <MessageSquare className="w-8 h-8 text-blue-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total</p>
+                <p className="text-2xl font-bold text-gray-900">{complaints.length}</p>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              {filterOptions.map((option) => (
-                <Button
-                  key={option.value}
-                  variant={selectedFilter === option.value ? "default" : "outline"}
-                  onClick={() => setSelectedFilter(option.value as FilterStatus)}
-                                    className={`flex items-center gap-2 ${selectedFilter === option.value
-                      ? "bg-black text-white hover:bg-gray-800 border-black"
-                      : ""
-                    }`}
-                >
-                  <Filter className="w-4 h-4" />
-                  {option.label}
-                  <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
-                    {option.count}
-                  </span>
-                </Button>
-              ))}
+          </Card>
+          
+          <Card className="shadow-sm">
+            <div className="flex items-center">
+              <Clock className="w-8 h-8 text-yellow-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Open</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {complaints.filter(c => c.status === "pending").length}
+                </p>
+              </div>
             </div>
-          </div>
+          </Card>
+          
+          <Card className="shadow-sm">
+            <div className="flex items-center">
+              <AlertTriangle className="w-8 h-8 text-orange-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">In Progress</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {complaints.filter(c => c.status === "investigating").length}
+                </p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="shadow-sm">
+            <div className="flex items-center">
+              <CheckCircle className="w-8 h-8 text-green-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Resolved</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {complaints.filter(c => c.status === "resolved").length}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
-          {/* Complaints List */}
-          <div className="space-y-4">
-            {filteredComplaints.length === 0 ? (
-              <Card>
-                <div className="text-center py-12">
-                  <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No complaints found</h3>
-                  <p className="text-gray-500 mb-4">
-                    {searchTerm ? "Try adjusting your search terms" : "You haven't submitted any complaints yet"}
-                  </p>
-                  <Button
-                    onClick={() => setIsNewComplaintModalOpen(true)}
-                    className="flex items-center gap-2 mx-auto"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Submit Your First Complaint
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              filteredComplaints.map((complaint) => (
-                <Card key={complaint.id}>
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {complaint.subject}
-                          </h3>
-                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
-                            {getTypeLabel(complaint.type)}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 mb-3">{complaint.description}</p>
+        <Card className="shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Your Complaints</h2>
+          
+          {complaints.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No complaints submitted yet</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {complaints.map((complaint) => (
+                <Card key={complaint.id} className="border border-gray-200 shadow-sm">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        {getStatusIcon(complaint.status)}
+                        <h3 className="font-semibold">{complaint.subject}</h3>
+                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(complaint.status)}`}>
+                          {complaint.status.replace("_", " ")}
+                        </span>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(complaint.status)}`}>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(complaint.status)}
-                          {complaint.status.charAt(0).toUpperCase() + complaint.status.slice(1)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        <span>Submitted: {formatDate(complaint.createdAt)}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <FileText className="w-4 h-4 mr-2" />
-                        <span>Case ID: {complaint.id}</span>
-                      </div>
-                      {complaint.orderId && (
-                        <div className="flex items-center">
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          <span>Order ID: {complaint.orderId}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {complaint.adminResponse && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <h4 className="font-medium text-blue-900 mb-2">Admin Response</h4>
-                        <p className="text-blue-800 text-sm">{complaint.adminResponse}</p>
-                        {complaint.updatedAt && (
-                          <p className="text-blue-600 text-xs mt-2">
-                            Updated: {formatDate(complaint.updatedAt)}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex justify-end space-x-2">
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                      {complaint.status === "pending" && (
-                        <Button variant="outline" size="sm">
-                          Update Complaint
-                        </Button>
-                      )}
+                      <p className="text-gray-600 mb-2">{complaint.description}</p>
+                      <p className="text-sm text-gray-500">
+                        Created: {new Date(complaint.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
                 </Card>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* New Complaint Modal */}
-      <Modal
-        isOpen={isNewComplaintModalOpen}
-        onClose={() => setIsNewComplaintModalOpen(false)}
-        title="Submit New Complaint"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Complaint Type
-            </label>
-            <select
-              value={newComplaint.type}
-              onChange={(e) => setNewComplaint({...newComplaint, type: e.target.value as ComplaintType})}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {complaintTypeOptions.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
+        </Card>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Subject
-            </label>
-            <input
-              type="text"
-              value={newComplaint.subject}
-              onChange={(e) => setNewComplaint({...newComplaint, subject: e.target.value})}
-              placeholder="Brief description of the issue"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+        {/* Create Complaint Modal */}
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h2 className="text-xl font-semibold mb-4">Submit New Complaint</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Type
+                  </label>
+                  <select
+                    value={newComplaint.type}
+                    onChange={(e) => setNewComplaint({...newComplaint, type: e.target.value as any})}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="other">Other</option>
+                    <option value="book-condition">Book Condition</option>
+                    <option value="delivery">Delivery Issue</option>
+                    <option value="user-behavior">User Behavior</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Subject
+                  </label>
+                  <input
+                    type="text"
+                    value={newComplaint.subject}
+                    onChange={(e) => setNewComplaint({...newComplaint, subject: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Brief description of the issue"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={newComplaint.description}
+                    onChange={(e) => setNewComplaint({...newComplaint, description: e.target.value})}
+                    rows={4}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Please provide detailed information about your complaint..."
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateComplaint}
+                  disabled={isSubmitting || !newComplaint.subject.trim() || !newComplaint.description.trim()}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Complaint"}
+                </Button>
+              </div>
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Order ID (Optional)
-            </label>
-            <input
-              type="text"
-              value={newComplaint.orderId}
-              onChange={(e) => setNewComplaint({...newComplaint, orderId: e.target.value})}
-              placeholder="Related order ID if applicable"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              value={newComplaint.description}
-              onChange={(e) => setNewComplaint({...newComplaint, description: e.target.value})}
-              placeholder="Please provide detailed information about your complaint..."
-              rows={5}
-              className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsNewComplaintModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmitComplaint}
-              disabled={!newComplaint.subject.trim() || !newComplaint.description.trim()}
-            >
-              Submit Complaint
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default ComplainPage;

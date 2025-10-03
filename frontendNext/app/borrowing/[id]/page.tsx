@@ -1,21 +1,17 @@
-// borrowingg orders detail
+// borrowing orders detail
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Clock, Truck, ArrowLeft, AlertTriangle } from "lucide-react";
-
+import CoverImg from "@/app/components/ui/CoverImg";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
+import { toast } from "sonner";
+import { getApiUrl, getToken, getCurrentUser } from "@/utils/auth";
 
-import type { Order, OrderStatus } from "@/app/types/order";
-import type { Book } from "@/app/types/book";
-import BookThumbnailCard from "@/app/components/common/BookThumbnailCard";
-import { mockOrders, mockBooks, mockUsers } from "@/app/data/mockData";
-import { getBookById } from "@/utils/books";
+import type { OrderStatus, ApiOrder } from "@/app/types/order";
 import type { User } from "@/app/types/user";
-import { getCurrentUser } from "@/utils/auth";
-
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -27,28 +23,68 @@ const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   CANCELED: { label: "Canceled", className: "text-gray-400" },
 };
 
-// cents → AUD 字符串
-const fmtAUD = (cents?: { amount: number }) =>
-  typeof cents?.amount === "number" ? `A$ ${(cents.amount / 100).toFixed(2)}` : "—";
+const fmtAUD = (amount?: number) =>
+  typeof amount === "number" ? `A$ ${amount.toFixed(2)}` : "—";
 
-// form time
-const fmtDate = (v?: string) => (v ? new Date(v).toLocaleString() : "—");
+const fmtDate = (v?: string | null) => (v ? new Date(v).toLocaleString() : "—");
+
+const fetchOrderDetails = async (orderId: string): Promise<ApiOrder | null> => {
+  try {
+    const apiUrl = getApiUrl();
+    const token = getToken();
+
+    const response = await fetch(`${apiUrl}/api/v1/orders/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch order: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching order details:", error);
+    return null;
+  }
+};
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [booksMap, setBooksMap] = useState<Record<string, Book>>({});
+  const [order, setOrder] = useState<ApiOrder | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
-  // 加载 mock 数据
   useEffect(() => {
-    const o = mockOrders.find((x) => x.id === id) || null;
-    setOrder(o);
+    const loadData = async () => {
+      if (!id) return;
 
-    const map: Record<string, Book> = {};
-    for (const b of mockBooks) map[b.id] = b;
-    setBooksMap(map);
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [orderData, userData] = await Promise.all([
+          fetchOrderDetails(id),
+          getCurrentUser(),
+        ]);
+
+        if (orderData) {
+          setOrder(orderData);
+        } else {
+          setError("Failed to load order details");
+        }
+
+        setUser(userData);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setError("Failed to load order details");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [id]);
 
   const statusMeta = useMemo(
@@ -56,10 +92,30 @@ export default function OrderDetailPage() {
     [order]
   );
 
-  const booksInOrder = useMemo(
-    () => (order ? order.bookIds.map((bid) => booksMap[bid]).filter(Boolean) as Book[] : []),
-    [order, booksMap]
-  );
+  const booksInOrder = useMemo(() => {
+    if (!order) return [];
+    return order.books.map((book) => ({
+      id: book.bookId,
+      title: book.titleEn,
+      author: book.author,
+      coverUrl: book.coverImgUrl || "/images/placeholder-book.png",
+      isbn: "",
+      publisher: "",
+      publishedYear: 0,
+      description: "",
+      category: "",
+      condition: "good" as const,
+      language: "en" as const,
+      availableForBorrow: false,
+      availableForSale: false,
+      borrowPrice: { amount: 0 },
+      salePrice: { amount: 0 },
+      deposit: { amount: 0 },
+      ownerId: order.owner.id,
+      createdAt: "",
+      updatedAt: "",
+    }));
+  }, [order]);
 
   const isOverdue =
     order &&
@@ -67,43 +123,92 @@ export default function OrderDetailPage() {
     order.dueAt &&
     new Date(order.dueAt).getTime() < Date.now();
 
-  const [user, setUser] = useState<User | null>(null);
+  const isOwner = user?.id === order?.owner.id;
+  const isBorrower = user?.id === order?.borrower.id;
 
-  useEffect(() => {
-    (async () => {
-      const u = await getCurrentUser();
-      setUser(u);
-    })();
-  }, []);
+  const handleCancelOrder = async () => {
+    if (!user) {
+      toast.error("Please login first");
+      router.push("/auth");
+      return;
+    }
 
-  const isOwner = user?.id === order?.ownerId;
-  const isBorrower = user?.id === order?.borrowerId;
+    const confirmCancel = window.confirm(
+      "Are you sure you want to cancel this order? This action cannot be undone."
+    );
+    if (!confirmCancel) return;
 
-  if (!order) {
+    try {
+      const token = getToken();
+      if (!token) {
+        toast.error("Authentication required. Please log in again.");
+        router.push("/auth");
+        return;
+      }
+
+      const res = await fetch(
+        `${getApiUrl()}/api/v1/orders/${order!.id}/cancel`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to cancel order");
+
+      toast.success("Order cancelled successfully");
+
+      const updatedOrder = await fetchOrderDetails(id);
+      if (updatedOrder) {
+        setOrder(updatedOrder);
+      }
+    } catch (err) {
+      console.error("Cancel order error:", err);
+      toast.error("Failed to cancel order");
+    }
+  };
+
+  const handleAuthRequired = (path: string) => {
+    if (!user) {
+      toast.error("Please login first");
+      router.push("/auth");
+      return;
+    }
+    router.push(path);
+  };
+
+  if (loading) {
     return (
       <div className="max-w-5xl mx-auto p-6">
-        <Button
-          variant="outline"
-          className="mb-4 border-black text-black hover:bg-black hover:text-white"
-          onClick={() => router.push("/borrowing")}
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Orders
-        </Button>
-        <Card><div className="p-6">Order not found.</div></Card>
+        <Card>
+          <div className="p-6">Loading order details...</div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <Card>
+          <div className="p-6">{error || "Order not found."}</div>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
-
       {/* Order ID + Status */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Order #{order.id}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Order #{order.id}
+          </h1>
         </div>
-
         <div className="flex gap-2 flex-wrap justify-end">
           {statusMeta && (
             <p className={`mt-1 text-2xl font-bold ${statusMeta.className}`}>
@@ -115,24 +220,19 @@ export default function OrderDetailPage() {
 
       {/* Section 1 — Order Info */}
       <div className="grid md:grid-cols-2 gap-4">
-
         <Card className="p-4">
           <h2 className="text-lg font-semibold mb-3">Order Info</h2>
-
-          {/* Owner & Borrower */}
           <div className="text-sm text-gray-500 mt-3 flex flex-col gap-1">
             <div>
-              Owner: <span>
-                {mockUsers.find(u => u.id === order.ownerId)?.name || "Unknown Owner"}
-              </span>
+              Owner:{" "}
+              <span className="text-black font-medium">{order.owner.name}</span>
             </div>
             <div>
-              Borrower: <span>
-                {mockUsers.find(u => u.id === order.borrowerId)?.name || "Unknown Borrower"}
+              Borrower:{" "}
+              <span className="text-black font-medium">
+                {order.borrower.name}
               </span>
             </div>
-
-            {/* Due date */}
             {order.dueAt && (
               <div className="flex text-black font-medium items-center gap-1">
                 <Clock className="w-4 h-4" />
@@ -147,35 +247,69 @@ export default function OrderDetailPage() {
           </div>
         </Card>
 
-        {/* shipping: tracking info + Redirect to third-party delivery services */}
-        <Card>
+        {/* Shipping Info */}
+        <Card className="p-4">
           <h2 className="text-lg font-semibold mb-3">Shipping Info</h2>
-
-          <div className="mt-3  text-gray-500 text-sm">
-            <div>Delivery Method: <span className="font-medium text-black">{order.deliveryMethod}</span></div>
-            {(order.shippingOut?.trackingNumber || order.shippingReturn?.trackingNumber) && (
+          <div className="mt-3 text-gray-500 text-sm">
+            <div>
+              Delivery Method:{" "}
+              <span className="font-medium text-black">
+                {order.shippingMethod}
+              </span>
+            </div>
+            <div className="mt-2 space-y-1">
+              <div>
+                Contact:{" "}
+                <span className="font-medium text-black">
+                  {order.contactName}
+                </span>
+              </div>
+              <div>
+                Phone:{" "}
+                <span className="font-medium text-black">{order.phone}</span>
+              </div>
+              <div>
+                Address:{" "}
+                <span className="font-medium text-black">
+                  {order.street}, {order.city}, {order.postcode},{" "}
+                  {order.country}
+                </span>
+              </div>
+            </div>
+            {(order.shippingOutTrackingNumber ||
+              order.shippingReturnTrackingNumber) && (
               <div className="mt-2 flex items-center gap-6 flex-wrap">
-                {order.shippingOut?.trackingNumber && (
+                {order.shippingOutTrackingNumber && (
                   <span className="inline-flex items-center gap-1">
                     <Truck className="w-4 h-4" /> Outbound:&nbsp;
-                    {order.shippingOut?.trackingUrl ? (
-                      <a className="underline font-medium text-black" href={order.shippingOut.trackingUrl} target="_blank" rel="noreferrer">
-                        {order.shippingOut.trackingNumber}
+                    {order.shippingOutTrackingUrl ? (
+                      <a
+                        className="underline font-medium text-black"
+                        href={order.shippingOutTrackingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {order.shippingOutTrackingNumber}
                       </a>
                     ) : (
-                      order.shippingOut.trackingNumber
+                      order.shippingOutTrackingNumber
                     )}
                   </span>
                 )}
-                {order.shippingReturn?.trackingNumber && (
+                {order.shippingReturnTrackingNumber && (
                   <span className="inline-flex items-center gap-1">
                     <Truck className="w-4 h-4" /> Return:&nbsp;
-                    {order.shippingReturn?.trackingUrl ? (
-                      <a className="underline" href={order.shippingReturn.trackingUrl} target="_blank" rel="noreferrer">
-                        {order.shippingReturn.trackingNumber}
+                    {order.shippingReturnTrackingUrl ? (
+                      <a
+                        className="underline"
+                        href={order.shippingReturnTrackingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {order.shippingReturnTrackingNumber}
                       </a>
                     ) : (
-                      order.shippingReturn.trackingNumber
+                      order.shippingReturnTrackingNumber
                     )}
                   </span>
                 )}
@@ -185,7 +319,7 @@ export default function OrderDetailPage() {
         </Card>
       </div>
 
-      {/* Section 2 — Books in this order */}
+      {/* Section 2 — Books */}
       <Card className="p-4">
         <h2 className="text-lg font-semibold mb-3">Books in this order</h2>
         {booksInOrder.length === 0 ? (
@@ -193,103 +327,118 @@ export default function OrderDetailPage() {
         ) : (
           <div className="flex flex-wrap gap-4">
             {booksInOrder.map((b) => (
-              <BookThumbnailCard key={b.id} book={b} />
+              <div key={b.id} className="border rounded-lg p-3 w-48">
+                <CoverImg
+                  src={b.coverUrl}
+                  title={b.title}
+                  className="w-full h-32 object-cover rounded mb-2"
+                />
+                <h4 className="font-medium text-sm truncate">{b.title}</h4>
+                <p className="text-xs text-gray-600 truncate">{b.author}</p>
+              </div>
             ))}
           </div>
         )}
       </Card>
 
-      {/* Section 3 - Price details + Settlement */}
+      {/* Section 3 - Pricing */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-4">
           <h3 className="text-base font-semibold mb-3">Pricing</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span>Deposit</span>
-              <span className="font-medium">{fmtAUD(order.deposit)}</span>
+              <span>Deposit/Sale Amount</span>
+              <span className="font-medium">
+                {fmtAUD(order.depositOrSaleAmount)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Service Fee</span>
-              <span className="font-medium">{fmtAUD(order.serviceFee)}</span>
+              <span className="font-medium">
+                {fmtAUD(order.serviceFeeAmount)}
+              </span>
             </div>
-            {order.shippingOutFee?.amount ? (
+            {order.shippingOutFeeAmount > 0 && (
               <div className="flex justify-between">
                 <span>Outbound Shipping</span>
-                <span className="font-medium">{fmtAUD(order.shippingOutFee)}</span>
+                <span className="font-medium">
+                  {fmtAUD(order.shippingOutFeeAmount)}
+                </span>
               </div>
-            ) : null}
-            {order.salePrice?.amount ? (
-              <div className="flex justify-between">
-                <span>Sale Price</span>
-                <span className="font-medium">{fmtAUD(order.salePrice)}</span>
-              </div>
-            ) : null}
+            )}
           </div>
           <div className="border-t mt-3 pt-3 flex justify-between text-sm">
             <span>Total Paid</span>
-            <span className="font-semibold text-black">{fmtAUD(order.totalPaid)}</span>
+            <span className="font-semibold text-black">
+              {fmtAUD(order.totalPaidAmount)}
+            </span>
           </div>
         </Card>
 
         <Card className="p-4">
           <h3 className="text-base font-semibold mb-3">Settlement</h3>
           <div className="space-y-2 text-sm">
-            {order.lateFee?.amount ? (
+            {order.lateFeeAmount > 0 && (
               <div className="flex justify-between">
                 <span>Late Fee</span>
-                <span className="font-medium">{fmtAUD(order.lateFee)}</span>
+                <span className="font-medium">
+                  {fmtAUD(order.lateFeeAmount)}
+                </span>
               </div>
-            ) : null}
-            {order.damageFee?.amount ? (
+            )}
+            {order.damageFeeAmount > 0 && (
               <div className="flex justify-between">
                 <span>Damage Fee</span>
-                <span className="font-medium">{fmtAUD(order.damageFee)}</span>
+                <span className="font-medium">
+                  {fmtAUD(order.damageFeeAmount)}
+                </span>
               </div>
-            ) : null}
+            )}
           </div>
           <div className="border-t mt-3 pt-3 flex justify-between text-sm">
             <span>Total Refunded</span>
-            <span className="font-semibold text-black">{fmtAUD(order.totalRefunded)}</span>
+            <span className="font-semibold text-black">
+              {fmtAUD(order.totalRefundedAmount)}
+            </span>
           </div>
         </Card>
       </div>
 
-      {/* Section 4 — Action */}
+      {/* Section 4 — Actions */}
       <Card className="p-4">
         <h3 className="text-base font-semibold mb-3">Actions</h3>
         <div className="flex flex-wrap gap-2">
-
-          {/* Borrower action */}
-          {/* Pay Now */}
           {isBorrower && order.status === "PENDING_PAYMENT" && (
-            <Button className="bg-black text-white hover:bg-gray-800" onClick={() => alert("TODO: Pay flow")}>
+            <Button
+              className="bg-black text-white hover:bg-gray-800"
+              onClick={() => alert("TODO: Pay flow")}
+            >
               Pay Now
             </Button>
           )}
 
-          {/* Return */}
-          {isBorrower && (order.status === "BORROWING" || order.status === "OVERDUE") && (
-            <Button
-              className="bg-black text-white hover:bg-gray-800"
-              onClick={() => router.push(`/borrow/${order.id}/confirm-return`)}
-            >
-              Return
-            </Button>
-          )}
+          {isBorrower &&
+            (order.status === "BORROWING" || order.status === "OVERDUE") && (
+              <Button
+                className="bg-black text-white hover:bg-gray-800"
+                onClick={() =>
+                  router.push(`/borrow/${order.id}/confirm-return`)
+                }
+              >
+                Return
+              </Button>
+            )}
 
-          {/* Cancel Order */}
-          {order.status === "PENDING_PAYMENT" && (
+          {(isBorrower || isOwner) && order.status === "PENDING_PAYMENT" && (
             <Button
               variant="outline"
               className="border-red-600 text-red-600 hover:bg-red-50"
-              onClick={() => alert("TODO: Cancel order API")}
+              onClick={handleCancelOrder}
             >
               Cancel Order
             </Button>
           )}
 
-          {/* Owner Action */}
-          {/* Add Tracking */}
           {isOwner && order.status === "PENDING_SHIPMENT" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
@@ -299,36 +448,48 @@ export default function OrderDetailPage() {
             </Button>
           )}
 
-          {/* Common Actions */}
-          {/* Message */}
           {order.status !== "COMPLETED" && order.status !== "CANCELED" && (
             <Button
               variant="outline"
               className="border-black text-black hover:bg-black hover:text-white"
-              onClick={() => router.push(`/messages?orderId=${order.id}`)}
+              onClick={() =>
+                handleAuthRequired(`/messages?orderId=${order.id}`)
+              }
             >
               Message
             </Button>
           )}
 
-          {/* Support */}
-          {order.status !== "COMPLETED" && order.status !== "PENDING_PAYMENT" && order.status !== "CANCELED" && (
-            <Button
-              variant="outline"
-              className="border-black text-black hover:bg-black hover:text-white"
-              onClick={() => router.push(`/complain?orderId=${order.id}`)}
-            >
-              Support
-            </Button>
-          )}
+          {order.status !== "COMPLETED" &&
+            order.status !== "PENDING_PAYMENT" && (
+              <Button
+                variant="outline"
+                className="border-black text-black hover:bg-black hover:text-white"
+                onClick={() =>
+                  handleAuthRequired(`/complain?orderId=${order.id}`)
+                }
+              >
+                Support
+              </Button>
+            )}
 
-          {/* Write Review */}
           {order.status === "COMPLETED" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
-              onClick={() => router.push(`/orders/${order.id}/review`)}
+              onClick={() =>
+                handleAuthRequired(`/borrowing/${order.id}/review`)
+              }
             >
               Write Review
+            </Button>
+          )}
+
+          {!user && (
+            <Button
+              className="bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => router.push("/auth")}
+            >
+              Login to View Actions
             </Button>
           )}
         </div>
@@ -338,14 +499,55 @@ export default function OrderDetailPage() {
       <Card className="p-4">
         <h3 className="text-base font-semibold mb-2">More Details</h3>
         <div className="grid md:grid-cols-2 text-sm gap-y-1">
-          <div>Order ID: <span className="font-medium">{order.id}</span></div>
-          <div>Status: <span className="font-medium">{STATUS_META[order.status].label}</span></div>
-          <div>Created: <span className="font-medium">{fmtDate(order.createdAt)}</span></div>
-          {order.startAt && <div>Start Borrowing: <span className="font-medium">{fmtDate(order.startAt)}</span></div>}
-          {order.dueAt && <div>Due: <span className="font-medium">{fmtDate(order.dueAt)}</span></div>}
-          {order.returnedAt && <div>Returned: <span className="font-medium">{fmtDate(order.returnedAt)}</span></div>}
-          {order.completedAt && <div>Completed: <span className="font-medium">{fmtDate(order.completedAt)}</span></div>}
-          {order.canceledAt && <div>Canceled: <span className="font-medium">{fmtDate(order.canceledAt)}</span></div>}
+          <div>
+            Order ID: <span className="font-medium">{order.id}</span>
+          </div>
+          <div>
+            Status:{" "}
+            <span className="font-medium">
+              {STATUS_META[order.status].label}
+            </span>
+          </div>
+          <div>
+            Action Type: <span className="font-medium">{order.actionType}</span>
+          </div>
+          <div>
+            Created:{" "}
+            <span className="font-medium">{fmtDate(order.createdAt)}</span>
+          </div>
+          <div>
+            Updated:{" "}
+            <span className="font-medium">{fmtDate(order.updatedAt)}</span>
+          </div>
+          {order.startAt && (
+            <div>
+              Start Borrowing:{" "}
+              <span className="font-medium">{fmtDate(order.startAt)}</span>
+            </div>
+          )}
+          {order.dueAt && (
+            <div>
+              Due: <span className="font-medium">{fmtDate(order.dueAt)}</span>
+            </div>
+          )}
+          {order.returnedAt && (
+            <div>
+              Returned:{" "}
+              <span className="font-medium">{fmtDate(order.returnedAt)}</span>
+            </div>
+          )}
+          {order.completedAt && (
+            <div>
+              Completed:{" "}
+              <span className="font-medium">{fmtDate(order.completedAt)}</span>
+            </div>
+          )}
+          {order.canceledAt && (
+            <div>
+              Canceled:{" "}
+              <span className="font-medium">{fmtDate(order.canceledAt)}</span>
+            </div>
+          )}
         </div>
       </Card>
     </div>
