@@ -71,7 +71,7 @@ const ComplaintDetailPage: React.FC = () => {
   }, [complaintId, router]);
 
   const handleAddMessage = async () => {
-    if (!newMessage.trim() || !complaint) return;
+    if (!newMessage.trim() || !complaint || !complaint.id) return;
 
     setIsSubmittingMessage(true);
     try {

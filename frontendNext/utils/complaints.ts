@@ -88,7 +88,7 @@ export async function getComplaint(complaintId: string): Promise<Complaint> {
   const response = await axios.get(`${API_URL}/api/v1/complaints/${complaintId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return response.data;
+  return response.data.complaint;
 }
 
 // 添加投诉消息
