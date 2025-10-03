@@ -11,7 +11,6 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from models.base import Base
-from models.book import Book
 from typing import Dict
 
 # Order status enum - matches frontend OrderStatus
@@ -89,7 +88,8 @@ class Order(Base):
     late_fee_amount = Column(DECIMAL(10, 2), nullable=True)
     damage_fee_amount = Column(DECIMAL(10, 2), nullable=True)
     
-
+    # payment id
+    payment_id = Column(String(255), ForeignKey("payments.id", ondelete="SET NULL"), nullable=True)
     
     # Address info for delivery (borrower's address)
     contact_name = Column(String(100), nullable=False)
@@ -106,6 +106,7 @@ class Order(Base):
     books = relationship("OrderBook", back_populates="order", cascade="all, delete-orphan")
     owner = relationship("User", foreign_keys=[owner_id])
     borrower = relationship("User", foreign_keys=[borrower_id])
+    payment = relationship("Payment", back_populates = "orders")
 
     def to_dict(self, include_books: bool = True) -> Dict:
         """

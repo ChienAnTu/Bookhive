@@ -184,7 +184,13 @@ class OrderService:
         return results
     
     @staticmethod
-    def create_orders_data_with_validation(db: Session, checkout: Checkout, user_id: str):
+    def create_orders_data_with_validation(db: Session, checkout_id: str, user_id: str, payment_id: str):
+        checkout = db.query(Checkout).filter(Checkout.checkout_id == checkout_id).first()
+        if not checkout:
+            raise HTTPException(status_code=404, detail=f"Checkout {checkout_id} not found")
+        if checkout.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied: Checkout does not belong to this user")
+    
         orders_data_without_price = OrderService.split_checkout_to_orders(checkout, db, user_id=user_id)
         orders_data = OrderService.add_calculate_order_amounts(db, orders_data=orders_data_without_price)
         created_orders = []
@@ -208,7 +214,9 @@ class OrderService:
                 street = checkout.street,
                 city = checkout.city,
                 postcode = checkout.postcode,
-                country = checkout.country
+                country = checkout.country,
+                estimate_time = first_item.estimate_time,
+                payment_id = payment_id
             )
             db.add(order)
             db.flush()
@@ -379,3 +387,32 @@ class OrderService:
                 })
 
         return result
+    
+
+
+
+
+
+    # order status service
+    @staticmethod
+    def confirm_payment(db: Session, order_id: str) -> bool:
+        """
+        Confirm payment received, transition PENDING_PAYMENT → PENDING_SHIPMENT
+        """
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.status != "PENDING_PAYMENT":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot confirm payment for order with status '{order.status}'"
+            )
+        
+        order.status = "PENDING_SHIPMENT"
+        db.commit()
+        db.refresh(order)
+        return True
+    
+
