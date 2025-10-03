@@ -22,6 +22,7 @@ router = APIRouter(tags=["orders"])
 # API Models
 class CreateOrderRequest(BaseModel):
     checkout_id: str
+    payment_id: str
 
 class TrackingNumberItem(BaseModel):
     order_id: str
@@ -34,15 +35,7 @@ def create_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
-    checkout = db.query(Checkout).filter(Checkout.checkout_id == request.checkout_id).first()
-    if not checkout:
-        raise HTTPException(status_code=404, detail=f"Checkout {request.checkout_id} not found")
-    
-    if checkout.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    created_orders = OrderService.create_orders_data_with_validation(db, checkout, user_id=current_user.user_id)
+    created_orders = OrderService.create_orders_data_with_validation(db, checkout_id=request.checkout_id, user_id=current_user.user_id, payment_id=request.payment_id)
     return {
         "message": "Orders created successfully",
         "orders": [
