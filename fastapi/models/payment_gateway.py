@@ -27,11 +27,14 @@ class Payment(Base):
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+ 
+    destination = Column(String(100), default="destination")
 
     # Relationship to refunds
     refunds = relationship("Refund", back_populates="payment")
     # Relationship to disputes
     disputes = relationship("Dispute", back_populates="payment")
+    orders = relationship("Order", back_populates="payment")
 
 # ---------------------------
 # Refunds Table
@@ -112,6 +115,7 @@ class PaymentInitiateRequest(BaseModel):
     shipping_fee: Optional[int] = Field(0, description="Shipping fee in cents")
     service_fee: Optional[int] = Field(0, description="Platform service fee in cents")
     lender_account_id: str = Field(..., description="Stripe connected account ID of the lender (e.g., acct_123...)")
+    checkout_id: str = Field(..., description="Checkout id")
 
 
 class PaymentStatusResponse(BaseModel):
@@ -121,15 +125,20 @@ class PaymentStatusResponse(BaseModel):
     currency: str
 
 
+class DistributeShippingFeeRequest(BaseModel):
+    lender_account_id: str = Field(..., description="Connected account ID to receive the transfer")
+
+
 class PaymentRefundRequest(BaseModel):
-    amount: Optional[int] = Field(None, description="Amount to refund in cents, full if omitted")
     reason: Optional[str] = Field(None, description="Reason for the refund")
+
 
 class DisputeCreateRequest(BaseModel):
     payment_id: str
     user_id: str
     reason: str
     note: Optional[str] = None
+
 
 class PaymentDisputeRequest(BaseModel):
     action: str = Field(..., description="Action to take (adjust, refund, reject)")
@@ -168,6 +177,5 @@ class DonationResponse(BaseModel):
 # ---------------------------
 
 class StripeWebhookEvent(BaseModel):
-    id: str
-    type: str
-    data: dict
+    raw_payload: str
+    sig_header: str

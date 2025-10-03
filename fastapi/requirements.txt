@@ -9,5 +9,6 @@ python-dotenv
 pydantic
 email-validator
 PyMySQL
+brevo
 httpx>=0.27.0
 stripe>=12.0.0
