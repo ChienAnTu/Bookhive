@@ -52,6 +52,7 @@ class CheckoutItem(Base):
     deposit = Column(Numeric(10, 2), nullable=True)
     destination = Column(String(100), default="destination")
 
+
     shipping_method = Column(String(50), nullable=True)   # Delivery / Pickup
     shipping_quote = Column(Numeric(10, 2), nullable=True)
     service_code = Column(String(50), nullable=True, default="AUS_PARCEL_REGULAR")  # New field
