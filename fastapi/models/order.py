@@ -1,37 +1,37 @@
 """
 Order model - supports multi-book orders matching frontend interface exactly
 """
-
+ 
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, DateTime, Enum, ForeignKey, 
+    Column, String, DateTime, Enum, ForeignKey,
     Text, DECIMAL
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from models.base import Base
 from typing import Dict
-
+ 
 # Order status enum - matches frontend OrderStatus
 ORDER_STATUS_ENUM = (
     "PENDING_PAYMENT",
-    "PENDING_SHIPMENT", 
+    "PENDING_SHIPMENT",
     "BORROWING",
     "OVERDUE",
     "RETURNED",
     "COMPLETED",
     "CANCELED"
 )
-
+ 
 # Delivery method enum - matches frontend DeliveryMethod
 SHIPPING_METHOD_ENUM = ("post", "pickup")
-
+ 
 # Carrier options enum - matches frontend ShippingRef.carrier
 CARRIER_ENUM = ("AUSPOST", "OTHER")
-
+ 
 ORDER_TYPE_ENUM = ("borrow", "purchase")
-
+ 
 class Order(Base):
     """
     Order table - matches frontend Order interface exactly
@@ -40,16 +40,16 @@ class Order(Base):
     
     # Core fields
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    owner_id = Column(String(25), ForeignKey("users.user_id", ondelete="CASCADE"), 
+    owner_id = Column(String(25), ForeignKey("users.user_id", ondelete="CASCADE"),
                      nullable=False, index=True)
-    borrower_id = Column(String(25), ForeignKey("users.user_id", ondelete="CASCADE"), 
+    borrower_id = Column(String(25), ForeignKey("users.user_id", ondelete="CASCADE"),
                         nullable=False, index=True)
     
-    status = Column(Enum(*ORDER_STATUS_ENUM, name="order_status_enum"), 
+    status = Column(Enum(*ORDER_STATUS_ENUM, name="order_status_enum"),
                    nullable=False, default="PENDING_PAYMENT", index=True)
     
     action_type = Column(Enum(*ORDER_TYPE_ENUM, name="order_type_enum"), nullable=False)
-
+ 
     # Time tracking
     start_at = Column(DateTime, nullable=True)
     due_at = Column(DateTime, nullable=True)
@@ -60,11 +60,11 @@ class Order(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     
-    # Delivery or pickup 
-    shipping_method = Column(Enum(*SHIPPING_METHOD_ENUM, name="delivery_method_enum"), 
+    # Delivery or pickup
+    shipping_method = Column(Enum(*SHIPPING_METHOD_ENUM, name="delivery_method_enum"),
                            nullable=False)
     
-    # Shipping Out info 
+    # Shipping Out info
     shipping_out_carrier = Column(Enum(*CARRIER_ENUM, name="shipping_out_carrier_enum"), nullable=True)
     shipping_out_tracking_number = Column(String(100), nullable=True)
     shipping_out_tracking_url = Column(String(500), nullable=True)
@@ -76,14 +76,14 @@ class Order(Base):
     
     # Pricing
     # Core pricing
-    deposit_or_sale_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00) 
+    deposit_or_sale_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     service_fee_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     shipping_out_fee_amount = Column(DECIMAL(10, 2), nullable=True)  # Optional
     
     # Totals
     total_paid_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00)     # Initial payment
     total_refunded_amount = Column(DECIMAL(10, 2), nullable=True)             # What borrower got back
-
+ 
     # Post-return adjustments
     late_fee_amount = Column(DECIMAL(10, 2), nullable=True)
     damage_fee_amount = Column(DECIMAL(10, 2), nullable=True)
@@ -107,14 +107,14 @@ class Order(Base):
     owner = relationship("User", foreign_keys=[owner_id])
     borrower = relationship("User", foreign_keys=[borrower_id])
     payment = relationship("Payment", back_populates = "orders")
-
+ 
     def to_dict(self, include_books: bool = True) -> Dict:
         """
         Convert Order instance to dict for frontend consumption
         """
         books_list = []
         if include_books:
-            for ob in self.books: 
+            for ob in self.books:
                 if ob.book:
                     books_list.append({
                         "bookId": ob.book.id,
@@ -123,7 +123,7 @@ class Order(Base):
                         "author": ob.book.author,
                         "coverImgUrl": ob.book.cover_img_url,
                     })
-
+ 
         return {
             "id": self.id,
             "owner": {
@@ -151,7 +151,7 @@ class Order(Base):
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "dueAt": self.due_at.isoformat() if getattr(self, "due_at", None) else None,
             "books": books_list,
-
+ 
             "startAt": self.start_at.isoformat() if self.start_at else None,
             "returnedAt": self.returned_at.isoformat() if self.returned_at else None,
             "completedAt": self.completed_at.isoformat() if self.completed_at else None,
@@ -166,7 +166,7 @@ class Order(Base):
             "damageFeeAmount": float(self.damage_fee_amount or 0),
             "totalRefundedAmount": float(self.total_refunded_amount or 0),
         }
-
+ 
 class OrderBook(Base):
     """
     Order-Book association table for multi-book orders

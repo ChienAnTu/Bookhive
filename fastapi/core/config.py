@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from typing import List
 import brevo_python
 from brevo_python.rest import ApiException
+import stripe 
 
 # Load the root .env file (adjust path if your structure differs)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
@@ -54,6 +55,13 @@ class Settings:
         
         self.brevo_config = brevo_python.Configuration()
         self.brevo_config.api_key[brevo_key_type] = brevo_api_key
+
+        # Stripe (required)
+        stripe_api_key = os.getenv("STRIPE_SECRET_KEY")
+        if not stripe_api_key:
+            raise ValueError("Missing STRIPE_SECRET_KEY in .env")
+
+        stripe.api_key = stripe_api_key
 
         # CORS (optional, with default)
         allowed_origins_str = os.getenv('ALLOWED_ORIGINS', '*')
