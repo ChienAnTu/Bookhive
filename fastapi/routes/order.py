@@ -3,7 +3,7 @@ Order API routes - FastAPI implementation
 Clean routes with business logic delegated to service layer
 """
 
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -22,6 +22,12 @@ router = APIRouter(tags=["orders"])
 # API Models
 class CreateOrderRequest(BaseModel):
     checkout_id: str
+    payment_id: str
+
+class TrackingNumberItem(BaseModel):
+    order_id: str
+    shipping_out_tracking_number: Optional[str]
+    shipping_return_tracking_number: Optional[str]
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -29,15 +35,7 @@ def create_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
-    checkout = db.query(Checkout).filter(Checkout.checkout_id == request.checkout_id).first()
-    if not checkout:
-        raise HTTPException(status_code=404, detail=f"Checkout {request.checkout_id} not found")
-    
-    if checkout.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    created_orders = OrderService.create_orders_data_with_validation(db, checkout, user_id=current_user.user_id)
+    created_orders = OrderService.create_orders_data_with_validation(db, checkout_id=request.checkout_id, user_id=current_user.user_id, payment_id=request.payment_id)
     return {
         "message": "Orders created successfully",
         "orders": [
@@ -69,18 +67,26 @@ def list_my_orders(
     )
     return orders
 
+@router.get(
+    "/tracking",
+    response_model=List[TrackingNumberItem],
+    status_code=status.HTTP_200_OK,
+)
+def get_user_auspost_tracking_numbers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    user_id: Optional[str] = None
+):
+    return OrderService.get_user_tracking_numbers(db, current_user, user_id)
+
 @router.get("/{order_id}", response_model=OrderDetail)
 async def get_order_detail(
     order_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """get order details"""
-    order_detail = OrderService.get_order_detail(db, order_id)
-    
-    if not order_detail:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    return order_detail
+    return OrderService.get_order_detail(db, order_id, current_user)
 
 @router.put("/{order_id}/cancel")
 def cancel_order(
@@ -88,6 +94,8 @@ def cancel_order(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    success = OrderService.cancel_order(db, order_id, current_user.user_id)
+    success = OrderService.cancel_order(db, order_id, current_user)
     if success:
         return {"message": "Order cancelled successfully"}
+    
+

@@ -8,18 +8,10 @@ import CoverImg from "@/app/components/ui/CoverImg";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import { toast } from "sonner";
+import { getApiUrl, getToken, getCurrentUser } from "@/utils/auth";
 
 import type { OrderStatus, ApiOrder } from "@/app/types/order";
 import type { User } from "@/app/types/user";
-import { getCurrentUser } from "@/utils/auth";
-
-// Get API URL for this page specifically
-const getOrderApiUrl = () => {
-  if (process.env.NODE_ENV === "production") {
-    return "https://your-production-api.com";
-  }
-  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-};
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -31,20 +23,20 @@ const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   CANCELED: { label: "Canceled", className: "text-gray-400" },
 };
 
-// Helper function to format currency (assuming amounts are already in dollars)
 const fmtAUD = (amount?: number) =>
   typeof amount === "number" ? `A$ ${amount.toFixed(2)}` : "—";
 
-// Format date
 const fmtDate = (v?: string | null) => (v ? new Date(v).toLocaleString() : "—");
 
-// API function to fetch order details using correct environment variable
 const fetchOrderDetails = async (orderId: string): Promise<ApiOrder | null> => {
   try {
-    const apiUrl = getOrderApiUrl();
-    const fullUrl = `${apiUrl}/api/v1/orders/${orderId}`;
+    const apiUrl = getApiUrl();
+    const token = getToken();
 
-    const response = await fetch(fullUrl);
+    const response = await fetch(`${apiUrl}/api/v1/orders/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
     if (!response.ok) {
       throw new Error(`Failed to fetch order: ${response.status}`);
     }
@@ -62,25 +54,37 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<ApiOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
-  // Load order data from API
   useEffect(() => {
-    if (!id) return;
+    const loadData = async () => {
+      if (!id) return;
 
-    const loadOrder = async () => {
       setLoading(true);
       setError(null);
 
-      const orderData = await fetchOrderDetails(id);
-      if (orderData) {
-        setOrder(orderData);
-      } else {
+      try {
+        const [orderData, userData] = await Promise.all([
+          fetchOrderDetails(id),
+          getCurrentUser(),
+        ]);
+
+        if (orderData) {
+          setOrder(orderData);
+        } else {
+          setError("Failed to load order details");
+        }
+
+        setUser(userData);
+      } catch (err) {
+        console.error("Failed to load data:", err);
         setError("Failed to load order details");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    loadOrder();
+    loadData();
   }, [id]);
 
   const statusMeta = useMemo(
@@ -88,7 +92,6 @@ export default function OrderDetailPage() {
     [order]
   );
 
-  // Convert API books to the expected Book format
   const booksInOrder = useMemo(() => {
     if (!order) return [];
     return order.books.map((book) => ({
@@ -96,7 +99,6 @@ export default function OrderDetailPage() {
       title: book.titleEn,
       author: book.author,
       coverUrl: book.coverImgUrl || "/images/placeholder-book.png",
-      // Add any other required Book properties with default values
       isbn: "",
       publisher: "",
       publishedYear: 0,
@@ -121,29 +123,66 @@ export default function OrderDetailPage() {
     order.dueAt &&
     new Date(order.dueAt).getTime() < Date.now();
 
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const u = await getCurrentUser();
-      setUser(u);
-    })();
-  }, []);
-
   const isOwner = user?.id === order?.owner.id;
   const isBorrower = user?.id === order?.borrower.id;
+
+  const handleCancelOrder = async () => {
+    if (!user) {
+      toast.error("Please login first");
+      router.push("/auth");
+      return;
+    }
+
+    const confirmCancel = window.confirm(
+      "Are you sure you want to cancel this order? This action cannot be undone."
+    );
+    if (!confirmCancel) return;
+
+    try {
+      const token = getToken();
+      if (!token) {
+        toast.error("Authentication required. Please log in again.");
+        router.push("/auth");
+        return;
+      }
+
+      const res = await fetch(
+        `${getApiUrl()}/api/v1/orders/${order!.id}/cancel`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to cancel order");
+
+      toast.success("Order cancelled successfully");
+
+      const updatedOrder = await fetchOrderDetails(id);
+      if (updatedOrder) {
+        setOrder(updatedOrder);
+      }
+    } catch (err) {
+      console.error("Cancel order error:", err);
+      toast.error("Failed to cancel order");
+    }
+  };
+
+  const handleAuthRequired = (path: string) => {
+    if (!user) {
+      toast.error("Please login first");
+      router.push("/auth");
+      return;
+    }
+    router.push(path);
+  };
 
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto p-6">
-        <Button
-          variant="outline"
-          className="mb-4 border-black text-black hover:bg-black hover:text-white"
-          onClick={() => router.push("/borrowing")}
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Orders
-        </Button>
         <Card>
           <div className="p-6">Loading order details...</div>
         </Card>
@@ -154,14 +193,6 @@ export default function OrderDetailPage() {
   if (error || !order) {
     return (
       <div className="max-w-5xl mx-auto p-6">
-        <Button
-          variant="outline"
-          className="mb-4 border-black text-black hover:bg-black hover:text-white"
-          onClick={() => router.push("/borrowing")}
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Orders
-        </Button>
         <Card>
           <div className="p-6">{error || "Order not found."}</div>
         </Card>
@@ -178,7 +209,6 @@ export default function OrderDetailPage() {
             Order #{order.id}
           </h1>
         </div>
-
         <div className="flex gap-2 flex-wrap justify-end">
           {statusMeta && (
             <p className={`mt-1 text-2xl font-bold ${statusMeta.className}`}>
@@ -192,8 +222,6 @@ export default function OrderDetailPage() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-4">
           <h2 className="text-lg font-semibold mb-3">Order Info</h2>
-
-          {/* Owner & Borrower */}
           <div className="text-sm text-gray-500 mt-3 flex flex-col gap-1">
             <div>
               Owner:{" "}
@@ -205,8 +233,6 @@ export default function OrderDetailPage() {
                 {order.borrower.name}
               </span>
             </div>
-
-            {/* Due date */}
             {order.dueAt && (
               <div className="flex text-black font-medium items-center gap-1">
                 <Clock className="w-4 h-4" />
@@ -224,7 +250,6 @@ export default function OrderDetailPage() {
         {/* Shipping Info */}
         <Card className="p-4">
           <h2 className="text-lg font-semibold mb-3">Shipping Info</h2>
-
           <div className="mt-3 text-gray-500 text-sm">
             <div>
               Delivery Method:{" "}
@@ -232,8 +257,6 @@ export default function OrderDetailPage() {
                 {order.shippingMethod}
               </span>
             </div>
-
-            {/* Contact Information */}
             <div className="mt-2 space-y-1">
               <div>
                 Contact:{" "}
@@ -253,8 +276,6 @@ export default function OrderDetailPage() {
                 </span>
               </div>
             </div>
-
-            {/* Tracking Information */}
             {(order.shippingOutTrackingNumber ||
               order.shippingReturnTrackingNumber) && (
               <div className="mt-2 flex items-center gap-6 flex-wrap">
@@ -298,7 +319,7 @@ export default function OrderDetailPage() {
         </Card>
       </div>
 
-      {/* Section 2 — Books in this order */}
+      {/* Section 2 — Books */}
       <Card className="p-4">
         <h2 className="text-lg font-semibold mb-3">Books in this order</h2>
         {booksInOrder.length === 0 ? (
@@ -320,7 +341,7 @@ export default function OrderDetailPage() {
         )}
       </Card>
 
-      {/* Section 3 - Price details + Settlement */}
+      {/* Section 3 - Pricing */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-4">
           <h3 className="text-base font-semibold mb-3">Pricing</h3>
@@ -383,12 +404,10 @@ export default function OrderDetailPage() {
         </Card>
       </div>
 
-      {/* Section 4 — Action */}
+      {/* Section 4 — Actions */}
       <Card className="p-4">
         <h3 className="text-base font-semibold mb-3">Actions</h3>
         <div className="flex flex-wrap gap-2">
-          {/* Borrower action */}
-          {/* Pay Now */}
           {isBorrower && order.status === "PENDING_PAYMENT" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
@@ -398,7 +417,6 @@ export default function OrderDetailPage() {
             </Button>
           )}
 
-          {/* Return */}
           {isBorrower &&
             (order.status === "BORROWING" || order.status === "OVERDUE") && (
               <Button
@@ -411,65 +429,16 @@ export default function OrderDetailPage() {
               </Button>
             )}
 
-          {/* Cancel Order */}
           {(isBorrower || isOwner) && order.status === "PENDING_PAYMENT" && (
             <Button
               variant="outline"
               className="border-red-600 text-red-600 hover:bg-red-50"
-              onClick={async () => {
-                if (!user) {
-                  toast.error("Please login first");
-                  router.push("/auth");
-                  return;
-                }
-
-                const confirmCancel = window.confirm(
-                  "Are you sure you want to cancel this order? This action cannot be undone."
-                );
-                if (!confirmCancel) return;
-
-                try {
-                  const token = localStorage.getItem("access_token"); // 使用 access_token
-                  if (!token) {
-                    toast.error(
-                      "Authentication required. Please log in again."
-                    );
-                    router.push("/auth");
-                    return;
-                  }
-
-                  const res = await fetch(
-                    `${getOrderApiUrl()}/api/v1/orders/${order.id}/cancel`,
-                    {
-                      method: "PUT",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`, // 添加JWT token
-                      },
-                    }
-                  );
-
-                  if (!res.ok) throw new Error("Failed to cancel order");
-
-                  toast.success("Order cancelled successfully");
-
-                  // Reload the order data to show updated status
-                  const updatedOrder = await fetchOrderDetails(id);
-                  if (updatedOrder) {
-                    setOrder(updatedOrder);
-                  }
-                } catch (err) {
-                  console.error("Cancel order error:", err);
-                  toast.error("Failed to cancel order");
-                }
-              }}
+              onClick={handleCancelOrder}
             >
               Cancel Order
             </Button>
           )}
 
-          {/* Owner Action */}
-          {/* Add Tracking */}
           {isOwner && order.status === "PENDING_SHIPMENT" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
@@ -479,62 +448,42 @@ export default function OrderDetailPage() {
             </Button>
           )}
 
-          {/* Common Actions */}
-          {/* Message */}
           {order.status !== "COMPLETED" && order.status !== "CANCELED" && (
             <Button
               variant="outline"
               className="border-black text-black hover:bg-black hover:text-white"
-              onClick={() => {
-                if (!user) {
-                  toast.error("Please login first");
-                  router.push("/auth");
-                  return;
-                }
-                router.push(`/messages?orderId=${order.id}`);
-              }}
+              onClick={() =>
+                handleAuthRequired(`/messages?orderId=${order.id}`)
+              }
             >
               Message
             </Button>
           )}
 
-          {/* Support */}
           {order.status !== "COMPLETED" &&
             order.status !== "PENDING_PAYMENT" && (
               <Button
                 variant="outline"
                 className="border-black text-black hover:bg-black hover:text-white"
-                onClick={() => {
-                  if (!user) {
-                    toast.error("Please login first");
-                    router.push("/auth");
-                    return;
-                  }
-                  router.push(`/complain?orderId=${order.id}`);
-                }}
+                onClick={() =>
+                  handleAuthRequired(`/complain?orderId=${order.id}`)
+                }
               >
                 Support
               </Button>
             )}
 
-          {/* Write Review */}
           {order.status === "COMPLETED" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
-              onClick={() => {
-                if (!user) {
-                  toast.error("Please login first");
-                  router.push("/auth");
-                  return;
-                }
-                router.push(`/borrowing/${order.id}/review`);
-              }}
+              onClick={() =>
+                handleAuthRequired(`/borrowing/${order.id}/review`)
+              }
             >
               Write Review
             </Button>
           )}
 
-          {/* Login Button for unauthenticated users */}
           {!user && (
             <Button
               className="bg-blue-600 text-white hover:bg-blue-700"
