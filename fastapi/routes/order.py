@@ -23,9 +23,10 @@ router = APIRouter(tags=["orders"])
 class CreateOrderRequest(BaseModel):
     checkout_id: str
 
-class TrackingNumbersResponse(BaseModel):
-    shipping_out_tracking_number: List[str]
-    shipping_return_tracking_number: List[str]
+class TrackingNumberItem(BaseModel):
+    order_id: str
+    shipping_out_tracking_number: Optional[str]
+    shipping_return_tracking_number: Optional[str]
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -73,21 +74,16 @@ def list_my_orders(
     )
     return orders
 
-@router.get("/tracking", response_model=Dict[str, List[str]])
-def get_user_tracking_numbers(
+@router.get(
+    "/tracking",
+    response_model=List[TrackingNumberItem],
+    status_code=status.HTTP_200_OK,
+)
+def get_user_auspost_tracking_numbers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     user_id: Optional[str] = None
 ):
-    """
-    Get AUPOST tracking numbers for a user's orders.
-    
-    Args:
-        user_id: Optional user ID (admin only, defaults to current user)
-    
-    Returns:
-        Dictionary with shipping_out and shipping_return tracking numbers
-    """
     return OrderService.get_user_tracking_numbers(db, current_user, user_id)
 
 @router.get("/{order_id}", response_model=OrderDetail)
