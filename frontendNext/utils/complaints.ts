@@ -8,11 +8,15 @@ export type Complaint = {
   orderId?: string;
   complainantId: string;
   respondentId?: string;
-  type: "book-condition" | "delivery" | "user-behavior" | "other";
+  type: "book-condition" | "delivery" | "user-behavior" | "overdue" | "other";
   subject: string;
   description: string;
   status: "pending" | "investigating" | "resolved" | "closed";
   adminResponse?: string;
+  deductedAmount?: number;
+  depositRemaining?: number;
+  autoDeductionEnabled?: boolean;
+  nextDeductionDate?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -106,6 +110,22 @@ export async function resolveComplaint(complaintId: string): Promise<any> {
   const response = await axios.post(
     `${API_URL}/api/v1/complaints/${complaintId}/resolve`,
     {},
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data;
+}
+
+// 押金扣除 - 管理员专用
+export async function deductDeposit(complaintId: string, amount: number, reason?: string): Promise<any> {
+  const token = getToken();
+  const response = await axios.post(
+    `${API_URL}/api/v1/complaints/${complaintId}/deduct-deposit`,
+    {
+      amount,
+      reason
+    },
     {
       headers: { Authorization: `Bearer ${token}` },
     }

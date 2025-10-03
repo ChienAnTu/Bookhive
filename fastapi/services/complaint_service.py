@@ -18,11 +18,15 @@ class ComplaintService:
         description: str,
         order_id: Optional[str] = None,
         respondent_id: Optional[str] = None,
+        is_system_generated: bool = False,
     ) -> Complaint:
         if type not in COMPLAINT_TYPE_ENUM:
             from fastapi import HTTPException
             raise HTTPException(status_code=422, detail="Invalid complaint type")
 
+        # For overdue complaints, enable auto deduction
+        auto_deduction = type == "overdue" and is_system_generated
+        
         c = Complaint(
             id=str(uuid4()),
             complainant_id=complainant_id,
@@ -32,6 +36,8 @@ class ComplaintService:
             subject=subject,
             description=description,
             status="pending",
+            auto_deduction_enabled=auto_deduction,
+            is_system_generated=is_system_generated,
         )
         db.add(c)
         db.commit()
@@ -110,3 +116,93 @@ class ComplaintService:
     @staticmethod
     def list_messages(db: Session, *, complaint_id: str) -> List[ComplaintMessage]:
         return db.query(ComplaintMessage).filter(ComplaintMessage.complaint_id == complaint_id).order_by(ComplaintMessage.created_at.asc()).all()
+
+    # Deposit deduction
+    @staticmethod
+    def deduct_deposit(
+        db: Session,
+        *,
+        complaint_id: str,
+        amount: float,
+        reason: Optional[str] = None
+    ) -> Complaint:
+        """
+        Deduct amount from borrower's deposit for this complaint.
+        This updates the complaint with deduction information and
+        should trigger order settlement updates.
+        """
+        c = ComplaintService.get(db, complaint_id)
+        
+        if not c.order_id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Cannot deduct deposit - complaint not linked to order")
+        
+        # Update complaint with deduction info
+        c.deducted_amount = (c.deducted_amount or 0) + amount
+        c.status = "resolved"  # Auto-resolve after deduction
+        if reason:
+            admin_response = f"Deposit deduction: ${amount:.2f}. Reason: {reason}"
+            if c.admin_response:
+                c.admin_response += f"\n{admin_response}"
+            else:
+                c.admin_response = admin_response
+        
+        db.add(c)
+        db.commit()
+        db.refresh(c)
+        
+        # TODO: Update order settlement records
+        # This should call OrderService.deduct_deposit(order_id, amount)
+        
+        return c
+
+    @staticmethod
+    def auto_deduct_overdue_deposits(db: Session) -> List[Complaint]:
+        """
+        Process automatic deposit deductions for overdue complaints.
+        Called by scheduled task every 7 days.
+        """
+        from datetime import datetime, timedelta
+        
+        # Find overdue complaints that need auto deduction
+        overdue_complaints = db.query(Complaint).filter(
+            and_(
+                Complaint.type == "overdue",
+                Complaint.auto_deduction_enabled == True,
+                Complaint.status.in_(["pending", "investigating"]),
+                or_(
+                    Complaint.next_deduction_date.is_(None),
+                    Complaint.next_deduction_date <= datetime.now()
+                )
+            )
+        ).all()
+        
+        updated_complaints = []
+        for complaint in overdue_complaints:
+            try:
+                # Deduct 20% of remaining deposit
+                # TODO: Get actual deposit amount from order
+                deduction_amount = 20.00  # Placeholder - should calculate 20% of deposit
+                
+                complaint.deducted_amount = (complaint.deducted_amount or 0) + deduction_amount
+                complaint.next_deduction_date = datetime.now() + timedelta(days=7)
+                
+                admin_response = f"Automatic deduction: ${deduction_amount:.2f} (20% penalty for overdue)"
+                if complaint.admin_response:
+                    complaint.admin_response += f"\n{admin_response}"
+                else:
+                    complaint.admin_response = admin_response
+                
+                db.add(complaint)
+                updated_complaints.append(complaint)
+                
+            except Exception as e:
+                print(f"Failed to process auto deduction for complaint {complaint.id}: {e}")
+                continue
+        
+        if updated_complaints:
+            db.commit()
+            for c in updated_complaints:
+                db.refresh(c)
+        
+        return updated_complaints

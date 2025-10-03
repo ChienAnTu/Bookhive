@@ -194,11 +194,27 @@ def deduct_deposit(
     """
     Admin-only endpoint to deduct amount from borrower's deposit.
     This is used for complaint resolution where compensation is needed.
+    
+    Example usage:
+    POST /complaints/{id}/deduct-deposit
+    {
+        "amount": 15.00,
+        "reason": "Book damage compensation"
+    }
     """
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
     
-    # This would call a service to handle deposit deduction
+    try:
+        c = ComplaintService.deduct_deposit(
+            db,
+            complaint_id=complaint_id,
+            amount=body.amount,
+            reason=body.reason
+        )
+        return _to_read(c)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
     # For now, return success response
     try:
         # Here you would implement the actual deposit deduction logic
