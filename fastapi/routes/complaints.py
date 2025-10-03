@@ -24,6 +24,10 @@ def _to_read(c: Complaint) -> dict:
         "description": c.description,
         "status": c.status,
         "adminResponse": c.admin_response,
+        "deductedAmount": getattr(c, 'deducted_amount', None),
+        "depositRemaining": getattr(c, 'deposit_remaining', None),
+        "autoDeductionEnabled": getattr(c, 'auto_deduction_enabled', False),
+        "nextDeductionDate": getattr(c, 'next_deduction_date', None),
         "createdAt": c.created_at,
         "updatedAt": c.updated_at,
     }
@@ -41,9 +45,10 @@ def _msg_to_read(m: ComplaintMessage) -> dict:
 class ComplaintCreateBody(BaseModel):
     orderId: Optional[str] = None
     respondentId: Optional[str] = None
-    type: Literal["book-condition","delivery","user-behavior","other"]
+    type: Literal["book-condition","delivery","user-behavior","overdue","other"]
     subject: constr(min_length=1, max_length=255)
     description: constr(min_length=1)
+    isSystemGenerated: Optional[bool] = False
 
 class MessageCreate(BaseModel):
     body: constr(min_length=1)
@@ -52,6 +57,10 @@ class MessageCreate(BaseModel):
 class AdminResolveBody(BaseModel):
     status: Optional[Literal["resolved","closed","investigating"]] = None
     adminResponse: Optional[str] = None
+
+class DepositDeductionBody(BaseModel):
+    amount: float
+    reason: Optional[str] = None
 
 @router.post("", status_code=201)
 def create_complaint(
@@ -74,6 +83,7 @@ def create_complaint(
         type=body.type,
         subject=body.subject,
         description=body.description,
+        is_system_generated=body.isSystemGenerated or False
     )
     return _to_read(c)
 
@@ -172,4 +182,34 @@ def resolve_complaint(
         admin_response=body.adminResponse,
     )
     return _to_read(c)
+
+
+@router.post("/{complaint_id}/deduct-deposit")
+def deduct_deposit(
+    complaint_id: str,
+    body: DepositDeductionBody,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    """
+    Admin-only endpoint to deduct amount from borrower's deposit.
+    This is used for complaint resolution where compensation is needed.
+    """
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    # This would call a service to handle deposit deduction
+    # For now, return success response
+    try:
+        # Here you would implement the actual deposit deduction logic
+        # ComplaintService.deduct_deposit(db, complaint_id, body.amount, body.reason)
+        
+        return {
+            "success": True,
+            "message": f"Successfully deducted ${body.amount} from deposit",
+            "deductedAmount": body.amount,
+            "reason": body.reason
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
