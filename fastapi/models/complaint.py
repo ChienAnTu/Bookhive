@@ -19,13 +19,6 @@ class Complaint(Base):
 
     status          = Column(Enum(*COMPLAINT_STATUS_ENUM, name="complaint_status_enum"), nullable=False, default="pending", index=True)
     admin_response  = Column(Text, nullable=True)
-    
-    # Deposit deduction fields
-    deducted_amount = Column(DECIMAL(10, 2), nullable=True, default=0.00)
-    deposit_remaining = Column(DECIMAL(10, 2), nullable=True)
-    auto_deduction_enabled = Column(Boolean, nullable=False, default=False)
-    next_deduction_date = Column(DateTime, nullable=True)
-    is_system_generated = Column(Boolean, nullable=False, default=False)
 
     created_at      = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     updated_at      = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

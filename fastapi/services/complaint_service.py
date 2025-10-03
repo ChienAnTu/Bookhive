@@ -18,15 +18,11 @@ class ComplaintService:
         description: str,
         order_id: Optional[str] = None,
         respondent_id: Optional[str] = None,
-        is_system_generated: bool = False,
     ) -> Complaint:
         if type not in COMPLAINT_TYPE_ENUM:
             from fastapi import HTTPException
             raise HTTPException(status_code=422, detail="Invalid complaint type")
 
-        # For overdue complaints, enable auto deduction
-        auto_deduction = type == "overdue" and is_system_generated
-        
         c = Complaint(
             id=str(uuid4()),
             complainant_id=complainant_id,
@@ -36,8 +32,6 @@ class ComplaintService:
             subject=subject,
             description=description,
             status="pending",
-            auto_deduction_enabled=auto_deduction,
-            is_system_generated=is_system_generated,
         )
         db.add(c)
         db.commit()
@@ -128,8 +122,7 @@ class ComplaintService:
     ) -> Complaint:
         """
         Deduct amount from borrower's deposit for this complaint.
-        This updates the complaint with deduction information and
-        should trigger order settlement updates.
+        This simulates the deposit deduction by updating admin response.
         """
         c = ComplaintService.get(db, complaint_id)
         
@@ -137,22 +130,23 @@ class ComplaintService:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Cannot deduct deposit - complaint not linked to order")
         
-        # Update complaint with deduction info
-        c.deducted_amount = (c.deducted_amount or 0) + amount
+        # Update complaint status and admin response to record the deduction
         c.status = "resolved"  # Auto-resolve after deduction
+        deduction_msg = f"Deposit deduction: ${amount:.2f}"
         if reason:
-            admin_response = f"Deposit deduction: ${amount:.2f}. Reason: {reason}"
-            if c.admin_response:
-                c.admin_response += f"\n{admin_response}"
-            else:
-                c.admin_response = admin_response
+            deduction_msg += f". Reason: {reason}"
+        
+        if c.admin_response:
+            c.admin_response += f"\n{deduction_msg}"
+        else:
+            c.admin_response = deduction_msg
         
         db.add(c)
         db.commit()
         db.refresh(c)
         
-        # TODO: Update order settlement records
-        # This should call OrderService.deduct_deposit(order_id, amount)
+        # TODO: Integrate with order settlement system
+        # This would call OrderService.deduct_deposit(order_id, amount)
         
         return c
 

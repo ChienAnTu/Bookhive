@@ -7,7 +7,7 @@ from models.user import User as UserModel
 from models.complaint import Complaint, ComplaintMessage
 from services.complaint_service import ComplaintService
 
-from pydantic import BaseModel, constr
+from pydantic import BaseModel
 from typing import Optional, Literal
 
 router = APIRouter(prefix="/complaints", tags=["Complaint"])
@@ -24,10 +24,10 @@ def _to_read(c: Complaint) -> dict:
         "description": c.description,
         "status": c.status,
         "adminResponse": c.admin_response,
-        "deductedAmount": getattr(c, 'deducted_amount', None),
-        "depositRemaining": getattr(c, 'deposit_remaining', None),
-        "autoDeductionEnabled": getattr(c, 'auto_deduction_enabled', False),
-        "nextDeductionDate": getattr(c, 'next_deduction_date', None),
+        "deductedAmount": 0.0,  # Default for compatibility
+        "depositRemaining": None,  # Default for compatibility
+        "autoDeductionEnabled": False,  # Default for compatibility
+        "nextDeductionDate": None,  # Default for compatibility
         "createdAt": c.created_at,
         "updatedAt": c.updated_at,
     }
@@ -45,13 +45,12 @@ def _msg_to_read(m: ComplaintMessage) -> dict:
 class ComplaintCreateBody(BaseModel):
     orderId: Optional[str] = None
     respondentId: Optional[str] = None
-    type: Literal["book-condition","delivery","user-behavior","overdue","other"]
-    subject: constr(min_length=1, max_length=255)
-    description: constr(min_length=1)
-    isSystemGenerated: Optional[bool] = False
+    type: Literal["book-condition","delivery","user-behavior","other"]
+    subject: str
+    description: str
 
 class MessageCreate(BaseModel):
-    body: constr(min_length=1)
+    body: str
 
 
 class AdminResolveBody(BaseModel):
@@ -82,8 +81,7 @@ def create_complaint(
         respondent_id=body.respondentId,
         type=body.type,
         subject=body.subject,
-        description=body.description,
-        is_system_generated=body.isSystemGenerated or False
+        description=body.description
     )
     return _to_read(c)
 
