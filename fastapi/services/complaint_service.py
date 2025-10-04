@@ -18,6 +18,7 @@ class ComplaintService:
         description: str,
         order_id: Optional[str] = None,
         respondent_id: Optional[str] = None,
+        commit: bool = True,
     ) -> Complaint:
         if type not in COMPLAINT_TYPE_ENUM:
             from fastapi import HTTPException
@@ -34,8 +35,9 @@ class ComplaintService:
             status="pending",
         )
         db.add(c)
-        db.commit()
-        db.refresh(c)
+        if commit:
+            db.commit()
+            db.refresh(c)
         return c
 
     # List (by user role)
