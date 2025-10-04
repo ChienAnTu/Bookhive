@@ -9,7 +9,10 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
 from models.service_fee import ServiceFee
+from models.complaint import Complaint
 from sqlalchemy import or_
+from services.complaint_service import ComplaintService
+from typing import Set
 
 class OrderService:
     """
@@ -482,7 +485,11 @@ class OrderService:
             # Update return tracking
             order.shipping_return_carrier = carrier_upper
             order.shipping_return_tracking_number = tracking_number
-            
+
+            # Update status to RETURNED
+            order.status = "RETURNED"
+            order.returned_at = datetime.now(timezone.utc)
+                
         else:
             raise HTTPException(
                 status_code=400,
@@ -520,7 +527,6 @@ class OrderService:
 
 
 
-
     @staticmethod
     def update_overdue_status(db: Session) -> int:
         """
@@ -529,18 +535,83 @@ class OrderService:
         
         Returns: number of orders updated
         """
+
         now = datetime.now(timezone.utc)
         
         orders = db.query(Order).filter(
             Order.status == "BORROWING",
-            Order.due_at <= now,
-            Order.due_at.isnot(None)
+            Order.due_at.isnot(None),
+            Order.due_at <= now
+        ).all()
+
+        if not orders:
+            return 0
+        
+
+        order_ids = [o.id for o in orders]
+
+        # Find existing overdue orders, avoiding repeated creating complaints
+        existing = (
+            db.query(Complaint.order_id)
+              .filter(
+                  Complaint.order_id.in_(order_ids),
+                  Complaint.status.in_(("pending", "investigating")),
+              )
+              .all()
+        )
+        existed_ids: Set[str] = {row[0] for row in existing}
+        
+        count = 0
+        try:
+            for order in orders:
+                if order.id not in existed_ids:
+                # create new complaint
+                    ComplaintService.create(
+                        db=db,
+                        complainant_id=order.owner_id, 
+                        respondent_id=order.borrower_id,  
+                        order_id=order.id,
+                        type="other",  
+                        subject=f"Order {order.id} is overdue",
+                        description=f"This order was due on {order.due_at} but has not been returned.",
+                        commit=False
+                    )
+                    
+                order.status = "OVERDUE"
+                count += 1
+                
+            db.commit()
+            return count
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def update_completed_status(db: Session) -> int:
+        """
+        Background task: Update orders to COMPLETED when returned package is delivered
+        Transition: RETURNED -> COMPLETED after estimated_delivery_time
+        
+        Returns: number of orders updated
+        """
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "RETURNED",
+            Order.returned_at.isnot(None)
         ).all()
         
         count = 0
         for order in orders:
-            order.status = "OVERDUE"
-            count += 1
+            # Calculate expected delivery date: returned_at + estimated_delivery_time
+            delivery_time = order.estimated_delivery_time or 3
+            expected_delivery = order.returned_at + timedelta(days=delivery_time)
+            
+            if now >= expected_delivery:
+                order.status = "COMPLETED"
+                order.completed_at = now
+                count += 1
         
         db.commit()
         return count

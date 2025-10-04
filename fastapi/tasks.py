@@ -27,7 +27,8 @@ def update_order_statuses():
     try:
         borrowing_count = OrderService.update_borrowing_status(db)
         overdue_count = OrderService.update_overdue_status(db)
-        print(f"Updated {borrowing_count} orders to BORROWING, {overdue_count} to OVERDUE")
+        completed_count = OrderService.update_completed_status(db)
+        print(f"Updated {borrowing_count} orders to BORROWING, {overdue_count} to OVERDUE, {completed_count} to COMPLETED")
     finally:
         db.close() 
 

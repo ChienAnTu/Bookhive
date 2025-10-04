@@ -85,4 +85,4 @@ class TrackingNumberItem(BaseModel):
 
 class ConfirmShipmentRequest(BaseModel):
     tracking_number: str
-    carrier: str  # "AUSPOST" or "OTHER"
+    carrier: str = "AUSPOST" # "AUSPOST" or "OTHER"
