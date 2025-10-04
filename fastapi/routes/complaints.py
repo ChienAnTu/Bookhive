@@ -7,7 +7,7 @@ from models.user import User as UserModel
 from models.complaint import Complaint, ComplaintMessage
 from services.complaint_service import ComplaintService
 
-from pydantic import BaseModel, constr
+from pydantic import BaseModel
 from typing import Optional, Literal
 
 router = APIRouter(prefix="/complaints", tags=["Complaint"])
@@ -24,6 +24,10 @@ def _to_read(c: Complaint) -> dict:
         "description": c.description,
         "status": c.status,
         "adminResponse": c.admin_response,
+        "deductedAmount": 0.0,  # Default for compatibility
+        "depositRemaining": None,  # Default for compatibility
+        "autoDeductionEnabled": False,  # Default for compatibility
+        "nextDeductionDate": None,  # Default for compatibility
         "createdAt": c.created_at,
         "updatedAt": c.updated_at,
     }
@@ -42,16 +46,20 @@ class ComplaintCreateBody(BaseModel):
     orderId: Optional[str] = None
     respondentId: Optional[str] = None
     type: Literal["book-condition","delivery","user-behavior","other"]
-    subject: constr(min_length=1, max_length=255)
-    description: constr(min_length=1)
+    subject: str
+    description: str
 
 class MessageCreate(BaseModel):
-    body: constr(min_length=1)
+    body: str
 
 
 class AdminResolveBody(BaseModel):
     status: Optional[Literal["resolved","closed","investigating"]] = None
     adminResponse: Optional[str] = None
+
+class DepositDeductionBody(BaseModel):
+    amount: float
+    reason: Optional[str] = None
 
 @router.post("", status_code=201)
 def create_complaint(
@@ -73,7 +81,7 @@ def create_complaint(
         respondent_id=body.respondentId,
         type=body.type,
         subject=body.subject,
-        description=body.description,
+        description=body.description
     )
     return _to_read(c)
 
@@ -94,9 +102,9 @@ def list_complaints(
     - If role=admin, it shows all complaints (requires admin user). -> You need admin account for this.
     You can filter by status (pending, investigating, resolved, closed).
     """
-    if role == "admin" and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if role == "admin" and not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
-    if role == "admin":                              # TODO: Change the admin to a proper judging logic
+    if role == "admin":
         items = ComplaintService.list_all(db, status=status)
     else:
         items = ComplaintService.list_for_user(db, user_id=user.user_id, status=status)
@@ -118,7 +126,7 @@ def get_complaint(
     """
 
     c = ComplaintService.get(db, complaint_id)
-    if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if user.user_id not in (c.complainant_id, c.respondent_id) and not user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
     msgs = ComplaintService.list_messages(db, complaint_id=complaint_id)
     return {"complaint": _to_read(c), "messages": [_msg_to_read(m) for m in msgs]}
@@ -139,7 +147,7 @@ def add_message(
     """
 
     c = ComplaintService.get(db, complaint_id)
-    if user.user_id not in (c.complainant_id, c.respondent_id) and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if user.user_id not in (c.complainant_id, c.respondent_id) and not user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
     m = ComplaintService.add_message(
         db, complaint_id=complaint_id, sender_id=user.user_id, body=body.body
@@ -163,7 +171,7 @@ def resolve_complaint(
     - complaint_id is auto-generated ID of this complaint.
     """
 
-    if user.user_id != "admin":                 # TODO: Change the admin to a proper judging logic
+    if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
     c = ComplaintService.admin_update(
         db,
@@ -172,4 +180,50 @@ def resolve_complaint(
         admin_response=body.adminResponse,
     )
     return _to_read(c)
+
+
+@router.post("/{complaint_id}/deduct-deposit")
+def deduct_deposit(
+    complaint_id: str,
+    body: DepositDeductionBody,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    """
+    Admin-only endpoint to deduct amount from borrower's deposit.
+    This is used for complaint resolution where compensation is needed.
+    
+    Example usage:
+    POST /complaints/{id}/deduct-deposit
+    {
+        "amount": 15.00,
+        "reason": "Book damage compensation"
+    }
+    """
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    try:
+        c = ComplaintService.deduct_deposit(
+            db,
+            complaint_id=complaint_id,
+            amount=body.amount,
+            reason=body.reason
+        )
+        return _to_read(c)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # For now, return success response
+    try:
+        # Here you would implement the actual deposit deduction logic
+        # ComplaintService.deduct_deposit(db, complaint_id, body.amount, body.reason)
+        
+        return {
+            "success": True,
+            "message": f"Successfully deducted ${body.amount} from deposit",
+            "deductedAmount": body.amount,
+            "reason": body.reason
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
