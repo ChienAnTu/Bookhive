@@ -3,31 +3,19 @@ Order API routes - FastAPI implementation
 Clean routes with business logic delegated to service layer
 """
 
-from typing import Optional, Dict
+from typing import Optional
 from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from schemas.order import OrderSummary, OrderDetail
+from schemas.order import OrderSummary, OrderDetail, CreateOrderRequest, TrackingNumberItem, ConfirmShipmentRequest
 from typing import List
 from services.order_service import OrderService
 from models.user import User
 # from models.order import Order
-from models.checkout import Checkout
 from core.dependencies import get_db, get_current_user
 
 
 router = APIRouter(tags=["orders"])
-
-
-# API Models
-class CreateOrderRequest(BaseModel):
-    checkout_id: str
-    payment_id: str
-
-class TrackingNumberItem(BaseModel):
-    order_id: str
-    shipping_out_tracking_number: Optional[str]
-    shipping_return_tracking_number: Optional[str]
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -99,3 +87,25 @@ def cancel_order(
         return {"message": "Order cancelled successfully"}
     
 
+# confirm shipment
+@router.put("/{order_id}/confirm-shipment")
+def confirm_shipment(
+    order_id: str,
+    request: ConfirmShipmentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Confirm shipment with tracking info
+    - PENDING_SHIPMENT: owner confirms outbound shipment
+    - BORROWING/OVERDUE: borrower confirms return shipment
+    """
+    success = OrderService.confirm_shipment(
+        db=db,
+        order_id=order_id,
+        current_user=current_user,
+        tracking_number=request.tracking_number,
+        carrier=request.carrier
+    )
+    if success:
+        return {"message": "Shipment confirmed successfully"}

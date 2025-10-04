@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, String, DateTime, Enum, ForeignKey,
-    Text, DECIMAL
+    Text, DECIMAL, Integer
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -46,7 +46,7 @@ class Order(Base):
                         nullable=False, index=True)
     
     status = Column(Enum(*ORDER_STATUS_ENUM, name="order_status_enum"),
-                   nullable=False, default="PENDING_PAYMENT", index=True)
+                   nullable=False, default="PENDING_SHIPMENT", index=True)
     
     action_type = Column(Enum(*ORDER_TYPE_ENUM, name="order_type_enum"), nullable=False)
  
@@ -89,7 +89,10 @@ class Order(Base):
     damage_fee_amount = Column(DECIMAL(10, 2), nullable=True)
     
     # payment id
-    payment_id = Column(String(255), ForeignKey("payments.id", ondelete="SET NULL"), nullable=True)
+    payment_id = Column(String(255), ForeignKey("payments.payment_id", ondelete="SET NULL"), nullable=True)
+
+    # Estimated delivery time
+    estimated_delivery_time = Column(Integer, nullable=True)
     
     # Address info for delivery (borrower's address)
     contact_name = Column(String(100), nullable=False)
@@ -174,6 +177,7 @@ class OrderBook(Base):
     __tablename__ = "order_books"
     order_id = Column(String(36), ForeignKey("orders.id", ondelete="CASCADE"), primary_key=True)
     book_id = Column(String(36), ForeignKey("book.id", ondelete="CASCADE"), primary_key=True)
+    
     # Relationships
     order = relationship("Order", back_populates="books")
     book = relationship("Book")
