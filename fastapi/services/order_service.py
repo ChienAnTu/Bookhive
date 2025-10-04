@@ -11,6 +11,8 @@ from collections import defaultdict
 from models.service_fee import ServiceFee
 from models.complaint import Complaint
 from sqlalchemy import or_
+from services.complaint_service import ComplaintService
+from typing import Set
 
 class OrderService:
     """
@@ -525,7 +527,6 @@ class OrderService:
 
 
 
-
     @staticmethod
     def update_overdue_status(db: Session) -> int:
         """
@@ -534,35 +535,57 @@ class OrderService:
         
         Returns: number of orders updated
         """
-        from services.complaint_service import ComplaintService
 
         now = datetime.now(timezone.utc)
         
         orders = db.query(Order).filter(
             Order.status == "BORROWING",
-            Order.due_at <= now,
-            Order.due_at.isnot(None)
+            Order.due_at.isnot(None),
+            Order.due_at <= now
         ).all()
+
+        if not orders:
+            return 0
+        
+
+        order_ids = [o.id for o in orders]
+
+        # Find existing overdue orders, avoiding repeated creating complaints
+        existing = (
+            db.query(Complaint.order_id)
+              .filter(
+                  Complaint.order_id.in_(order_ids),
+                  Complaint.status.in_(("pending", "investigating")),
+              )
+              .all()
+        )
+        existed_ids: Set[str] = {row[0] for row in existing}
         
         count = 0
-        for order in orders:
-         # create new complaint
-            ComplaintService.create(
-                db=db,
-                complainant_id=order.owner_id, 
-                respondent_id=order.borrower_id,  
-                order_id=order.id,
-                type="other",  
-                subject=f"Order {order.id} is overdue",
-                description=f"This order was due on {order.due_at} but has not been returned."
-            )
-            
-            order.status = "OVERDUE"
-            count += 1
-            
-        db.commit()
-        return count
-    
+        try:
+            for order in orders:
+                if order.id not in existed_ids:
+                # create new complaint
+                    ComplaintService.create(
+                        db=db,
+                        complainant_id=order.owner_id, 
+                        respondent_id=order.borrower_id,  
+                        order_id=order.id,
+                        type="other",  
+                        subject=f"Order {order.id} is overdue",
+                        description=f"This order was due on {order.due_at} but has not been returned.",
+                        commit=False
+                    )
+                    
+                order.status = "OVERDUE"
+                count += 1
+                
+            db.commit()
+            return count
+        except Exception:
+            db.rollback()
+            raise
+
     @staticmethod
     def update_completed_status(db: Session) -> int:
         """
