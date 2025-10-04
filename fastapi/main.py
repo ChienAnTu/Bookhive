@@ -20,12 +20,23 @@ from routes.bans import router as bans_router
 from routes.blacklists import router as blacklists_router
 from routes.review import router as review_router
 
+# update order statuses automatically
+from contextlib import asynccontextmanager
+from tasks import start_scheduler, stop_scheduler
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware for Next.js integration

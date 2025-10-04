@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
 from models.service_fee import ServiceFee
+from sqlalchemy import or_
 
 class OrderService:
     """
@@ -215,8 +216,10 @@ class OrderService:
                 city = checkout.city,
                 postcode = checkout.postcode,
                 country = checkout.country,
-                estimate_time = first_item.estimate_time,
-                payment_id = payment_id
+
+                # new fields
+                estimated_delivery_time = first_item.estimate_time,
+                payment_id = payment_id,
             )
             db.add(order)
             db.flush()
@@ -255,7 +258,12 @@ class OrderService:
         if user.is_admin:
             query = db.query(Order)
         else:
-            query = db.query(Order).filter(Order.borrower_id == user_id)
+            query = db.query(Order).filter(
+                or_(
+                    Order.borrower_id == user_id,
+                    Order.owner_id == user_id
+                )
+            )
 
         if status:
             query = query.filter(Order.status == status)
@@ -287,7 +295,7 @@ class OrderService:
         order = db.query(Order).filter(Order.id == order_id).first()
         if not order:
             return None    
-        if not current_user.is_admin and order.borrower_id != current_user.user_id:
+        if not current_user.is_admin and order.borrower_id != current_user.user_id and order.owner_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to view this order")
         return order.to_dict(include_books = True)
 
@@ -416,3 +424,124 @@ class OrderService:
         return True
     
 
+    @staticmethod
+    def confirm_shipment(
+        db: Session, 
+        order_id: str, 
+        current_user: User,
+        tracking_number: str,
+        carrier: str
+    ) -> bool:
+        """
+        Confirm shipment with tracking number and carrier
+        
+        Logic:
+            - If status is PENDING_SHIPMENT -> update shipping_out_* (outbound, owner confirms)
+            - If status is BORROWING or OVERDUE -> update shipping_return_* (return, borrower confirms)
+        """
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Validate carrier
+        carrier_upper = carrier.upper()
+        if carrier_upper not in ["AUSPOST", "OTHER"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid carrier '{carrier}'. Must be 'AUSPOST' or 'OTHER'"
+            )
+        
+        # Check status and permissions
+        if order.status == "PENDING_SHIPMENT":
+            # Outbound: only owner can confirm
+            if order.owner_id != current_user.user_id and not current_user.is_admin:
+                raise HTTPException(status_code=403, detail="Only owner can confirm outbound shipment")
+            
+            # Update outbound tracking
+            order.shipping_out_carrier = carrier_upper
+            order.shipping_out_tracking_number = tracking_number
+            
+            # Calculate start_at and due_at
+            from datetime import timedelta
+            now = datetime.now(timezone.utc)
+            
+            order.start_at = now + timedelta(days=order.estimated_delivery_time or 3)
+            
+            max_lending_days = max(
+                (ob.book.max_lending_days for ob in order.books if ob.book and ob.book.max_lending_days),
+                default=20
+            )
+            order.due_at = order.start_at + timedelta(days=max_lending_days)
+            
+        elif order.status in ["BORROWING", "OVERDUE"]:
+            # Return: only borrower can confirm
+            if order.borrower_id != current_user.user_id and not current_user.is_admin:
+                raise HTTPException(status_code=403, detail="Only borrower can confirm return shipment")
+            
+            # Update return tracking
+            order.shipping_return_carrier = carrier_upper
+            order.shipping_return_tracking_number = tracking_number
+            
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot confirm shipment for status '{order.status}'. Valid: PENDING_SHIPMENT, BORROWING, OVERDUE"
+            )
+
+        db.commit()
+        db.refresh(order)
+        return True
+
+
+    @staticmethod
+    def update_borrowing_status(db: Session) -> int:
+        """
+        Background task: Update orders to BORROWING when start_at is reached
+        Should be run periodically (e.g., every hour)
+        
+        Returns: number of orders updated
+        """
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "PENDING_SHIPMENT",
+            Order.start_at <= now,
+            Order.start_at.isnot(None)
+        ).all()
+        
+        count = 0
+        for order in orders:
+            order.status = "BORROWING"
+            count += 1
+        
+        db.commit()
+        return count
+
+
+
+
+    @staticmethod
+    def update_overdue_status(db: Session) -> int:
+        """
+        Background task: Update orders to OVERDUE when due_at is passed
+        Should be run periodically (e.g., every hour)
+        
+        Returns: number of orders updated
+        """
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "BORROWING",
+            Order.due_at <= now,
+            Order.due_at.isnot(None)
+        ).all()
+        
+        count = 0
+        for order in orders:
+            order.status = "OVERDUE"
+            count += 1
+        
+        db.commit()
+        return count
+    
