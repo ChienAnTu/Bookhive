@@ -17,20 +17,20 @@ Usage:
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from services.order_service import OrderService
-from database import SessionLocal 
+from core.dependencies import get_db
 
 scheduler = BackgroundScheduler()
 
 def update_order_statuses():
     """hourly check and update order status"""
-    db = SessionLocal() 
+    db = next(get_db())
     try:
         borrowing_count = OrderService.update_borrowing_status(db)
         overdue_count = OrderService.update_overdue_status(db)
         completed_count = OrderService.update_completed_status(db)
         print(f"Updated {borrowing_count} orders to BORROWING, {overdue_count} to OVERDUE, {completed_count} to COMPLETED")
     finally:
-        db.close() 
+        db.close()
 
 def start_scheduler():
     """Start the scheduled task scheduler"""
