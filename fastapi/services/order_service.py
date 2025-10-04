@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
 from models.service_fee import ServiceFee
+from models.complaint import Complaint
 from sqlalchemy import or_
 
 class OrderService:
@@ -533,6 +534,8 @@ class OrderService:
         
         Returns: number of orders updated
         """
+        from services.complaint_service import ComplaintService
+
         now = datetime.now(timezone.utc)
         
         orders = db.query(Order).filter(
@@ -543,9 +546,20 @@ class OrderService:
         
         count = 0
         for order in orders:
+         # create new complaint
+            ComplaintService.create(
+                db=db,
+                complainant_id=order.owner_id, 
+                respondent_id=order.borrower_id,  
+                order_id=order.id,
+                type="other",  
+                subject=f"Order {order.id} is overdue",
+                description=f"This order was due on {order.due_at} but has not been returned."
+            )
+            
             order.status = "OVERDUE"
             count += 1
-        
+            
         db.commit()
         return count
     
