@@ -482,7 +482,11 @@ class OrderService:
             # Update return tracking
             order.shipping_return_carrier = carrier_upper
             order.shipping_return_tracking_number = tracking_number
-            
+
+            # Update status to RETURNED
+            order.status = "RETURNED"
+            order.returned_at = datetime.now(timezone.utc)
+                
         else:
             raise HTTPException(
                 status_code=400,
@@ -541,6 +545,36 @@ class OrderService:
         for order in orders:
             order.status = "OVERDUE"
             count += 1
+        
+        db.commit()
+        return count
+    
+    @staticmethod
+    def update_completed_status(db: Session) -> int:
+        """
+        Background task: Update orders to COMPLETED when returned package is delivered
+        Transition: RETURNED -> COMPLETED after estimated_delivery_time
+        
+        Returns: number of orders updated
+        """
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "RETURNED",
+            Order.returned_at.isnot(None)
+        ).all()
+        
+        count = 0
+        for order in orders:
+            # Calculate expected delivery date: returned_at + estimated_delivery_time
+            delivery_time = order.estimated_delivery_time or 3
+            expected_delivery = order.returned_at + timedelta(days=delivery_time)
+            
+            if now >= expected_delivery:
+                order.status = "COMPLETED"
+                order.completed_at = now
+                count += 1
         
         db.commit()
         return count
