@@ -6,12 +6,16 @@ import { Package, Truck, CheckCircle } from "lucide-react";
 import Card from "@/app/components/ui/Card";
 import { getCurrentUser, isAuthenticated } from "@/utils/auth";
 import { getOrders, type Order } from "@/utils/borrowingOrders";
+import { getMyCheckouts } from "@/utils/checkout";
+import { getShippingQuotes, type ShippingQuote } from "@/utils/shipping";
 
 const ShippingPage: React.FC = () => {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [checkouts, setCheckouts] = useState<any[]>([]);
+  const [totalShippingFees, setTotalShippingFees] = useState<number>(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -24,8 +28,24 @@ const ShippingPage: React.FC = () => {
         const userData = await getCurrentUser();
         if (userData) {
           setCurrentUser(userData);
+          
+          // 加载订单数据
           const ordersData = await getOrders();
           setOrders(ordersData);
+          
+          // 加载结账数据以获取运输费用信息
+          try {
+            const checkoutData = await getMyCheckouts();
+            setCheckouts(checkoutData);
+            
+            // 计算总运输费用
+            const totalFees = checkoutData.reduce((sum: number, checkout: any) => {
+              return sum + (checkout.shippingFee || 0);
+            }, 0);
+            setTotalShippingFees(totalFees);
+          } catch (error) {
+            console.error("Failed to load checkout data:", error);
+          }
         } else {
           router.push("/auth");
         }
@@ -55,7 +75,7 @@ const ShippingPage: React.FC = () => {
           <p className="text-gray-600">Track your order shipments and delivery status</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="shadow-sm">
             <div className="flex items-center">
               <Package className="w-8 h-8 text-blue-600 mr-3" />
@@ -86,6 +106,16 @@ const ShippingPage: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">
                   {orders.filter(o => o.status.toLowerCase().includes("complete")).length}
                 </p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="shadow-sm bg-blue-50">
+            <div className="flex items-center">
+              <div className="w-8 h-8 text-blue-600 mr-3 flex items-center justify-center">🚚</div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Shipping Fees</p>
+                <p className="text-2xl font-bold text-blue-700">${totalShippingFees.toFixed(2)}</p>
               </div>
             </div>
           </Card>

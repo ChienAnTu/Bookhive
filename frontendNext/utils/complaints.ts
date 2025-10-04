@@ -112,3 +112,48 @@ export async function resolveComplaint(complaintId: string): Promise<any> {
   );
   return response.data;
 }
+
+// 押金扣除 - 管理员专用 (集成支付网关)
+export async function deductDeposit(complaintId: string, amount: number, reason?: string): Promise<any> {
+  const token = getToken();
+  const response = await axios.post(
+    `${API_URL}/api/v1/complaints/${complaintId}/deduct-deposit`,
+    {
+      amount,
+      reason,
+      usePaymentGateway: true // 使用新的支付网关
+    },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data;
+}
+
+// 获取用户押金余额 (从支付网关)
+export async function getUserDepositBalance(userId?: string): Promise<number> {
+  const token = getToken();
+  const response = await axios.get(
+    `${API_URL}/api/v1/users/${userId || 'me'}/deposit-balance`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data.balance || 0;
+}
+
+// 退还押金 (通过支付网关)
+export async function refundDeposit(complaintId: string, amount: number): Promise<any> {
+  const token = getToken();
+  const response = await axios.post(
+    `${API_URL}/api/v1/complaints/${complaintId}/refund-deposit`,
+    {
+      amount,
+      usePaymentGateway: true
+    },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data;
+}

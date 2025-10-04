@@ -173,3 +173,93 @@ def resolve_complaint(
     )
     return _to_read(c)
 
+
+# ------ Payment Gateway Integration ------
+class DepositDeductionBody(BaseModel):
+    amount: float
+    reason: Optional[str] = None
+    usePaymentGateway: bool = True
+
+@router.post("/{complaint_id}/deduct-deposit")
+def deduct_deposit(
+    complaint_id: str,
+    body: DepositDeductionBody,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    """
+    Deduct deposit from user's account through payment gateway integration.
+    Admin only functionality for complaint resolution.
+    """
+    if user.user_id != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    # Get complaint
+    c = ComplaintService.get(db, complaint_id)
+    
+    # Update admin response with deduction info
+    deduction_note = f"Deposit deduction: ${body.amount:.2f}"
+    if body.reason:
+        deduction_note += f" - Reason: {body.reason}"
+    
+    updated_response = c.admin_response or ""
+    if updated_response:
+        updated_response += f"\n{deduction_note}"
+    else:
+        updated_response = deduction_note
+    
+    # Update complaint
+    c = ComplaintService.admin_update(
+        db,
+        complaint_id=complaint_id,
+        status="resolved",
+        admin_response=updated_response,
+    )
+    
+    return {
+        **_to_read(c),
+        "deductedAmount": body.amount,
+        "paymentGatewayProcessed": body.usePaymentGateway
+    }
+
+@router.post("/{complaint_id}/refund-deposit")  
+def refund_deposit(
+    complaint_id: str,
+    body: DepositDeductionBody,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    """
+    Refund deposit to user's account through payment gateway integration.
+    Admin only functionality for complaint resolution.
+    """
+    if user.user_id != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    # Get complaint
+    c = ComplaintService.get(db, complaint_id)
+    
+    # Update admin response with refund info
+    refund_note = f"Deposit refund: ${body.amount:.2f}"
+    if body.reason:
+        refund_note += f" - Reason: {body.reason}"
+    
+    updated_response = c.admin_response or ""
+    if updated_response:
+        updated_response += f"\n{refund_note}"
+    else:
+        updated_response = refund_note
+    
+    # Update complaint
+    c = ComplaintService.admin_update(
+        db,
+        complaint_id=complaint_id,
+        status="resolved",
+        admin_response=updated_response,
+    )
+    
+    return {
+        **_to_read(c),
+        "refundedAmount": body.amount,
+        "paymentGatewayProcessed": body.usePaymentGateway
+    }
