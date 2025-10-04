@@ -218,7 +218,7 @@ class OrderService:
                 country = checkout.country,
 
                 # new fields
-                estimated_delivery_time = first_item.estimate_time,
+                estimated_delivery_time = first_item.estimated_delivery_time,
                 payment_id = payment_id,
             )
             db.add(order)
