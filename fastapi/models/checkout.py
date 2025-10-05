@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Numeric, TIMESTAMP, ForeignKey, func
+from sqlalchemy import Column, String, Numeric, TIMESTAMP, Integer, ForeignKey, func
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel
@@ -31,6 +31,8 @@ class Checkout(Base):
     total_due = Column(Numeric(10, 2), default=0.00)
 
     status = Column(String(20), default="PENDING")
+    
+
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -50,11 +52,11 @@ class CheckoutItem(Base):
     action_type = Column(String(20), nullable=False)  # BORROW / PURCHASE
     price = Column(Numeric(10, 2), nullable=True)
     deposit = Column(Numeric(10, 2), nullable=True)
-    destination = Column(String(100), default="destination")
 
     shipping_method = Column(String(50), nullable=True)   # Delivery / Pickup
     shipping_quote = Column(Numeric(10, 2), nullable=True)
     service_code = Column(String(50), nullable=True, default="AUS_PARCEL_REGULAR")  # New field
+    estimated_delivery_time = Column(Integer, nullable=False, default=0)  
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -71,7 +73,8 @@ class CheckoutItemBase(BaseModel):
     deposit: Optional[float] = None
     shippingMethod: Optional[str] = None
     shippingQuote: Optional[float] = None
-    serviceCode: Optional[str] = "AUS_PARCEL_REGULAR"   # New field
+    serviceCode: Optional[str] = "AUS_PARCEL_REGULAR"
+    estimatedDeliveryTime: Optional[int] = 0
 
 
 class CheckoutItemCreate(CheckoutItemBase):
