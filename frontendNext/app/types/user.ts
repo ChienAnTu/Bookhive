@@ -27,9 +27,8 @@ export interface User {
   avatar?: string;           // default
   profilePicture?: string;   // user upload
 
- // Stripe Connect account id（任选其一或同时存在，后端用哪个就留哪个）
-  connectAccountId?: string | null;
-  acc_id?: string | null;
+ // Stripe Connect account id
+  stripe_account_id?: string | null;
 
   // sys
   createdAt: Date;

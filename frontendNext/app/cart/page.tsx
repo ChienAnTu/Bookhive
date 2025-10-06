@@ -12,6 +12,10 @@ import { getUserById, getCurrentUser } from "@/utils/auth";
 import type { User } from "@/app/types/user";
 import { rebuildCheckout } from "@/utils/checkout";
 
+import { toast } from "sonner";
+import PaymentAccountPromptModal from "@/app/components/ui/PaymentAccountCompleteModal";
+import { createExpressAccount } from "@/utils/payments";
+
 
 export default function CartPage() {
   const { cart, loading, fetchCart, removeFromCart, setMode } = useCartStore();
@@ -20,6 +24,9 @@ export default function CartPage() {
   const router = useRouter();
   const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
 
+  const [showPayAccountModal, setShowPayAccountModal] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
+  const [lastSavedUser, setLastSavedUser] = useState<User | null>(null);
   // Pull the backend shopping cart then owner Info
   useEffect(() => {
     fetchCart();
@@ -168,12 +175,12 @@ export default function CartPage() {
               <div className="flex items-center gap-2">
                 {isRemoveMode && (
                   <Button variant="outline" onClick={toggleSelectAll} className="flex items-center gap-2">
-                    {cart.length > 0 && cart.every((b) => selectedIds.includes(b.id)) ? (
+                    {cart.length > 0 && cart.every((b) => selectedIds.includes(b.cartItemId)) ? (
                       <CheckSquare className="w-4 h-4" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
-                    {cart.length > 0 && cart.every((b) => selectedIds.includes(b.id)) ? "Unselect all" : "Select all"}
+                    {cart.length > 0 && cart.every((b) => selectedIds.includes(b.cartItemId)) ? "Unselect all" : "Select all"}
                   </Button>
                 )}
 
@@ -398,25 +405,35 @@ export default function CartPage() {
                               return;
                             }
 
-                            const selectedItems = cart.filter(it => selectedIds.includes(it.cartItemId));
+                            // check if user has Stripe Connect account
+                            const hasConnect = !!(
+                              (user as any).stripe_account_id
+                            );
+                            if (!hasConnect) {
+                              setLastSavedUser(user);
+                              setShowPayAccountModal(true); // pop-up stripe Account opening guidance
+                              return;
+                            }
+
+                            const selectedItems = cart.filter((it) => selectedIds.includes(it.cartItemId));
                             if (selectedItems.length === 0) {
                               alert("Please select at least one item to checkout");
                               return;
                             }
 
-                            // rebuild Checkout
+                            // build checkout
                             const checkout = await rebuildCheckout(user, selectedItems);
-
                             console.log("Proceeding with checkout:", checkout);
                             router.push(`/checkout?checkoutId=${checkout.checkoutId}`);
                           } catch (err) {
-                            console.error("Failed to rebuild checkout:", err);
+                            console.error("Failed to proceed to checkout:", err);
                             alert("Failed to proceed to checkout. Please try again.");
                           }
                         }}
                       >
                         Proceed to Checkout
                       </Button>
+
 
                     ) : (
                       <Button
@@ -437,6 +454,31 @@ export default function CartPage() {
           )}
         </div>
       </div>
+      <PaymentAccountPromptModal
+        isOpen={showPayAccountModal}
+        onClose={() => setShowPayAccountModal(false)}
+        email={lastSavedUser?.email}
+        onConfirm={async () => {
+          if (!lastSavedUser?.email) {
+            toast.error("Please login first.");
+            return;
+          }
+          try {
+            setCreatingLink(true);
+            // POST /payment_gateway/accounts/express  { email }
+            const { onboarding_url } = await createExpressAccount(lastSavedUser.email);
+            setShowPayAccountModal(false);
+            window.location.href = onboarding_url; // go to Stripe
+          } catch (e: any) {
+            console.error(e);
+            toast.error(e?.response?.data?.detail || "Failed to create payment account");
+          } finally {
+            setCreatingLink(false);
+          }
+        }}
+        loading={creatingLink}
+      />
+
     </div>
   );
 }

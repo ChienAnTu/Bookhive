@@ -68,15 +68,14 @@ useEffect(() => {
         return;
       }
 
-      // 1) profileData 保留后端原样（dateOfBirth = string | null）
+      // 1) profileData
       setProfileData({
         ...(userData as any),
         profilePicture: userData.profilePicture ?? "",
-        connectAccountId: userData.connectAccountId ?? null,
-        acc_id: userData.acc_id ?? null,
+        stripe_account_id: userData.stripe_account_id ?? null,
       } as any);
 
-      // 2) 给表单用的三格 DOB
+      // 2) 
       setDobForm(parseDOB(userData.dateOfBirth as any));
     } catch (error) {
       console.error("Failed to load user data:", error);
@@ -115,9 +114,8 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 
     const hasConnect = !!(
       result?.connectAccountId ||
-      result?.acc_id ||
-      profileData?.connectAccountId ||
-      profileData?.acc_id
+      result?.stripe_account_id ||
+      profileData?.stripe_account_id
     );
 
     if (!hasConnect) {
@@ -152,10 +150,10 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   try {
     setUploadingAvatar(true);
 
-    // 调后端上传，scene 随你约定，比如 "avatar"
+    // scene = "avatar"
     const url = await uploadFile(file, "avatar");
 
-    // 只更新 profilePicture（不要动 avatar）
+    // update profilePicture（not avatar）
     setProfileData(prev => ({ ...prev, profilePicture: url }));
 
     toast.success("Avatar uploaded");
@@ -164,7 +162,6 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     toast.error(err?.response?.data?.detail || "Upload failed");
   } finally {
     setUploadingAvatar(false);
-    // e.target.value = ""; // 如需允许重复选择同一文件，可以清空
   }
 };
 
