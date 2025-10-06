@@ -39,6 +39,12 @@ export default function MessagesPage() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [loading, setLoading] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
+  const selectedThreadRef = useRef<ChatThread | null>(null);
+
+  // Keep a ref to the latest selectedThread for use inside WS callbacks
+  useEffect(() => {
+    selectedThreadRef.current = selectedThread;
+  }, [selectedThread]);
 
   // Load initial data
   useEffect(() => {
@@ -120,16 +126,18 @@ export default function MessagesPage() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'message') {
-          const isMessageForSelectedThread = selectedThread && 
-            (data.data.sender_email === selectedThread.user.email || 
-            data.data.receiver_email === selectedThread.user.email);
+          const currentSelected = selectedThreadRef.current;
+          const isMessageForSelectedThread = !!currentSelected && (
+            data.data.sender_email === currentSelected.user.email ||
+            data.data.receiver_email === currentSelected.user.email
+          );
           // Update threads with new message
           setThreads(prevThreads => {
             const newMessage: Message = {
               id: data.data.message_id,
               content: data.data.content,
               sender_email: data.data.sender_email,
-              receiver_email: data.data.receiver_id,
+              receiver_email: data.data.receiver_email,
               timestamp: data.data.timestamp,
               read: false,
               imageUrl: data.data.image_url
@@ -181,7 +189,7 @@ export default function MessagesPage() {
                 id: data.data.message_id,
                 content: data.data.content,
                 sender_email: data.data.sender_email,
-                receiver_email: data.data.receiver_id,
+                receiver_email: data.data.receiver_email,
                 timestamp: data.data.timestamp,
                 read: true, // Mark as read immediately if in active conversation
                 imageUrl: data.data.image_url
@@ -217,7 +225,7 @@ export default function MessagesPage() {
     return () => {
       ws.close();
     };
-  }, [currentUser, selectedThread]);
+  }, [currentUser]);
 
   // Handle thread selection
   const handleThreadSelect = async (thread: ChatThread) => {
@@ -233,7 +241,7 @@ export default function MessagesPage() {
       // Update thread unread count
       setThreads(prevThreads =>
         prevThreads.map(t =>
-          t.user.id === thread.user.id ? { ...t, unreadCount: 0 } : t
+          t.user.email === thread.user.email ? { ...t, unreadCount: 0 } : t
         )
       );
     } 
@@ -257,7 +265,7 @@ export default function MessagesPage() {
       const newMessage: Message = {
         id: response.message_id,
         content: messageInput || '',
-        sender_email: currentUser.id,
+        sender_email: currentUser.email,
         receiver_email: selectedThread.user.email,
         timestamp: response.timestamp, // Use timestamp from response
         read: false,
@@ -276,13 +284,12 @@ export default function MessagesPage() {
       // Update threads list
       setThreads(prev => {
         const updatedThreads = prev.map(thread =>
-          thread.user.id === selectedThread.user.id
+          thread.user.email === selectedThread.user.email
           ? {
               ...thread,
               lastMessage: newMessage,
-              unreadCount: thread.user.id === newMessage.receiver_email && thread.user.id !== currentUser.id 
-              ? thread.unreadCount + 1 
-              : thread.unreadCount
+              // Do not increment unread count for the sender's own UI
+              unreadCount: thread.unreadCount
             }
           : thread
       );
@@ -330,14 +337,12 @@ export default function MessagesPage() {
      // Update threads list
       setThreads(prev => {
         const updatedThreads = prev.map(thread =>
-          thread.user.id === selectedThread.user.id
+          thread.user.email === selectedThread.user.email
             ? {
                 ...thread,
                 lastMessage: newMessage,
-                // Ensure the unread count isn't incorrectly incremented for self-sent messages
-                unreadCount: thread.user.id === newMessage.receiver_email && thread.user.id !== currentUser.id 
-                  ? thread.unreadCount + 1 
-                  : thread.unreadCount
+                // Never increment unread count when the current user is the sender
+                unreadCount: thread.unreadCount
               }
             : thread
         );
@@ -361,19 +366,19 @@ export default function MessagesPage() {
 
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] pt-2 bg-white">
+    <div className="flex h-[calc(100vh-4rem)] bg-white">
       {/* Chat List */}
       <div className="w-1/3 border-r border-gray-200 bg-white">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-5.5 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
         </div>
         <div className="overflow-y-auto h-[calc(100vh-5rem)]">
           {threads.map((thread) => (
             <Card
-              key={thread.user.id}
+              key={thread.user.email}
               className={`m-2 cursor-pointer transition-colors ${
-                selectedThread?.user.id === thread.user.id
-                  ? "bg-blue-50"
+                selectedThread?.user.email === thread.user.email
+                  ? "bg-gray-100 ring-2 ring-gray-300 ring-offset-1"
                   : "hover:bg-gray-50"
               }`}
               onClick={() => handleThreadSelect(thread)}
@@ -417,7 +422,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-white"> 
         {selectedThread ? (
           <>
             {/* Chat Header */}
@@ -442,21 +447,20 @@ export default function MessagesPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {selectedThread.messages?.map((msg) => {
                 const isOwn = (msg.sender_email === currentUser?.email);
-                console.log('Rendering message:', msg, 'isOwn:', isOwn);
-                console.log('Current user ID:', currentUser?.email);
+                const displayName = isOwn ? (currentUser?.name || 'You') : selectedThread.user.name;
                 return (
                   <div
                     key={msg.id}
                     className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${isOwn
+                      className={`max-w-xs px-4 py-2 rounded-2xl text-sm break-words ${isOwn
                           ? "bg-black text-white rounded-br-none"
                           : "bg-gray-200 text-gray-900 rounded-bl-none"
                       }`}
                     >
-                      {isOwn}
-                      {msg.content && <p>{msg.content}</p>}
+                      <div className="text-xs font-semibold mb-1">{displayName}</div>
+                      {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
                       {msg.imageUrl && (
                         <img 
                           src={`${API_URL}${msg.imageUrl}`} 
