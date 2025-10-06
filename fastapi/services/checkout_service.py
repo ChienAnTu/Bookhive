@@ -58,8 +58,20 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
                 postage_result = data.get("postage_result", {})
                 totalFee = float(postage_result.get("total_cost", 0.0))
 
+                # Default delivery time
+                estimatedDays = 0
+                if serviceCode == "AUS_PARCEL_REGULAR":
+                    delivery_str = postage_result.get("delivery_time", "")
+                    if delivery_str:
+                        match = response.findall(r"(\d+)", delivery_str)  
+                        if match:
+                            estimatedDays = int(match[-1])  #  "4-5 business days" → 5
+                elif serviceCode == "AUS_PARCEL_EXPRESS":
+                    estimatedDays = 2  # Express default 2 
+                    
                 results[ownerId] = {
-                    "totalFee": totalFee
+                    "totalFee": totalFee,
+                    "estimatedDeliveryTime": estimatedDays
                 }
             else:
                 raise HTTPException(
@@ -153,6 +165,7 @@ async def _apply_checkout_data(db: Session, checkout: Checkout, checkoutIn: Chec
             shipping_method=itemIn.shippingMethod,
             shipping_quote=0.0,
             service_code=getattr(itemIn, "serviceCode", "AUS_PARCEL_REGULAR"),
+            estimated_delivery_time=getattr(itemIn, "estimatedDeliveryTime", 0),
         )
         checkout.items.append(item)
 
@@ -163,9 +176,11 @@ async def _apply_checkout_data(db: Session, checkout: Checkout, checkoutIn: Chec
     for item in checkout.items:
         if item.owner_id in shippingFees:
             item.shipping_quote = shippingFees[item.owner_id]["totalFee"]
+            item.estimated_delivery_time = shippingFees[item.owner_id]["estimatedDeliveryTime"]
             if item.owner_id not in processedOwners:
                 shippingFeeTotal += float(item.shipping_quote)
                 processedOwners.add(item.owner_id)
+
 
     # Step D: service fee
     serviceFeeRate = (
