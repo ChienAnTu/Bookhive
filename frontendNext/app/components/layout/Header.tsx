@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
-import ProfileIncompleteModal from "../ui/ProfileIncompleteModal";
+import ProfileIncompleteModal from "../ui/ProfileInCompleteModal";
 import { isProfileComplete } from "@/utils/profileValidation";
 
 import { User as UserIcon, LogOut, Plus, Truck, Mail, LifeBuoy, ShoppingBag } from "lucide-react";

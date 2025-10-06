@@ -91,6 +91,8 @@ export const getBookById = async (bookId: string): Promise<Book | null> => {
 export async function uploadFile (file: File, scene: string): Promise<string> {
   const API_URL = getApiUrl();
   const token = getToken();
+    if (!scene || !scene.trim()) throw new Error("scene is required");
+
 
   const formData = new FormData();
   formData.append("file", file);

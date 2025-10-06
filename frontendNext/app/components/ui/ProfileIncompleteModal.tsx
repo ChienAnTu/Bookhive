@@ -32,7 +32,7 @@ export default function ProfileIncompleteModal({
               router.push("/profile/edit");
             }}
           >
-            Go to Profile
+            Edit Profile
           </Button>
         </div>
       </div>

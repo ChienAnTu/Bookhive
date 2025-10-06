@@ -1,11 +1,4 @@
 // types/user.ts
-
-export interface DateOfBirth {
-  month: string;
-  day: string;
-  year: string;
-}
-
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -20,8 +13,7 @@ export interface User {
   name: string;              // Delivery contact name
   email: string;
   phoneNumber?: string;
-  dateOfBirth?: DateOfBirth;
-
+  dateOfBirth?: string | null
   // address
   country: string;
   streetAddress: string;
@@ -34,6 +26,10 @@ export interface User {
   // profile pic
   avatar?: string;           // default
   profilePicture?: string;   // user upload
+
+ // Stripe Connect account id（任选其一或同时存在，后端用哪个就留哪个）
+  connectAccountId?: string | null;
+  acc_id?: string | null;
 
   // sys
   createdAt: Date;
