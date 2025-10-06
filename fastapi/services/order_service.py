@@ -382,7 +382,9 @@ class OrderService:
         if not current_user.is_admin and current_user.user_id != user_id:
             raise HTTPException(status_code=403, detail="Not authorized")
 
-        orders = db.query(Order).filter(Order.borrower_id == user_id).all()
+        orders = db.query(Order).filter(
+            (Order.borrower_id == user_id) | (Order.owner_id == user_id)
+        ).all()
 
         result = []
         for order in orders:

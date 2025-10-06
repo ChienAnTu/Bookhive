@@ -53,3 +53,32 @@ export async function getShippingQuotes(
     throw err;
   }
 }
+
+
+export type TrackingNumberItem = {
+  order_id: string;
+  shipping_out_tracking_number?: string | null;
+  shipping_return_tracking_number?: string | null;
+};
+
+/**
+ * @param userId option，Only administrators can upload
+ */
+export async function getUserAuspostTrackingNumbers(
+  userId?: string
+): Promise<TrackingNumberItem[]> {
+  try {
+    const res = await axios.get(`${API_URL}/api/v1/orders/tracking`, {
+      params: userId ? { user_id: userId } : {},
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      withCredentials: true,
+    });
+
+    return res.data;
+  } catch (err) {
+    console.error("Failed to fetch tracking numbers:", err);
+    throw err;
+  }
+}
