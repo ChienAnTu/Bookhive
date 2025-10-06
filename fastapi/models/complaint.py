@@ -3,7 +3,7 @@ from sqlalchemy.sql import func
 from models.base import Base
 
 COMPLAINT_STATUS_ENUM = ("pending", "investigating", "resolved", "closed")
-COMPLAINT_TYPE_ENUM   = ("book-condition", "delivery", "user-behavior", "other")
+COMPLAINT_TYPE_ENUM   = ("book-condition", "delivery", "user-behavior", "other", "overdue")
 
 class Complaint(Base):
     __tablename__ = "complaint"

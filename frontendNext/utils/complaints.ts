@@ -17,60 +17,57 @@ export type Complaint = {
   updatedAt: string;
 };
 
-export type CreateComplaintRequest = {
-  orderId?: string;
-  respondentId?: string;
-  type: "book-condition" | "delivery" | "user-behavior" | "other";
-  subject: string;
-  description: string;
+export type Message = {
+  id: string;
+  complaintId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
 };
 
-export type MessageCreate = {
-  body: string;
+export type ComplaintDetail = {
+  complaint: Complaint;
+  messages: Message[];
+};
+
+export type CreateComplaintRequest = Omit<Complaint, "id" | "status" | "createdAt" | "updatedAt" | "adminResponse" | "complainantId">;
+
+export type MessageCreate = { body: string };
+
+export type ResolveComplaintRequest = {
+  status?: "resolved" | "closed" | "investigating";
+  adminResponse?: string;
 };
 
 // 获取所有投诉
-export async function getComplaints(): Promise<Complaint[]> {
+export async function getComplaints(
+  role: "mine" | "admin" = "mine",
+  status?: Complaint["status"]
+): Promise<Complaint[]> {
   try {
     const token = getToken();
-    if (!token) {
-      console.error("No authentication token found");
-      return [];
-    }
-    
     const response = await axios.get(`${API_URL}/api/v1/complaints`, {
       headers: { Authorization: `Bearer ${token}` },
+      params: { role, status },
     });
-    
-    // 后端返回格式: {"items": [complaints]}
-    if (response.data && Array.isArray(response.data.items)) {
-      return response.data.items;
-    } else {
-      console.error("API returned unexpected data format:", response.data);
-      return [];
-    }
+
+    // 直接返回 items（后端字段已经是驼峰格式）
+    return response.data.items || [];
   } catch (error) {
     console.error("Failed to fetch complaints:", error);
     return [];
   }
 }
 
-// 创建新投诉
-export async function createComplaint(complaintData: CreateComplaintRequest): Promise<Complaint | null> {
+
+
+// 创建投诉
+export async function createComplaint(data: CreateComplaintRequest): Promise<Complaint | null> {
   try {
     const token = getToken();
-    if (!token) {
-      console.error("No authentication token found");
-      return null;
-    }
-    
-    const response = await axios.post(
-      `${API_URL}/api/v1/complaints`,
-      complaintData,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const response = await axios.post(`${API_URL}/api/v1/complaints`, data, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
     console.error("Failed to create complaint:", error);
@@ -78,37 +75,50 @@ export async function createComplaint(complaintData: CreateComplaintRequest): Pr
   }
 }
 
-// 获取特定投诉
-export async function getComplaint(complaintId: string): Promise<Complaint> {
-  const token = getToken();
-  const response = await axios.get(`${API_URL}/api/v1/complaints/${complaintId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
+// 获取投诉详情
+export async function getComplaintDetail(complaintId: string): Promise<ComplaintDetail | null> {
+  try {
+    const token = getToken();
+    const response = await axios.get(`${API_URL}/api/v1/complaints/${complaintId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data; // ✅ 不要再映射
+  } catch (error) {
+    console.error("Failed to get complaint detail:", error);
+    return null;
+  }
 }
 
-// 添加投诉消息
-export async function addComplaintMessage(complaintId: string, messageData: MessageCreate): Promise<any> {
-  const token = getToken();
-  const response = await axios.post(
-    `${API_URL}/api/v1/complaints/${complaintId}/messages`,
-    messageData,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
-  return response.data;
+
+
+// 添加消息
+export async function addComplaintMessage(complaintId: string, message: MessageCreate): Promise<Message | null> {
+  try {
+    const token = getToken();
+    const response = await axios.post(
+      `${API_URL}/api/v1/complaints/${complaintId}/messages`,
+      message,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to add complaint message:", error);
+    return null;
+  }
 }
 
-// 解决投诉
-export async function resolveComplaint(complaintId: string): Promise<any> {
-  const token = getToken();
-  const response = await axios.post(
-    `${API_URL}/api/v1/complaints/${complaintId}/resolve`,
-    {},
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
-  return response.data;
+// 管理员解决投诉
+export async function resolveComplaint(complaintId: string, data: ResolveComplaintRequest): Promise<Complaint | null> {
+  try {
+    const token = getToken();
+    const response = await axios.post(
+      `${API_URL}/api/v1/complaints/${complaintId}/resolve`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to resolve complaint:", error);
+    return null;
+  }
 }

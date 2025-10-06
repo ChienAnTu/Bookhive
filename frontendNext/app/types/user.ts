@@ -36,6 +36,8 @@ export interface User {
   // social data
   bio?: string;
   preferredLanguages?: string[];
+
+  is_admin?: boolean; 
 }
 
 // rating
