@@ -17,7 +17,7 @@ import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
 import { getUserById, getCurrentUser } from "@/utils/auth";
 import { isProfileComplete } from "@/utils/profileValidation";
-import ProfileIncompleteModal from "@/app/components/ui/ProfileInCompleteModal";
+import ProfileIncompleteModal from "@/app/components/ui/ProfileIncompleteModal";
 
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
