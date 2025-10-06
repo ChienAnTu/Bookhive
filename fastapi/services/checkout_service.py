@@ -1,3 +1,4 @@
+import re
 import uuid
 import httpx
 import os
@@ -63,7 +64,7 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
                 if serviceCode == "AUS_PARCEL_REGULAR":
                     delivery_str = postage_result.get("delivery_time", "")
                     if delivery_str:
-                        match = response.findall(r"(\d+)", delivery_str)  
+                        match = re.findall(r"(\d+)", delivery_str)  
                         if match:
                             estimatedDays = int(match[-1])  #  "4-5 business days" → 5
                 elif serviceCode == "AUS_PARCEL_EXPRESS":
