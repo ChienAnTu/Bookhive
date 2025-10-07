@@ -160,7 +160,7 @@ const ComplainPage: React.FC = () => {
               reason: newComplaint.subject || "Related payment issue",
               note: newComplaint.description || "",
             });
-            console.log("Payment dispute also created successfully.");
+            console.log("Payment dispute created successfully.");
           } else {
             console.warn("No paymentId found in order.");
           }

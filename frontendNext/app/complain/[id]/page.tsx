@@ -24,7 +24,8 @@ import {
   type Complaint,
 } from "@/utils/complaints";
 import type { User } from "@/app/types/user";
-import { handlePaymentDispute } from "@/utils/payments";
+import { handlePaymentDispute, compensatePayment } from "@/utils/payments";
+import { getOrderById } from "@/utils/borrowingOrders";
 
 
 const ComplaintDetailPage: React.FC = () => {
@@ -509,16 +510,45 @@ const ComplaintDetailPage: React.FC = () => {
 
                     // Step 2: Handle Payment Dispute (if complaint linked to an order)
                     if (complaint.orderId) {
+                      console.log("Handling payment dispute for order:", complaint.orderId);
+
                       try {
                         const amount = deductionAmount || 0;
                         const action = resolutionAction;
-                        await handlePaymentDispute(complaint.orderId, {
-                          action,
-                          note: newMessage,
-                          deduction: amount,
-                        });
+                        console.log("Dispute payload:", { amount, action, note: newMessage });
 
-                        console.log("Payment dispute handled successfully");
+                        // get order's payment_id
+                        const order = await getOrderById(complaint.orderId);
+                        console.log("Retrieved order:", order);
+
+                        const paymentId = order?.paymentId;
+                        if (!paymentId) {
+                          console.warn("No payment_id found for this complaint.");
+                        } else {
+                          console.log("Handling dispute for payment:", paymentId);
+
+                          await handlePaymentDispute(paymentId, {
+                            action,
+                            note: newMessage,
+                            deduction: amount,
+                          });
+                          console.log("handlePaymentDispute success:", paymentId);
+
+                          // Compensation block (now inside same try)
+                          if (action === "adjust") {
+                            const destination =
+                              order?.owner?.stripe_account_id ||
+                              order?.owner?.stripeAccountId ||
+                              "acct_fakeBookhive"; // fallback for dev
+                            console.log("Trigger compensatePayment with:", {
+                              paymentId,
+                              destination,
+                            });
+
+                            await compensatePayment(paymentId, destination);
+                            console.log("Compensation processed successfully.");
+                          }
+                        }
                       } catch (err) {
                         console.warn("Payment dispute handling failed:", err);
                       }

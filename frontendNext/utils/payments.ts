@@ -99,8 +99,7 @@ export async function refundPayment(
   };
 }
 
-
-// Create a new payment dispute (when complaint created)
+// Create a new payment dispute (user-initiated)
 export async function createPaymentDispute(
   paymentId: string,
   data: {
@@ -111,7 +110,10 @@ export async function createPaymentDispute(
 ) {
   const res = await axios.post(
     `${API_URL}/payment_gateway/payment/dispute/create/${paymentId}`,
-    data,
+    {
+      payment_id: paymentId,
+      ...data,
+    },
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -132,8 +134,10 @@ export async function handlePaymentDispute(
     deduction?: number; // amount in AUD
   }
 ) {
+  console.log("handlePaymentDispute payload:", paymentId, data);
+
   const res = await axios.post(
-    `${API_URL}/payment_gateway/payment/dispute/create/${paymentId}`, // ✅ 后端目前用相同路径
+    `${API_URL}/payment_gateway/payment/dispute/handle/${paymentId}`,
     data,
     {
       headers: {
@@ -144,4 +148,34 @@ export async function handlePaymentDispute(
     }
   );
   return res.data;
+}
+
+
+// Execute compensation transfer after dispute resolved
+export async function compensatePayment(
+  paymentId: string,
+  destination: string // Stripe connected account ID
+) {
+  console.log("🚀 Trigger compensatePayment:", { paymentId, destination });
+
+  const res = await axios.post(
+    `${API_URL}/payment_gateway/payment/compensate/${paymentId}?destination=${encodeURIComponent(destination)}`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        "Content-Type": "application/json",
+      },
+      withCredentials: true,
+    }
+  );
+
+  console.log("Compensation API response:", res.data);
+  return res.data as {
+    message: string;
+    transfer_id?: string;
+    amount?: number;
+    currency?: string;
+    destination: string;
+  };
 }
