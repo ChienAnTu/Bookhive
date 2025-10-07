@@ -2,7 +2,7 @@
 User model for the API
 """
 
-from sqlalchemy import Column, String, DateTime, Enum, Date, Boolean
+from sqlalchemy import Boolean, Column, String, DateTime, Enum, Date
 from sqlalchemy.sql import func
 from models.base import Base
 
@@ -32,4 +32,5 @@ class User(Base):
     state          = Column(String(100), nullable=True)
     zip_code       = Column(String(20), nullable=True)
     profile_picture = Column(String(255), nullable=True)
+    stripe_account_id = Column(String(255), unique=True, nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)

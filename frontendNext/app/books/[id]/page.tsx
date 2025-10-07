@@ -157,9 +157,9 @@ export default function BookDetailPage() {
 
       // Redirect to the messages page and specify which conversation to open.
       // The timeout is kept to allow the user to see the success message.
-      setTimeout(() => {
-        router.push(`/message?to=${owner.email}`);
-      }, 1500);
+      // setTimeout(() => {
+      //   router.push(`/message?to=${owner.email}`);
+      // }, 1500);
 
     } catch (error: any) {
       console.error('Error sending message:', error);

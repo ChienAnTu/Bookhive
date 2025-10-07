@@ -15,10 +15,14 @@ import { listServiceFees } from "@/utils/serviceFee";
 import { getShippingQuotes } from "@/utils/shipping";
 import { createOrder } from "@/utils/borrowingOrders";
 
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { initiatePayment } from "@/utils/payments";
+
 // When the page loads → Check if checkout exists, create a new one if not
 // The total amount is based on the calculation result returned by the backend
-// Changing the address or modifying the shipping method → Rebuild the checkout (delete + create anew)
-// Clicking to place order → Submit the checkout
+// Changing the address or modifying the shipping method → Rebuild the checkout (update)
+// Clicking to Pay Now → Submit the checkout → jump to Stript to pay → Confirm → Create order
 
 type DeliveryChoice = "post" | "pickup"; // delivery == post
 
@@ -45,6 +49,60 @@ interface CheckoutItem {
   deposit?: number;
   deliveryMethod?: "post" | "pickup" | "both";
   shippingMethod?: "post" | "pickup";
+  shippingQuote?: number;
+}
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PK!);
+// Payment Confirm
+function PaymentConfirmForm({
+  clientSecret,
+  onSuccess,
+}: {
+  clientSecret: string;
+  onSuccess: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setSubmitting(true);
+    setErr(null);
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      clientSecret,
+      confirmParams: {
+        return_url:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/checkout/success`
+            : undefined,
+      },
+      redirect: "if_required",
+    });
+
+    setSubmitting(false);
+
+    if (error) setErr(error.message || "Payment failed");
+    else onSuccess();
+  };
+
+  return (
+    <form onSubmit={handleConfirm} className="space-y-3">
+      <PaymentElement />
+      <button
+        className="px-4 py-2 rounded-md bg-black text-white w-full"
+        disabled={!stripe || !elements || submitting}
+      >
+        {submitting ? "Processing..." : "Confirm Payment"}
+      </button>
+      {err && <p className="text-red-600 text-sm">{err}</p>}
+    </form>
+  );
 }
 
 
@@ -69,14 +127,19 @@ export default function CheckoutPage() {
 
   const [rebuilding, setRebuilding] = useState(false);
   const [loading, setLoading] = useState(false);
-const checkoutFields = [
-      { f: "contactName", label: "Full Name" },
-      { f: "phone", label: "Phone Number" },
-      { f: "street", label: "Street Address" },
-      { f: "city", label: "City" },
-      { f: "state", label: "State" },
-      { f: "postcode", label: "Postcode" },
-    ];
+  const checkoutFields = [
+    { f: "contactName", label: "Full Name" },
+    { f: "phone", label: "Phone Number" },
+    { f: "street", label: "Street Address" },
+    { f: "city", label: "City" },
+    { f: "state", label: "State" },
+    { f: "postcode", label: "Postcode" },
+  ];
+
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+
+
   // 1. load current user, fill address info
   useEffect(() => {
     async function loadUser() {
@@ -315,6 +378,63 @@ const checkoutFields = [
     });
   };
 
+  function validateCheckoutBeforePay(co: any): string | null {
+    const { contactName, phone, street, city, state, postcode } = co;
+    if (!contactName || !phone || !street || !city || !state || !postcode) {
+      return "Please complete your delivery address before paying.";
+    }
+    const invalidItems = co.items.filter((it: CheckoutItem) => !it.shippingMethod);
+    if (invalidItems.length > 0) return "Please select delivery/pickup for all items and save them.";
+    for (const it of co.items) {
+      if (it.shippingMethod === "post" && !it.shippingQuote) {
+        return "Please select delivery shipping quote.";
+      }
+    }
+    if (!co.totalDue || co.totalDue <= 0) return "Order total is invalid.";
+    return null;
+  }
+
+
+  // initiate PaymentIntent，to get client_secret
+  const startPayment = async () => {
+    const co = checkouts[0];
+    if (!co) return;
+
+    const err = validateCheckoutBeforePay(co);
+    if (err) { alert(err); return; }
+
+    const toCents = (n?: number) => Math.round((n || 0) * 100);
+    try {
+      setPaying(true);
+      const res = await initiatePayment({
+        user_id: currentUser!.id,
+        amount: toCents(co.totalDue),
+        currency: "aud",
+        deposit: toCents(co.deposit),
+        purchase: toCents(co.bookFee),
+        shipping_fee: toCents(co.shippingFee),
+        service_fee: toCents(co.serviceFee),
+        checkout_id: co.checkoutId,
+      });
+      setClientSecret(res.client_secret);
+    } catch (e: any) {
+      alert(e?.message || "Failed to initiate payment");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+
+  const onPaymentSuccess = async () => {
+    try {
+      const checkoutId = currentCheckout?.checkoutId;
+      await createOrder(checkoutId);
+      router.push("/borrowing");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.response?.data?.detail || "Create order failed");
+    }
+  };
 
   // ---------- Place Order ----------
   const placeOrder = async () => {
@@ -371,6 +491,7 @@ const checkoutFields = [
       setLoading(false);
     }
   };
+
 
 
   // ---------- When Empty ----------
@@ -583,9 +704,21 @@ const checkoutFields = [
         </div>
       </Card>
 
-      <div className="flex justify-end">
-        <Button className="bg-black text-white" onClick={placeOrder}>Place Order</Button>
-      </div>
+      {/* Summary 卡片后面 */}
+      {!clientSecret ? (
+        <div className="flex justify-end">
+          <Button className="bg-black text-white" onClick={startPayment} disabled={paying}>
+            {paying ? "Preparing..." : "Pay Now"}
+          </Button>
+        </div>
+      ) : (
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { labels: "floating" }, loader: "auto" }}>
+          <div className="p-4 rounded-md border">
+            <PaymentConfirmForm clientSecret={clientSecret} onSuccess={onPaymentSuccess} />
+          </div>
+        </Elements>
+      )}
+
     </div>
   );
 }

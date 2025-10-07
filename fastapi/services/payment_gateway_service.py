@@ -11,10 +11,10 @@ from functools import wraps
 from typing import Callable, List, Dict, Optional 
 from fastapi import Request, HTTPException
 
+from models.user import User
 from models.checkout import Checkout
 from models.order import Order
 from models.payment_split import PaymentSplit
-from models.checkout import Checkout
 from models.checkout import CheckoutItem
 from services.order_service import OrderService
 
@@ -81,7 +81,6 @@ def audit(event_type: str):
 
 
 # -------- Services --------
-
 @audit("/create_express_account")
 def create_express_account(email: str, *, db: Session):
     try:
@@ -113,6 +112,13 @@ def create_express_account(email: str, *, db: Session):
             type="account_onboarding",
         )
 
+        user = db.query(User).filter_by(email=email).first()
+        if not user:
+            raise ValueError("User not found")
+        user.stripe_account_id = account.id
+        db.commit()
+        db.refresh(user)
+
         return {
             "account_id": account.id,
             "onboarding_url": link.url
@@ -123,7 +129,7 @@ def create_express_account(email: str, *, db: Session):
 
 
 @audit("payment_initiated")
-def initiate_payment(data: dict, *, db: Session):
+def initiate_payment(data: dict, db: Session):
     """
     1. Create PaymentIntent with Stripe
     2. Extract client_secret
@@ -135,26 +141,25 @@ def initiate_payment(data: dict, *, db: Session):
     amount = data.get("amount")
     currency = data.get("currency", "usd")
     deposit = data.get("deposit", 0)
-    purchase = data.get("purchase", 0)
     shipping_fee = data.get("shipping_fee", 0)
     service_fee = data.get("service_fee", 0)
+    lender_account_id = data.get("lender_account_id")
+
     checkout_id = data.get("checkout_id")
 
+    total_amount = amount + deposit + shipping_fee + service_fee
 
     try:
-
         # 1. Create Stripe PaymentIntent
         intent = stripe.PaymentIntent.create(
-            amount=amount,
+            amount=total_amount,
             currency=currency,
-            capture_method="automatic",
+            capture_method="manual",
             automatic_payment_methods={"enabled": True},
-            #transfer_data={"destination": lender_account_id},
-            #application_fee_amount=service_fee,
+            transfer_data={"destination": lender_account_id},
             metadata={
                 "user_id": user_id,
                 "deposit": deposit,
-                "puchase": purchase,
                 "shipping_fee": shipping_fee,
                 "service_fee": service_fee,
             },
@@ -163,8 +168,23 @@ def initiate_payment(data: dict, *, db: Session):
         # 2. Extract client_secret
         client_secret = intent.client_secret
 
+        # 3. Save payment record in DB
+        payment = Payment(
+            payment_id=intent.id,
+            user_id=user_id,
+            amount=total_amount,
+            currency=currency,
+            status=intent.status,
+            deposit=deposit,
+            shipping_fee=shipping_fee,
+            service_fee=service_fee,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
 
         checkoutItem = db.query(CheckoutItem).filter_by(checkout_id=checkout_id).all()
+
+        payment = None
 
         for owner in checkoutItem:
             
@@ -180,17 +200,25 @@ def initiate_payment(data: dict, *, db: Session):
                 amount=value,
                 currency=currency,
                 status=intent.status,
+
                 deposit=deposit,
                 shipping_fee=owner.shipping_quote,
                 service_fee=service_fee,
+
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
-                action_type = owner.action_type,
-                destination= owner.destination
+
+                destination= owner.destination,
+                action_type = owner.action_type
             )
 
             db.add(payment)
         
+        # Only refresh if we actually created one
+        if payment is None:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"No checkout items to create a payment {payment}")
+
         db.commit()
         db.refresh(payment)
 
@@ -200,13 +228,12 @@ def initiate_payment(data: dict, *, db: Session):
             "payment_id": intent.id,
             "client_secret": client_secret,
             "status": intent.status,
-            "amount": total_amount,
+            "amount": amount,
             "currency": currency,
         }
 
     except stripe.error.StripeError as e:
         db.rollback()
-        traceback.print_exc()
         return {"error": str(e)}, 400
 
 

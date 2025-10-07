@@ -24,6 +24,10 @@ interface RegisterData {
   agree_terms: boolean;
 }
 
+type UpdateUserPayload = Omit<User, "dateOfBirth"> & {
+  dateOfBirth?: string | null;
+};
+
 // User login function
 export const loginUser = async (credentials: LoginCredentials) => {
   const API_URL = getApiUrl();
