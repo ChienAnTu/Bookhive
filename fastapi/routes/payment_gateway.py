@@ -153,7 +153,7 @@ def create_dispute(payment_id: str, body: DisputeCreateRequest, db: Session = De
     - Return dispute confirmation
     """
     try:
-        result = payment_gateway_service.create_dispute(payment_id, body.dict(), db)
+        result = payment_gateway_service.create_dispute(payment_id, body.dict(), db=db)  # ✅ 改这里
         return result
     except Exception as e:
         traceback.print_exc()

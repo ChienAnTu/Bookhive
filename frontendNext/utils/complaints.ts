@@ -15,6 +15,7 @@ export type Complaint = {
   adminResponse?: string;
   createdAt: string;
   updatedAt: string;
+  
 };
 
 export type Message = {
@@ -39,7 +40,6 @@ export type ResolveComplaintRequest = {
   adminResponse?: string;
 };
 
-// 获取所有投诉
 export async function getComplaints(
   role: "mine" | "admin" = "mine",
   status?: Complaint["status"]
@@ -51,7 +51,6 @@ export async function getComplaints(
       params: { role, status },
     });
 
-    // 直接返回 items（后端字段已经是驼峰格式）
     return response.data.items || [];
   } catch (error) {
     console.error("Failed to fetch complaints:", error);
@@ -61,7 +60,6 @@ export async function getComplaints(
 
 
 
-// 创建投诉
 export async function createComplaint(data: CreateComplaintRequest): Promise<Complaint | null> {
   try {
     const token = getToken();
@@ -75,14 +73,14 @@ export async function createComplaint(data: CreateComplaintRequest): Promise<Com
   }
 }
 
-// 获取投诉详情
+
 export async function getComplaintDetail(complaintId: string): Promise<ComplaintDetail | null> {
   try {
     const token = getToken();
     const response = await axios.get(`${API_URL}/api/v1/complaints/${complaintId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return response.data; // ✅ 不要再映射
+    return response.data;
   } catch (error) {
     console.error("Failed to get complaint detail:", error);
     return null;
@@ -91,7 +89,6 @@ export async function getComplaintDetail(complaintId: string): Promise<Complaint
 
 
 
-// 添加消息
 export async function addComplaintMessage(complaintId: string, message: MessageCreate): Promise<Message | null> {
   try {
     const token = getToken();
@@ -107,7 +104,7 @@ export async function addComplaintMessage(complaintId: string, message: MessageC
   }
 }
 
-// 管理员解决投诉
+
 export async function resolveComplaint(complaintId: string, data: ResolveComplaintRequest): Promise<Complaint | null> {
   try {
     const token = getToken();

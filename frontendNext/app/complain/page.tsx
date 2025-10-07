@@ -22,6 +22,9 @@ import {
   type Complaint,
   type CreateComplaintRequest
 } from "@/utils/complaints";
+import { getOrderById } from "@/utils/borrowingOrders";
+import { createPaymentDispute } from "@/utils/payments";
+
 
 const ComplainPage: React.FC = () => {
   const router = useRouter();
@@ -120,7 +123,6 @@ const ComplainPage: React.FC = () => {
     return "Unknown";
   };
 
-
   const handleCreateComplaint = async () => {
     if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
       return;
@@ -133,17 +135,51 @@ const ComplainPage: React.FC = () => {
         subject: newComplaint.subject,
         description: newComplaint.description,
         orderId: newComplaint.orderId || undefined,
-        respondentId: newComplaint.respondentId || undefined
+        respondentId: newComplaint.respondentId || undefined,
       };
 
+      console.log("Creating complaint with data:", complaintData);
+
+      // Step 1: create Complaint
       const createdComplaint = await createComplaint(complaintData);
+      console.log("Complaint created:", createdComplaint);
+
+      // Step 2: find payment_id from orderid and create Dispute
+      if (createdComplaint && newComplaint.orderId) {
+        try {
+          console.log("Fetching order info for dispute:", newComplaint.orderId);
+          const order = await getOrderById(newComplaint.orderId);
+          console.log("Order data:", order);
+
+          const paymentId = order?.paymentId;
+
+          if (paymentId) {
+            console.log("Found payment_id:", paymentId);
+            await createPaymentDispute(paymentId, {
+              user_id: currentUser.id,
+              reason: newComplaint.subject || "Related payment issue",
+              note: newComplaint.description || "",
+            });
+            console.log("Payment dispute also created successfully.");
+          } else {
+            console.warn("No paymentId found in order.");
+          }
+        } catch (err) {
+          console.warn("Failed to create payment dispute:", err);
+        }
+      }
+
+      // Step 3: update frontend
       if (createdComplaint) {
         setComplaints([createdComplaint, ...complaints]);
-        setIsCreateModalOpen(false);
-        setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
-      } else {
-        alert("Failed to submit complaint. Please try again.");
       }
+      setIsCreateModalOpen(false);
+      setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
+
+
+
+      console.log("Complaint flow completed successfully.");
+
     } catch (error) {
       console.error("Failed to create complaint:", error);
       alert("Failed to submit complaint. Please try again.");
@@ -151,6 +187,7 @@ const ComplainPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -174,7 +211,7 @@ const ComplainPage: React.FC = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "pending": return "Open";
+      case "pending": return "Pending";
       case "investigating": return "In Progress";
       case "resolved": return "Resolved";
       case "closed": return "Closed";
@@ -225,7 +262,7 @@ const ComplainPage: React.FC = () => {
             <div className="flex items-center">
               <Clock className="w-8 h-8 text-yellow-600 mr-3" />
               <div>
-                <p className="text-sm font-medium text-gray-600">Open</p>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {complaints.filter(c => c.status === "pending").length}
                 </p>
@@ -278,11 +315,12 @@ const ComplainPage: React.FC = () => {
                 >
                   {/* statuss*/}
                   <div
-                    className={`absolute top-3 right-3 px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(complaint.status)}`}
+                    className={`absolute top-3 right-3 flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-semibold shadow-sm ${getStatusColor(complaint.status)}`}
                   >
                     {getStatusIcon(complaint.status)}
-                    <span className="ml-1">{getStatusText(complaint.status)}</span>
+                    <span>{getStatusText(complaint.status)}</span>
                   </div>
+
 
                   {/* Info */}
                   <div className="flex flex-col space-y-2">
