@@ -13,6 +13,7 @@ export async function initiatePayment(payload: {
   shipping_fee?: number; // in cents
   service_fee?: number;  // in cents
   checkout_id: string;
+  lender_account_id?: string;
 }) {
   const res = await axios.post(`${API_URL}/payment_gateway/payment/initiate`, payload, {
     headers: {

@@ -398,16 +398,23 @@ export default function CheckoutPage() {
   // initiate PaymentIntent，to get client_secret
   const startPayment = async () => {
     const co = checkouts[0];
-    if (!co) return;
+    if (!co || !currentUser) return;
 
-    const err = validateCheckoutBeforePay(co);
-    if (err) { alert(err); return; }
+    const lenderAccountId =
+      (currentUser as any).stripe_account_id;
 
-    const toCents = (n?: number) => Math.round((n || 0) * 100);
+    if (!lenderAccountId) {
+      alert("No payout account found. Please open your payment account first.");
+      return;
+    }
+
+    const toCents = (n: number | undefined | null) =>
+      Math.max(0, Math.round((n || 0) * 100));
+
     try {
       setPaying(true);
       const res = await initiatePayment({
-        user_id: currentUser!.id,
+        user_id: currentUser.id,
         amount: toCents(co.totalDue),
         currency: "aud",
         deposit: toCents(co.deposit),
@@ -415,10 +422,12 @@ export default function CheckoutPage() {
         shipping_fee: toCents(co.shippingFee),
         service_fee: toCents(co.serviceFee),
         checkout_id: co.checkoutId,
+        lender_account_id: lenderAccountId,
       });
       setClientSecret(res.client_secret);
     } catch (e: any) {
-      alert(e?.message || "Failed to initiate payment");
+      console.error("initiatePayment failed:", e?.response?.data || e);
+      alert(e?.response?.data?.detail || "Failed to initiate payment");
     } finally {
       setPaying(false);
     }
