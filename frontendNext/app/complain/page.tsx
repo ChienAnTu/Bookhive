@@ -123,70 +123,93 @@ const ComplainPage: React.FC = () => {
     return "Unknown";
   };
 
+  const determineRespondentId = async (orderId: string, currentUserId: string) => {
+  try {
+    const order = await getOrderById(orderId);
+    if (!order) return undefined;
+
+    const ownerId = order.owner?.id;
+    const borrowerId = order.borrower?.id;
+
+    if (ownerId && borrowerId) {
+      // The current user complains the book owner
+      if (borrowerId === currentUserId) return ownerId;
+      // otherwise
+      if (ownerId === currentUserId) return borrowerId;
+    }
+
+    return undefined;
+  } catch (err) {
+    console.warn("Failed to determine respondentId:", err);
+    return undefined;
+  }
+};
+
+
   const handleCreateComplaint = async () => {
-    if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
-      return;
+  if (!newComplaint.subject.trim() || !newComplaint.description.trim()) {
+    return;
+  }
+
+  setIsSubmitting(true);
+  try {
+    let respondentId = newComplaint.respondentId;
+    if (newComplaint.orderId) {
+      respondentId = await determineRespondentId(newComplaint.orderId, currentUser.id);
+      console.log("🧩 Auto-detected respondentId:", respondentId);
     }
 
-    setIsSubmitting(true);
-    try {
-      const complaintData: CreateComplaintRequest = {
-        type: newComplaint.type,
-        subject: newComplaint.subject,
-        description: newComplaint.description,
-        orderId: newComplaint.orderId || undefined,
-        respondentId: newComplaint.respondentId || undefined,
-      };
+    const complaintData: CreateComplaintRequest = {
+      type: newComplaint.type,
+      subject: newComplaint.subject,
+      description: newComplaint.description,
+      orderId: newComplaint.orderId || undefined,
+      respondentId: respondentId || undefined,
+    };
 
-      console.log("Creating complaint with data:", complaintData);
+    console.log("Creating complaint with data:", complaintData);
 
-      // Step 1: create Complaint
-      const createdComplaint = await createComplaint(complaintData);
-      console.log("Complaint created:", createdComplaint);
+    // Step 1: create Complaint
+    const createdComplaint = await createComplaint(complaintData);
+    console.log("Complaint created:", createdComplaint);
 
-      // Step 2: find payment_id from orderid and create Dispute
-      if (createdComplaint && newComplaint.orderId) {
-        try {
-          console.log("Fetching order info for dispute:", newComplaint.orderId);
-          const order = await getOrderById(newComplaint.orderId);
-          console.log("Order data:", order);
+    // Step 2: if has orderID then create Payment Dispute
+    if (createdComplaint && newComplaint.orderId) {
+      try {
+        const order = await getOrderById(newComplaint.orderId);
+        const paymentId = order?.paymentId;
 
-          const paymentId = order?.paymentId;
-
-          if (paymentId) {
-            console.log("Found payment_id:", paymentId);
-            await createPaymentDispute(paymentId, {
-              user_id: currentUser.id,
-              reason: newComplaint.subject || "Related payment issue",
-              note: newComplaint.description || "",
-            });
-            console.log("Payment dispute created successfully.");
-          } else {
-            console.warn("No paymentId found in order.");
-          }
-        } catch (err) {
-          console.warn("Failed to create payment dispute:", err);
+        if (paymentId) {
+          console.log("Found payment_id:", paymentId);
+          await createPaymentDispute(paymentId, {
+            user_id: currentUser.id,
+            reason: newComplaint.subject || "Related payment issue",
+            note: newComplaint.description || "",
+          });
+          console.log("Payment dispute created successfully.");
+        } else {
+          console.warn("No paymentId found in order.");
         }
+      } catch (err) {
+        console.warn("Failed to create payment dispute:", err);
       }
-
-      // Step 3: update frontend
-      if (createdComplaint) {
-        setComplaints([createdComplaint, ...complaints]);
-      }
-      setIsCreateModalOpen(false);
-      setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
-
-
-
-      console.log("Complaint flow completed successfully.");
-
-    } catch (error) {
-      console.error("Failed to create complaint:", error);
-      alert("Failed to submit complaint. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+
+    // Step 3: update list
+    if (createdComplaint) {
+      setComplaints([createdComplaint, ...complaints]);
+    }
+    setIsCreateModalOpen(false);
+    setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
+
+    console.log("Complaint flow completed successfully.");
+  } catch (error) {
+    console.error("Failed to create complaint:", error);
+    alert("Failed to submit complaint. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
 
   const getStatusIcon = (status: string) => {
