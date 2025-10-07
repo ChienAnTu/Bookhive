@@ -52,7 +52,6 @@ export default function CartPage() {
   }, [cart]);
 
 
-
   // delete confirm
   const handleConfirmRemove = async () => {
     try {

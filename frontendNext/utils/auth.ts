@@ -225,6 +225,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
       bio: userData.bio || undefined,
       preferredLanguages: userData.preferredLanguages || undefined,
+      stripe_account_id: userData.stripe_account_id || undefined,
     };
 
     return user;
@@ -310,6 +311,8 @@ export const getUserById = async (id: string): Promise<User | null> => {
 
       bio: userData.bio || undefined,
       preferredLanguages: userData.preferredLanguages || undefined,
+      stripe_account_id: userData.stripe_account_id || undefined,
+
     };
 
     return user;
