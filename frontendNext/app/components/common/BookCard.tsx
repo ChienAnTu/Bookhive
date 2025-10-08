@@ -9,6 +9,8 @@ import type { Book } from "@/app/types/book";
 import type { User } from "@/app/types/user";
 import { getCurrentUser, getUserById } from "@/utils/auth";
 import StarRating from "@/app/components/ui/StarRating";
+import { getUserRatingSummary } from "@/utils/review";
+import type { RatingStats } from "@/app/types/index";
 
 
 export interface BookCardProps {
@@ -20,14 +22,32 @@ const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
   const [imgError, setImgError] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [ownerUser, setOwnerUser] = useState<User | null>(null);
+  const [ownerRating, setOwnerRating] = useState<RatingStats>({
+    averageRating: 0,
+    totalReviews: 0,
+    ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+
 
   useEffect(() => {
     if (!book?.ownerId) return;
 
     const fetchData = async () => {
       try {
-        const owner = await getUserById(book.ownerId);
-        if (owner) setOwnerUser(owner);
+        if (book?.ownerId) {
+          try {
+            const [owner, ratingSummary] = await Promise.all([
+              getUserById(book.ownerId),
+              getUserRatingSummary(book.ownerId),
+            ]);
+
+            if (owner) setOwnerUser(owner);
+            if (ratingSummary) setOwnerRating(ratingSummary);
+          } catch (err) {
+            console.error("Failed to load owner or rating:", err);
+          }
+        }
+
       } catch (err) {
         console.error("Failed to load owner:", err);
       }
@@ -147,9 +167,11 @@ const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
 
           {/* Rating */}
           <div className="flex items-center">
-            <StarRating rating={(ownerUser as any)?.rating ?? 0} readonly size="sm" />
+            <StarRating rating={ownerRating.averageRating} readonly size="sm" />
             <span className="ml-1 text-sm text-gray-600">
-              {(ownerUser as any)?.rating?.toFixed?.(1) ?? "0"}
+              {ownerRating.totalReviews > 0
+                ? `${ownerRating.averageRating.toFixed(1)} (${ownerRating.totalReviews})`
+                : "No reviews"}
             </span>
           </div>
 

@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     zipCode: Optional[str] = None
 
     createdAt: str
+    stripe_account_id: Optional[str] = None
 
 
 # DateOfBirth 
@@ -97,6 +98,8 @@ def _to_user_response(u: User) -> UserResponse:
                  if getattr(u, "zip_code", None) is not None else None),
 
         createdAt=created_out,
+        stripe_account_id=getattr(u, "stripe_account_id", None),
+
     )
 
 

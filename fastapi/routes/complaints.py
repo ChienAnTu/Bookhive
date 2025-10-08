@@ -41,7 +41,7 @@ def _msg_to_read(m: ComplaintMessage) -> dict:
 class ComplaintCreateBody(BaseModel):
     orderId: Optional[str] = None
     respondentId: Optional[str] = None
-    type: Literal["book-condition","delivery","user-behavior","other"]
+    type: Literal["book-condition","delivery","user-behavior","other","overdue"]
     subject: constr(min_length=1, max_length=255)
     description: constr(min_length=1)
 
@@ -94,9 +94,9 @@ def list_complaints(
     - If role=admin, it shows all complaints (requires admin user). -> You need admin account for this.
     You can filter by status (pending, investigating, resolved, closed).
     """
-    if role == "admin" and user.user_id != "admin":  # TODO: Change the admin to a proper judging logic
+    if role == "admin" and not user.is_admin:  # TODO: Change the admin to a proper judging logic
         raise HTTPException(status_code=403, detail="Admin only")
-    if role == "admin":                              # TODO: Change the admin to a proper judging logic
+    if role == "admin" or user.is_admin:                              # TODO: Change the admin to a proper judging logic
         items = ComplaintService.list_all(db, status=status)
     else:
         items = ComplaintService.list_for_user(db, user_id=user.user_id, status=status)

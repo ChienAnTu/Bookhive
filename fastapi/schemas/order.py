@@ -66,6 +66,7 @@ class OrderDetail(BaseModel):
     shippingReturnTrackingUrl: Optional[str]
     
     # fee
+    paymentId: Optional[str] = None
     lateFeeAmount: float
     damageFeeAmount: float
     totalRefundedAmount: float

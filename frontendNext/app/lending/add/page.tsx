@@ -47,69 +47,81 @@ export default function AddBook() {
     conditionFiles: [],
   });
 
+  const [customLang, setCustomLang] = useState("");
+  const [languages, setLanguages] = useState([
+    "English",
+    "Chinese",
+    "Hindi",
+    "Japanese",
+  ]);
+
   const [tagsInput, setTagsInput] = useState("");
 
   const [showErrors, setShowErrors] = useState(false);
   const router = useRouter();
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value, type, checked } = e.target as HTMLInputElement;
+  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+) => {
+  const { name, value, type, checked } = e.target as HTMLInputElement;
 
-    setForm((prev) => {
-      if (name === "tags") {
-        return {
-          ...prev,
-          tags: value.split(",").map((t) => t.trim()).filter(Boolean),
-        };
+  // 1) 先单独处理 originalLanguage 的“添加新语言”分支（不要放在 setForm 回调里）
+  if (name === "originalLanguage" && value === "__add_new__") {
+    const newLang = window.prompt("Enter new language:")?.trim();
+    if (newLang) {
+      if (!languages.includes(newLang)) {
+        setLanguages((langs) => [...langs, newLang]);
       }
-
-      // choose language
-      if (name === "originalLanguage") {
-        let updated = { ...prev, originalLanguage: value };
-
-        // if language = English and TitleEn is null, then syn titleOr
-        if (value === "English" && !prev.titleEn) {
+      // 这里安全更新表单：始终返回完整对象
+      setForm((prev) => {
+        const updated: FormState = { ...prev, originalLanguage: newLang };
+        // 如果之前没填英文标题，且新语言为 English，则自动同步
+        if (newLang === "English" && !prev.titleEn) {
           updated.titleEn = prev.titleOr;
         }
         return updated;
+      });
+    } else {
+      // 用户取消输入：把选择恢复到原值（什么都不做即可）
+    }
+    return; // 结束
+  }
+
+  // 2) 其它常规分支放在一个 setForm 回调里，保证“每个路径都 return”
+  setForm((prev) => {
+    let updated: FormState = { ...prev };
+
+    // originalLanguage（非 add 分支）
+    if (name === "originalLanguage") {
+      updated.originalLanguage = value;
+      if (value === "English" && !prev.titleEn) {
+        updated.titleEn = prev.titleOr;
       }
+      return updated;
+    }
 
-      if (name === "titleOr") {
-        let updated = { ...prev, titleOr: value };
-
-        if (prev.originalLanguage === "English" && !prev.titleEn) {
-          updated.titleEn = value;
-        }
-        return updated;
+    // titleOr：如果原语言是 English 且没填 titleEn，自动同步
+    if (name === "titleOr") {
+      updated.titleOr = value;
+      if (prev.originalLanguage === "English" && !prev.titleEn) {
+        updated.titleEn = value;
       }
+      return updated;
+    }
 
-      if (name === "tags") {
-        return {
-          ...prev,
-          tags: value.split(",").map((t) => t.trim()).filter(Boolean),
-        };
-      }
+    // 数字字段
+    if (["deposit", "salePrice", "publishYear", "maxLendingDays"].includes(name)) {
+      (updated as any)[name] = value ? Number(value) : undefined;
+      return updated;
+    }
 
-      if (["deposit", "salePrice", "publishYear", "maxLendingDays"].includes(name)) {
-        return {
-          ...prev,
-          [name]: value ? Number(value) : undefined,
-        };
-      }
-
-      return {
-        ...prev,
-        [name]: type === "checkbox" ? checked : value,
-      };
-    });
-  };
+    // 其它通用字段（checkbox / text）
+    (updated as any)[name] = type === "checkbox" ? checked : value;
+    return updated;
+  });
+};
 
 
-  // upload image
   // cover image
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -259,11 +271,15 @@ export default function AddBook() {
               required
             >
               <option value="">Select the book's original language</option>
-              <option value="English">English</option>
-              <option value="Chinese">Chinese</option>
-              <option value="Hindi">Hindi</option>
-              <option value="Japanese">Japanese</option>
-            </Select>
+              {languages.map((lang) => (
+          <option key={lang} value={lang}>
+            {lang}
+          </option>
+        ))}
+        <option value="__add_new__" className="text-blue-500">
+          ➕ Add new language...
+        </option>
+      </Select>
 
             <Input
               label="Title (Original Language)*"
@@ -535,7 +551,7 @@ export default function AddBook() {
                       />
                       <Input
                         label="Lend Duration*"
-                        name="lendDuration"
+                        name="maxLendingDays"
                         value={form.maxLendingDays}
                         onChange={handleChange}
                         placeholder="Days"

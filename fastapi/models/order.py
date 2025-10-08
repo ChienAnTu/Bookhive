@@ -125,8 +125,7 @@ class Order(Base):
                         "titleOr": ob.book.title_or,
                         "author": ob.book.author,
                         "coverImgUrl": ob.book.cover_img_url,
-                    })
- 
+                    }) 
         return {
             "id": self.id,
             "owner": {
@@ -154,7 +153,8 @@ class Order(Base):
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "dueAt": self.due_at.isoformat() if getattr(self, "due_at", None) else None,
             "books": books_list,
- 
+            "paymentId": self.payment_id,
+
             "startAt": self.start_at.isoformat() if self.start_at else None,
             "returnedAt": self.returned_at.isoformat() if self.returned_at else None,
             "completedAt": self.completed_at.isoformat() if self.completed_at else None,
