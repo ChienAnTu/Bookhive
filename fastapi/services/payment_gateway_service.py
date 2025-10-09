@@ -9,7 +9,7 @@ from models.service_fee import ServiceFee, ServiceFeeUpdate
 from models.payment_gateway import Payment, Refund, Dispute, AuditLog, Donation
 from functools import wraps
 from typing import Callable, List, Dict, Optional 
-from fastapi import Request, HTTPException, testclient
+from fastapi import Request, HTTPException
 
 from models.user import User
 from models.checkout import Checkout
@@ -17,9 +17,6 @@ from models.order import Order
 from models.payment_split import PaymentSplit
 from models.checkout import CheckoutItem
 from services.order_service import OrderService
-from main import app
-
-client = testclient(app)
 
 logger = logging.getLogger(__name__)
 
@@ -139,10 +136,12 @@ def initiate_payment(data: dict, db: Session):
     3. Save payment record into DB
     4. Return client_secret to frontend
     """
+    print("[initiate_payment] raw data:", data)
 
     user_id = data.get("user_id")
     amount = data.get("amount")
     currency = data.get("currency", "usd")
+    purchase = data.get("purchase", 0)
     deposit = data.get("deposit", 0)
     shipping_fee = data.get("shipping_fee", 0)
     service_fee = data.get("service_fee", 0)
@@ -150,18 +149,18 @@ def initiate_payment(data: dict, db: Session):
 
     checkout_id = data.get("checkout_id")
 
-    total_amount = amount + deposit + shipping_fee + service_fee
 
     try:
         # 1. Create Stripe PaymentIntent
         intent = stripe.PaymentIntent.create(
-            amount=total_amount,
+            amount=amount,
             currency=currency,
-            capture_method="manual",
+            capture_method="automatic",
             automatic_payment_methods={"enabled": True},
             transfer_data={"destination": lender_account_id},
             metadata={
                 "user_id": user_id,
+                "purchase": purchase,
                 "deposit": deposit,
                 "shipping_fee": shipping_fee,
                 "service_fee": service_fee,
@@ -170,6 +169,7 @@ def initiate_payment(data: dict, db: Session):
 
         # 2. Extract client_secret
         client_secret = intent.client_secret
+
         checkoutItem = db.query(CheckoutItem).filter_by(checkout_id=checkout_id).all()
 
         payment = None
@@ -184,11 +184,12 @@ def initiate_payment(data: dict, db: Session):
             # 3. Save payment record in DB
             payment = Payment(
                 payment_id=intent.id,
+                checkout_id=owner.checkout_id,
                 user_id=user_id,
-                amount=value,
+                amount=amount,
                 currency=currency,
                 status=intent.status,
-
+                purchase=purchase,
                 deposit=deposit,
                 shipping_fee=owner.shipping_quote,
                 service_fee=service_fee,
@@ -624,14 +625,23 @@ async def stripe_webhook(event: dict, db: Session):
 
     event_type = event["type"]
     obj = event["data"]["object"]
+    print("[webhook] incoming event type:", event.get("type"))
+
 
     # -------------------------
     # PaymentIntent succeeded
     # -------------------------
+    payment = None
     if event_type == "payment_intent.succeeded":
         payment_id = obj["id"]
         metadata = obj.get("metadata", {})
         intent_type = metadata.get("type", "payment")
+        # order = db.query(Order).filter_by(payment_id=payment_id).first()
+        # checkout = db.query(Checkout).filter_by(checkout_id=checkout_id).first()
+        checkout = None
+        if payment and getattr(payment, "checkout_id", None):
+            checkout = db.query(Checkout).filter_by(checkout_id=payment.checkout_id).first()
+
 
         if intent_type == "donation":
             donation = db.query(Donation).filter_by(donation_id=payment_id).first()
@@ -640,33 +650,15 @@ async def stripe_webhook(event: dict, db: Session):
                 db.commit()
             log_event(db, "donation_succeeded", reference_id=payment_id, actor="system")
         else:
-            payment = db.query(Payment).filter_by(payment_id=payment_id).all()
-            for pay in payment:
-                if payment:
-                    payment.status = "succeeded"
-                    db.commit()
-                    payment_id = pay.payment_id
-                    checkout_id = pay.checkout_id
-                    checkout = db.query(Checkout).filter_by(checkout_id=checkout_id).first()
-                    checkoutItem = db.query(CheckoutItem).filter_by(checkout_id=checkout_id).first()
-                    Order.create_orders_data_with_validation(db, checkout.checkout_id, checkoutItem.borrower_id, payment_id) 
-                    order = db.query(Order).filter_by(payment_id=payment_id).all()
-                    for o in order:
-                        Order.confirm_payment(db, o.id)
+            payment = db.query(Payment).filter_by(payment_id=payment_id).first()
+            print("[webhook] payment_intent.succeeded pi:", payment_id, "hit:", bool(payment))
 
-            userPayment = db.query(Payment).filter_by(payment_id=payment_id).first()
-            user = db.query(User).filter_by(user_id=userPayment.user_id).first()
-            total_amount = userPayment.amount + userPayment.deposit + userPayment.shipping_fee + userPayment.service_fee
-
-            client.post(
-                "/send_receipt",
-                json={
-                    "email": userPayment.user_id,
-                    "username": user.name,
-                    "total_amount": total_amount,
-                    "order_id": payment_id,
-                },
-            )       
+            order = db.query(Order).filter_by(id=id).first()
+            if payment:
+                payment.status = "succeeded"
+                db.commit()
+                Order.confirm_payment(db, order.id)
+                Order.create_orders_data_with_validation(db, checkout.checkout_id, order.borrower_id, payment_id)
 
             log_event(db, "payment_succeeded", reference_id=payment_id, actor="system")
 
@@ -738,6 +730,7 @@ async def stripe_webhook(event: dict, db: Session):
         )
 
     return {"message": "Webhook received", "event": event_type}
+
 
 
 # ---------- New: Payment confirmation & splits ----------
