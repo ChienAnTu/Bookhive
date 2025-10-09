@@ -232,6 +232,7 @@ def donation_history(user_id: str, db: Session = Depends(get_db)):
 
 @router.post("/payment/webhook", status_code=status.HTTP_200_OK)
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    print("🔥 ENTER stripe_webhook route handler")
     payload = await request.body()
     sig_header = request.headers.get("Stripe-Signature")
 
@@ -254,6 +255,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         print(f"Error: {repr(e)}") 
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Webhook error: {str(e)}")
+    
+    print(">>> Calling service.stripe_webhook now ...", type(event))    
 
     event_type = await payment_gateway_service.stripe_webhook(event, db=db)
     return {"message": "Webhook received", "event": event_type}
