@@ -1,31 +1,105 @@
+// app/checkout/success/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { loadStripe } from "@stripe/stripe-js";
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PK!);
 
 export default function CheckoutSuccessPage() {
   const [status, setStatus] = useState<"succeeded"|"processing"|"canceled"|"unknown">("unknown");
   const [pi, setPi] = useState<string | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+
+  const log = (msg: string, extra?: any) => {
+    console.log(msg, extra ?? "");
+    setLogs(prev => [...prev, `${msg} ${extra ? JSON.stringify(extra) : ""}`]);
+  };
 
   useEffect(() => {
+  (async () => {
     const p = new URLSearchParams(window.location.search);
-    // Common parameters brought back from Stripe
-    const paymentIntent = p.get("payment_intent");
-    const redirectStatus = p.get("redirect_status"); // succeeded/failed/redirect
-    const cs = p.get("payment_intent_client_secret");
+    const paymentIntentFromUrl = p.get("payment_intent");
+    const redirectStatus = p.get("redirect_status");
+    const csFromUrl = p.get("payment_intent_client_secret");
 
-    setPi(paymentIntent);
+    log("[success] params ->", {
+      paymentIntentId: paymentIntentFromUrl,
+      redirectStatus,
+      clientSecret: csFromUrl,
+    });
 
-    // only for front-end display. The true status is determined by the backend /webhook
-    if (redirectStatus === "succeeded") setStatus("succeeded");
-    else if (redirectStatus === "processing") setStatus("processing");
-    else if (redirectStatus === "failed" || redirectStatus === "canceled") setStatus("canceled");
-    else setStatus("unknown");
+    // 先从 URL，再从 localStorage 兜底
+    let clientSecret =
+      csFromUrl || localStorage.getItem("last_pi_client_secret") || "";
 
-  }, []);
+    let piId =
+      paymentIntentFromUrl || localStorage.getItem("last_pi_id") || null;
+
+    setPi(piId);
+
+    // 读完就清理，避免下次误读
+    localStorage.removeItem("last_pi_client_secret");
+    localStorage.removeItem("last_pi_id");
+
+    // 没有 client_secret：多数是 no-redirect 的成功场景
+    // 先展示 processing，等 webhook 创建订单
+    if (!clientSecret) {
+      if (piId) {
+        log("[success] no client_secret, but have PI -> processing");
+        setStatus("processing");
+      } else {
+        log("[success] no client_secret & no PI -> unknown");
+        setStatus("unknown");
+      }
+      return;
+    }
+
+    const stripe = await stripePromise;
+    if (!stripe) {
+      log("[success] stripe not loaded");
+      setStatus("unknown");
+      return;
+    }
+
+    const { paymentIntent: piObj, error } =
+      await stripe.retrievePaymentIntent(clientSecret);
+
+    log("[success] retrievePaymentIntent ->", {
+      piId: piObj?.id,
+      status: piObj?.status,
+      error,
+    });
+
+    if (error) {
+      setStatus("unknown");
+      return;
+    }
+
+    setPi(piObj?.id || piId);
+
+    switch (piObj?.status) {
+      case "succeeded":
+        setStatus("succeeded");
+        break;
+      case "processing":
+      case "requires_action":
+        setStatus("processing");
+        break;
+      case "requires_payment_method":
+      case "canceled":
+        setStatus("canceled");
+        break;
+      default:
+        setStatus("unknown");
+    }
+  })();
+}, []);
+
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-4">
+    <div className="max-w-6xl mx-auto p-6 space-y-4">
       <h1 className="text-2xl font-semibold">Payment Result</h1>
 
       {status === "succeeded" && (
@@ -50,7 +124,6 @@ export default function CheckoutSuccessPage() {
       )}
 
       <div className="flex gap-3">
-        <Link href="/checkout" className="px-4 py-2 rounded-md border">Back to Checkout</Link>
         <Link href="/borrowing" className="px-4 py-2 rounded-md bg-black text-white">View Orders</Link>
       </div>
     </div>

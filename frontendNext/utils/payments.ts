@@ -6,14 +6,14 @@ const API_URL = getApiUrl();
 
 export async function initiatePayment(payload: {
   user_id: string;
-  amount: number;        // total in cents
+  amount?: number;        // total price in cents
   currency?: string;     // e.g. "aud"
+  purchase?: number;      // in cents
   deposit?: number;      // in cents
-  purchase?: number;     // in cents
   shipping_fee?: number; // in cents
   service_fee?: number;  // in cents
   checkout_id: string;
-  lender_account_id?: string;
+  lender_account_id: string;
 }) {
   const res = await axios.post(`${API_URL}/payment_gateway/payment/initiate`, payload, {
     headers: {
@@ -21,12 +21,15 @@ export async function initiatePayment(payload: {
     },
     withCredentials: true,
   });
+  console.log("[initiatePayment] response ->", res);
+
   return res.data as {
     message: string;
     payment_id: string;
     client_secret: string;
     status: string;
-    amount: number;
+    lender_account_id: string;
+    amount?: number;
     currency: string;
   };
 }
