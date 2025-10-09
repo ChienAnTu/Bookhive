@@ -9,7 +9,7 @@ from models.service_fee import ServiceFee, ServiceFeeUpdate
 from models.payment_gateway import Payment, Refund, Dispute, AuditLog, Donation
 from functools import wraps
 from typing import Callable, List, Dict, Optional 
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, testclient
 
 from models.user import User
 from models.checkout import Checkout
@@ -17,6 +17,9 @@ from models.order import Order
 from models.payment_split import PaymentSplit
 from models.checkout import CheckoutItem
 from services.order_service import OrderService
+from main import app
+
+client = testclient(app)
 
 logger = logging.getLogger(__name__)
 
@@ -167,21 +170,6 @@ def initiate_payment(data: dict, db: Session):
 
         # 2. Extract client_secret
         client_secret = intent.client_secret
-
-        # 3. Save payment record in DB
-        payment = Payment(
-            payment_id=intent.id,
-            user_id=user_id,
-            amount=total_amount,
-            currency=currency,
-            status=intent.status,
-            deposit=deposit,
-            shipping_fee=shipping_fee,
-            service_fee=service_fee,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-
         checkoutItem = db.query(CheckoutItem).filter_by(checkout_id=checkout_id).all()
 
         payment = None
@@ -644,9 +632,6 @@ async def stripe_webhook(event: dict, db: Session):
         payment_id = obj["id"]
         metadata = obj.get("metadata", {})
         intent_type = metadata.get("type", "payment")
-        order = db.query(Order).filter_by(payment_id=payment_id).first()
-        checkout = db.query(Checkout).filter_by(payment_id=payment_id).first()
-
 
         if intent_type == "donation":
             donation = db.query(Donation).filter_by(donation_id=payment_id).first()
@@ -655,13 +640,33 @@ async def stripe_webhook(event: dict, db: Session):
                 db.commit()
             log_event(db, "donation_succeeded", reference_id=payment_id, actor="system")
         else:
-            payment = db.query(Payment).filter_by(payment_id=payment_id).first()
-            order = db.query(Order).filter_by(id=id).first()
-            if payment:
-                payment.status = "succeeded"
-                db.commit()
-                Order.confirm_payment(db, order.id)
-                Order.create_orders_data_with_validation(db, checkout.checkout_id, order.borrower_id, payment_id)
+            payment = db.query(Payment).filter_by(payment_id=payment_id).all()
+            for pay in payment:
+                if payment:
+                    payment.status = "succeeded"
+                    db.commit()
+                    payment_id = pay.payment_id
+                    checkout_id = pay.checkout_id
+                    checkout = db.query(Checkout).filter_by(checkout_id=checkout_id).first()
+                    checkoutItem = db.query(CheckoutItem).filter_by(checkout_id=checkout_id).first()
+                    Order.create_orders_data_with_validation(db, checkout.checkout_id, checkoutItem.borrower_id, payment_id) 
+                    order = db.query(Order).filter_by(payment_id=payment_id).all()
+                    for o in order:
+                        Order.confirm_payment(db, o.id)
+
+            userPayment = db.query(Payment).filter_by(payment_id=payment_id).first()
+            user = db.query(User).filter_by(user_id=userPayment.user_id).first()
+            total_amount = userPayment.amount + userPayment.deposit + userPayment.shipping_fee + userPayment.service_fee
+
+            client.post(
+                "/send_receipt",
+                json={
+                    "email": userPayment.user_id,
+                    "username": user.name,
+                    "total_amount": total_amount,
+                    "order_id": payment_id,
+                },
+            )       
 
             log_event(db, "payment_succeeded", reference_id=payment_id, actor="system")
 

@@ -15,7 +15,8 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    payment_id = Column(String(255), unique=True, nullable=False)  # Stripe PaymentIntent ID
+    payment_id = Column(String(255), nullable=False)  # Stripe PaymentIntent ID
+    checkout_id = Column(String(255), unique=True, nullable=False)
     user_id = Column(String(255), nullable=False)
     amount = Column(Integer, nullable=False)                       # total in cents
     currency = Column(String(10), default="usd")
