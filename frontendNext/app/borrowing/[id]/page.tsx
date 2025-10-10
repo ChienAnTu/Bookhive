@@ -7,6 +7,7 @@ import { Clock, Truck, ArrowLeft, AlertTriangle } from "lucide-react";
 import CoverImg from "@/app/components/ui/CoverImg";
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
+import Modal from "@/app/components/ui/Modal";
 import { toast } from "sonner";
 import { getApiUrl, getToken, getCurrentUser } from "@/utils/auth";
 
@@ -55,6 +56,11 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+
+  // useState for shipping
+  const [shipModalOpen, setShipModalOpen] = useState(false); // control if Modal should display
+  const [trackingNumber, setTrackingNumber] = useState(""); // input tracking number
+  const [carrier, setCarrier] = useState("AUSPOST"); // default carrier="AUSPOST"
 
   useEffect(() => {
     const loadData = async () => {
@@ -178,6 +184,48 @@ export default function OrderDetailPage() {
       return;
     }
     router.push(path);
+  };
+
+  const handleConfirmShipment = async () => {
+    if (!order) return;
+
+    try {
+      const token = getToken();
+      if (!token) {
+        toast.error("Authentication required");
+        router.push("/auth");
+        return;
+      }
+
+      const res = await fetch(
+        `${getApiUrl()}/api/v1/orders/${order.id}/confirm-shipment`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            tracking_number: trackingNumber,
+            carrier: carrier,
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to confirm shipment");
+
+      toast.success("Shipment confirmed successfully");
+
+      const updatedOrder = await fetchOrderDetails(order.id);
+      if (updatedOrder) {
+        setOrder(updatedOrder);
+      }
+
+      setShipModalOpen(false); // close Modal
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to confirm shipment");
+    }
   };
 
   if (loading) {
@@ -442,9 +490,9 @@ export default function OrderDetailPage() {
           {isOwner && order.status === "PENDING_SHIPMENT" && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
-              onClick={() => router.push(`/orders/${order.id}/shipping`)}
+              onClick={() => setShipModalOpen(true)}
             >
-              Ship
+              {order.shippingOutTrackingNumber ? "Update Shipment" : "Ship"} 
             </Button>
           )}
 
@@ -550,6 +598,52 @@ export default function OrderDetailPage() {
           )}
         </div>
       </Card>
+
+      {/* Ship Modal */}
+      <Modal
+        isOpen={shipModalOpen}
+        onClose={() => setShipModalOpen(false)}
+        title="Confirm Shipment"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Carrier</label>
+            <select
+              className="border rounded w-full p-2"
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+            >
+              <option value="AUSPOST">AUSPOST</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Tracking Number
+            </label>
+            <input
+              type="text"
+              className="border rounded w-full p-2"
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              placeholder="Enter tracking number"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShipModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmShipment}
+              disabled={!trackingNumber.trim()}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
