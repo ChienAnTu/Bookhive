@@ -73,6 +73,8 @@ async def calculate_shipping_fee(items, toPostcode: str, ownerData: dict):
                 results[ownerId] = {
                     "totalFee": totalFee,
                     "estimatedDeliveryTime": estimatedDays
+                    "totalFee": totalFee,
+                    "estimatedDeliveryTime": estimatedDays
                 }
             else:
                 raise HTTPException(
@@ -167,6 +169,7 @@ async def _apply_checkout_data(db: Session, checkout: Checkout, checkoutIn: Chec
             shipping_quote=0.0,
             service_code=getattr(itemIn, "serviceCode", "AUS_PARCEL_REGULAR"),
             estimated_delivery_time=getattr(itemIn, "estimatedDeliveryTime", 0),
+            estimated_delivery_time=getattr(itemIn, "estimatedDeliveryTime", 0),
         )
         checkout.items.append(item)
 
@@ -178,9 +181,11 @@ async def _apply_checkout_data(db: Session, checkout: Checkout, checkoutIn: Chec
         if item.owner_id in shippingFees:
             item.shipping_quote = shippingFees[item.owner_id]["totalFee"]
             item.estimated_delivery_time = shippingFees[item.owner_id]["estimatedDeliveryTime"]
+            item.estimated_delivery_time = shippingFees[item.owner_id]["estimatedDeliveryTime"]
             if item.owner_id not in processedOwners:
                 shippingFeeTotal += float(item.shipping_quote)
                 processedOwners.add(item.owner_id)
+
 
 
     # Step D: service fee
