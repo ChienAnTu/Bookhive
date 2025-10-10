@@ -25,6 +25,10 @@ interface RegisterData {
   agree_terms: boolean;
 }
 
+type UpdateUserPayload = Omit<User, "dateOfBirth"> & {
+  dateOfBirth?: string | null;
+};
+
 // User login function
 export const loginUser = async (credentials: LoginCredentials) => {
   const API_URL = getApiUrl();
@@ -222,6 +226,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
       bio: userData.bio || undefined,
       preferredLanguages: userData.preferredLanguages || undefined,
+      stripe_account_id: userData.stripe_account_id || undefined,
     };
 
     return user;
@@ -307,6 +312,8 @@ export const getUserById = async (id: string): Promise<User | null> => {
 
       bio: userData.bio || undefined,
       preferredLanguages: userData.preferredLanguages || undefined,
+      stripe_account_id: userData.stripe_account_id || undefined,
+
     };
 
     return user;
@@ -315,3 +322,133 @@ export const getUserById = async (id: string): Promise<User | null> => {
     return null;
   }
 };
+
+//-------- Administrator ban users
+const API_URL = getApiUrl();
+
+export type BanItem = {
+  ban_id: string;
+  user_id: string;
+  reason: string;
+  banned_at: string;
+  banned_by: string;
+  is_active: boolean;
+};
+
+/**
+ * Administrator: Ban the user
+ */
+export async function createBan(userId: string, reason: string): Promise<BanItem> {
+  try {
+    const res = await axios.post(
+      `${API_URL}/api/v1/bans`,
+      { user_id: userId, reason },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        withCredentials: true,
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error("Failed to create ban:", err);
+    throw err;
+  }
+}
+
+/**
+ * Administrator: Get the ban list
+ */
+export async function listBans(): Promise<BanItem[]> {
+  try {
+    const res = await axios.get(`${API_URL}/api/v1/bans`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      withCredentials: true,
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Failed to fetch ban list:", err);
+    throw err;
+  }
+}
+
+/**
+ * Administrator: Lift the ban
+ */
+export async function unban(banId: string): Promise<BanItem> {
+  try {
+    const res = await axios.delete(`${API_URL}/api/v1/bans/${banId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      withCredentials: true,
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Failed to unban:", err);
+    throw err;
+  }
+}
+
+
+//-------- users add other blackList 
+/**
+ * Block users
+ */
+export async function addToBlacklist(blockedUserId: string): Promise<{ message: string }> {
+  try {
+    const res = await axios.post(
+      `${API_URL}/api/v1/blacklists`,
+      { blocked_user_id: blockedUserId },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        withCredentials: true,
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error("Failed to add to blacklist:", err);
+    throw err;
+  }
+}
+
+/**
+ * cancel block
+ */
+export async function removeFromBlacklist(blockedUserId: string): Promise<{ message: string }> {
+  try {
+    const res = await axios.delete(`${API_URL}/api/v1/blacklists/${blockedUserId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      withCredentials: true,
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Failed to remove from blacklist:", err);
+    throw err;
+  }
+}
+
+/**
+ * Obtain the blacklist list of the current user
+ */
+export async function listBlacklist(): Promise<string[]> {
+  try {
+    const res = await axios.get(`${API_URL}/api/v1/blacklists`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      withCredentials: true,
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Failed to fetch blacklist:", err);
+    throw err;
+  }
+}

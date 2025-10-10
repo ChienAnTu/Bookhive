@@ -5,25 +5,29 @@ interface AvatarProps {
   user: {
     firstName?: string;
     lastName?: string;
+    name?: string | null;
     avatar?: string;
     profilePicture?: string;
   };
-  size?: number; // 默认 40px
+  size?: number; // 40px
   className?: string;
 }
 
 const Avatar: React.FC<AvatarProps> = ({ user, size = 40, className }) => {
+  const displayName =
+    ([user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "User").trim();
+
   const src =
-    user.profilePicture || // 本地上传的优先
-    user.avatar || // 后端 API 的头像
+    user.profilePicture || // upload avatar
+    user.avatar || // default avatar
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      `${user.firstName} ${user.lastName}`
+      displayName
     )}&background=FF6801&color=fff&bold=true&size=${size}`;
 
   return (
     <img
       src={src}
-      alt={`${user.firstName} ${user.lastName}`}
+      alt={displayName}
       className={`rounded-full object-cover ${className || ""}`}
       style={{ width: size, height: size }}
     />

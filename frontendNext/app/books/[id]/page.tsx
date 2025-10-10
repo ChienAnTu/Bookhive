@@ -22,6 +22,8 @@ import ProfileIncompleteModal from "@/app/components/ui/ProfileIncompleteModal";
 import Avatar from "@/app/components/ui/Avatar";
 import { useCartStore } from "@/app/store/cartStore";
 import StarRating from "@/app/components/ui/StarRating";
+import type { RatingStats } from "@/app/types/index";
+import { getUserRatingSummary } from "@/utils/review";
 
 import { toast } from 'sonner';
 
@@ -55,6 +57,13 @@ export default function BookDetailPage() {
     );
   }, [owner, currentUser]);
 
+const [ownerRating, setOwnerRating] = useState<RatingStats>({
+  averageRating: 0,
+  totalReviews: 0,
+  ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+});
+
+
   // pull cart first
   useEffect(() => {
     fetchCart();
@@ -74,9 +83,15 @@ export default function BookDetailPage() {
 
         // parallel
         if (b.ownerId) {
-          const [u] = await Promise.all([getUserById(b.ownerId)]);
-          setOwner(u);
-        }
+  const [u, ratingSummary] = await Promise.all([
+    getUserById(b.ownerId),
+    getUserRatingSummary(b.ownerId),
+  ]);
+  setOwner(u);
+  setOwnerRating(ratingSummary);
+}
+
+        
       } catch (err) {
         console.error(err);
         setError("Failed to load book details.");
@@ -157,9 +172,9 @@ export default function BookDetailPage() {
 
       // Redirect to the messages page and specify which conversation to open.
       // The timeout is kept to allow the user to see the success message.
-      setTimeout(() => {
-        router.push(`/message?to=${owner.email}`);
-      }, 1500);
+      // setTimeout(() => {
+      //   router.push(`/message?to=${owner.email}`);
+      // }, 1500);
 
     } catch (error: any) {
       console.error('Error sending message:', error);
@@ -442,11 +457,14 @@ export default function BookDetailPage() {
                         </div>
                       </div>
                       <div className="flex items-center mt-2">
-                        <StarRating rating={(owner as any).rating ?? 0} readonly size="sm" />
-                        <span className="ml-2 text-sm text-gray-600">
-                          {(owner as any).rating ?? 0}
-                        </span>
-                      </div>
+  <StarRating rating={ownerRating.averageRating} readonly size="sm" />
+  <span className="ml-2 text-sm text-gray-600">
+    {ownerRating.totalReviews > 0
+      ? `${ownerRating.averageRating.toFixed(1)} (${ownerRating.totalReviews} reviews)`
+      : "No reviews yet"}
+  </span>
+</div>
+
 
                     </div>
                     <Button

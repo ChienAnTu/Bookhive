@@ -11,6 +11,17 @@ import type { User } from "@/app/types/user";
 import Avatar from "@/app/components/ui/Avatar";
 import { toast } from "sonner";
 import { updateUser } from "@/utils/auth";
+import { uploadFile } from "@/utils/books";
+import PaymentAccountPromptModal from "@/app/components/ui/PaymentAccountCompleteModal";
+import { createExpressAccount } from "@/utils/payments";
+
+const parseDOB = (dob?: string | null) => {
+  if (!dob) return { year: "", month: "", day: "" };
+  const m = String(dob).match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return { year: "", month: "", day: "" };
+  const [_, y, mo, d] = m;
+  return { year: y, month: mo.padStart(2, "0"), day: d.padStart(2, "0") };
+};
 
 
 const emptyUser: User = {
@@ -20,7 +31,7 @@ const emptyUser: User = {
   name: "",
   email: "",
   phoneNumber: "",
-  dateOfBirth: { month: "", day: "", year: "" },
+  dateOfBirth: "",
   country: "",
   streetAddress: "",
   city: "",
@@ -37,83 +48,122 @@ const UpdateProfilePage: React.FC = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [profileData, setProfileData] = useState<User>(emptyUser);
+  const [showPayAccountModal, setShowPayAccountModal] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
+  const [lastSavedUser, setLastSavedUser] = useState<User | null>(null);
+  const [dobForm, setDobForm] = useState({ year: "", month: "", day: "" });
+const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      if (!isAuthenticated()) {
+useEffect(() => {
+  const loadUserData = async () => {
+    if (!isAuthenticated()) {
+      router.push("/auth");
+      return;
+    }
+
+    try {
+      const userData = await getCurrentUser();
+      if (!userData) {
         router.push("/auth");
         return;
       }
 
-      try {
-        const userData = await getCurrentUser();
-        if (userData) {
-          setProfileData(userData);
-        } else {
-          router.push("/auth");
-        }
-      } catch (error) {
-        console.error("Failed to load user data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      // 1) profileData
+      setProfileData({
+        ...(userData as any),
+        profilePicture: userData.profilePicture ?? "",
+        stripe_account_id: userData.stripe_account_id ?? null,
+      } as any);
 
-    loadUserData();
-  }, [router]);
+      // 2) 
+      setDobForm(parseDOB(userData.dateOfBirth as any));
+    } catch (error) {
+      console.error("Failed to load user data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-const handleSubmit = async (e: React.FormEvent) => {
+  loadUserData();
+}, [router]);
+
+
+  // 在组件内部
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   setIsLoading(true);
 
   try {
-    //dateOfBirth
-    let dateOfBirthStr: string | null = null;
-    if (profileData.dateOfBirth) {
-      const { year, month, day } = profileData.dateOfBirth;
-      if (year && month && day) {
-        dateOfBirthStr = `${year}-${month}-${day}`;
-      }
-    }
+    // 组装 DOB: YYYY-MM-DD
+    const composeDOB = (y?: string, m?: string, d?: string) =>
+      y && m && d ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
+
+    const dateOfBirthStr = composeDOB(dobForm.year, dobForm.month, dobForm.day);
 
     const payload = {
       ...profileData,
-      // combine name
       name: `${profileData.firstName} ${profileData.lastName}`.trim(),
-      ...(dateOfBirthStr ? { dateOfBirth: dateOfBirthStr } : {}),
+      dateOfBirth: dateOfBirthStr,               // 后端要字符串
     };
 
     const result = await updateUser(payload);
 
-    console.log("Profile updated:", result);
     toast.success("Profile updated successfully!");
+    setProfileData(prev => ({ ...prev, dateOfBirth: dateOfBirthStr || "" }));
+    setDobForm(parseDOB(dateOfBirthStr || ""));
 
-    window.dispatchEvent(new Event("auth-changed"));
-    router.push("/profile");
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : "Update failed");
-    console.error("Failed to update profile:", error);
+    const hasConnect = !!(
+      result?.connectAccountId ||
+      result?.stripe_account_id ||
+      profileData?.stripe_account_id
+    );
+
+    if (!hasConnect) {
+      setLastSavedUser(result || profileData);
+      setShowPayAccountModal(true);
+    } else {
+      window.dispatchEvent(new Event("auth-changed"));
+      router.push("/profile");
+    }
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err?.message || "Update failed");
   } finally {
     setIsLoading(false);
   }
 };
 
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
+  // 可选校验
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    toast.error("Please upload JPG/PNG/WebP image");
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    toast.error("Image must be ≤ 2MB");
+    return;
+  }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Implement image upload logic
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileData((prev) => ({
-          ...prev,
-          profilePicture: reader.result as string,
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  try {
+    setUploadingAvatar(true);
+
+    // scene = "avatar"
+    const url = await uploadFile(file, "avatar");
+
+    // update profilePicture（not avatar）
+    setProfileData(prev => ({ ...prev, profilePicture: url }));
+
+    toast.success("Avatar uploaded");
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err?.response?.data?.detail || "Upload failed");
+  } finally {
+    setUploadingAvatar(false);
+  }
+};
 
   if (isLoading) {
     return (
@@ -140,8 +190,8 @@ const handleSubmit = async (e: React.FormEvent) => {
               <div className="flex flex-col items-center">
                 <div className="relative">
                   {/* Avatar */}
-                    <Avatar user={profileData} size={96} />
-                  
+                  <Avatar user={profileData} size={96} />
+
                   {/* upload */}
                   <label className="absolute bottom-0 right-0 bg-black rounded-full p-2 cursor-pointer">
                     <Camera className="w-4 h-4 text-white" />
@@ -224,36 +274,28 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <div className="grid grid-cols-3 gap-4">
                   <Input
                     placeholder="DD"
-                    value={profileData.dateOfBirth?.day || ""}
+                    value={dobForm.day}
                     onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        dateOfBirth: { ...profileData.dateOfBirth!, day: e.target.value },
-                      })
+                      setDobForm((p) => ({ ...p, day: e.target.value }))
                     }
                   />
                   <Input
                     placeholder="MM"
-                    value={profileData.dateOfBirth?.month || ""}
+                    value={dobForm.month}
                     onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        dateOfBirth: { ...profileData.dateOfBirth!, month: e.target.value },
-                      })
+                      setDobForm((p) => ({ ...p, month: e.target.value }))
                     }
                   />
                   <Input
                     placeholder="YYYY"
-                    value={profileData.dateOfBirth?.year || ""}
+                    value={dobForm.year}
                     onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        dateOfBirth: { ...profileData.dateOfBirth!, year: e.target.value },
-                      })
+                      setDobForm((p) => ({ ...p, year: e.target.value }))
                     }
                   />
                 </div>
               </div>
+
 
               {/* Address Information */}
               <div className="col-span-2">
@@ -336,22 +378,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                   }
                 />
               </div>
-              {/* <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Bio
-                </label>
-                <textarea
-                  rows={4}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-black focus:border-black"
-                  value={profileData.bio || ""}
-                  onChange={(e) =>
-                    setProfileData({ ...profileData, bio: e.target.value })
-                  }
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Tell others a bit about yourself and your reading interests.
-                </p>
-              </div> */}
             </div>
 
             {/* Action Buttons */}
@@ -368,11 +394,36 @@ const handleSubmit = async (e: React.FormEvent) => {
                 Save
               </Button>
             </div>
-
-
           </form>
         </div>
       </div>
+      <PaymentAccountPromptModal
+        isOpen={showPayAccountModal}
+        onClose={() => setShowPayAccountModal(false)}
+        email={lastSavedUser?.email || profileData?.email}
+        onConfirm={async () => {
+          //「Open payment account」
+          if (!(lastSavedUser?.email || profileData?.email)) {
+            toast.error("Please login first.");
+            return;
+          }
+          try {
+            setCreatingLink(true);
+            const { onboarding_url } = await createExpressAccount(
+              lastSavedUser?.email || profileData.email!
+            );
+            setShowPayAccountModal(false);
+            window.location.href = onboarding_url; // Jump to Stripe
+          } catch (e: any) {
+            console.error(e);
+            toast.error(e?.response?.data?.detail || "Failed to create payment account");
+          } finally {
+            setCreatingLink(false);
+          }
+        }}
+        loading={creatingLink}
+      />
+
     </div>
   );
 };

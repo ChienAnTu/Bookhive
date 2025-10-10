@@ -9,7 +9,10 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
 from models.service_fee import ServiceFee
+from models.complaint import Complaint
 from sqlalchemy import or_
+from services.complaint_service import ComplaintService
+from typing import Set
 
 class OrderService:
     """
@@ -185,7 +188,13 @@ class OrderService:
         return results
     
     @staticmethod
-    def create_orders_data_with_validation(db: Session, checkout: Checkout, user_id: str):
+    def create_orders_data_with_validation(db: Session, checkout_id: str, user_id: str, payment_id: str):
+        checkout = db.query(Checkout).filter(Checkout.checkout_id == checkout_id).first()
+        if not checkout:
+            raise HTTPException(status_code=404, detail=f"Checkout {checkout_id} not found")
+        if checkout.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied: Checkout does not belong to this user")
+    
         orders_data_without_price = OrderService.split_checkout_to_orders(checkout, db, user_id=user_id)
         orders_data = OrderService.add_calculate_order_amounts(db, orders_data=orders_data_without_price)
         created_orders = []
@@ -209,7 +218,11 @@ class OrderService:
                 street = checkout.street,
                 city = checkout.city,
                 postcode = checkout.postcode,
-                country = checkout.country
+                country = checkout.country,
+
+                # new fields
+                estimated_delivery_time = first_item.estimated_delivery_time,
+                payment_id = payment_id,
             )
             db.add(order)
             db.flush()
@@ -241,7 +254,19 @@ class OrderService:
         skip: int = 0, 
         limit: int = 20
     ) -> List[dict]:
-        query = db.query(Order).filter(Order.borrower_id == user_id)
+        
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if user.is_admin:
+            query = db.query(Order)
+        else:
+            query = db.query(Order).filter(
+                or_(
+                    Order.borrower_id == user_id,
+                    Order.owner_id == user_id
+                )
+            )
 
         if status:
             query = query.filter(Order.status == status)
@@ -269,22 +294,24 @@ class OrderService:
         return result
     
     @staticmethod
-    def get_order_detail(db: Session, order_id: str) -> Optional[Dict]:
+    def get_order_detail(db: Session, order_id: str, current_user: User) -> Optional[Dict]:
         order = db.query(Order).filter(Order.id == order_id).first()
         if not order:
-            return None
+            return None    
+        if not current_user.is_admin and order.borrower_id != current_user.user_id and order.owner_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this order")
         return order.to_dict(include_books = True)
 
         
     @staticmethod
-    def cancel_order(db: Session, order_id: str, user_id: str) -> bool:
+    def cancel_order(db: Session, order_id: str, current_user: User) -> bool:
         """
         Cancel an order if it's in a cancellable state
         
         Args:
             db: Database session
             order_id: Order ID to cancel
-            user_id: User ID performing the cancellation (for authorization)
+            current_user: User
             
         Returns:
             bool: True if cancellation was successful
@@ -301,7 +328,7 @@ class OrderService:
             )
         
         # Check authorization - only borrower can cancel their order
-        if order.borrower_id != user_id:
+        if order.borrower_id != current_user.user_id and not current_user.is_admin:
             raise HTTPException(
                 status_code=403,
                 detail="Not authorized to cancel this order"
@@ -328,3 +355,266 @@ class OrderService:
         
         db.commit()
         return True
+
+    @staticmethod
+    def get_user_tracking_numbers(
+        db: Session,
+        current_user: User,
+        target_user_id: Optional[str] = None
+    ) -> List[Dict[str, Optional[str]]]:
+        """
+        Return AUPOST shipping out and return tracking numbers per order for a user.
+        Each item includes order_id and tracking numbers (or None if not AUPOST).
+
+        Example:
+        [
+            {
+                "order_id": "ORD123",
+                "shipping_out_tracking_number": "OUT123",
+                "shipping_return_tracking_number": "RET123"
+            },
+            ...
+        ]
+        """
+        user_id = target_user_id or current_user.user_id
+
+        # authorization check: allow if admin or user querying themselves
+        if not current_user.is_admin and current_user.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        orders = db.query(Order).filter(
+            (Order.borrower_id == user_id) | (Order.owner_id == user_id)
+        ).all()
+
+        result = []
+        for order in orders:
+            out_num = order.shipping_out_tracking_number if order.shipping_out_carrier == "AUSPOST" else None
+            return_num = order.shipping_return_tracking_number if order.shipping_return_carrier == "AUSPOST" else None
+
+            # Only include if at least one AUPOST tracking number exists
+            if out_num or return_num:
+                result.append({
+                    "order_id": order.id,
+                    "shipping_out_tracking_number": out_num,
+                    "shipping_return_tracking_number": return_num,
+                })
+
+        return result
+    
+
+
+
+
+
+    # order status service
+    @staticmethod
+    def confirm_payment(db: Session, order_id: str) -> bool:
+        """
+        Confirm payment received, transition PENDING_PAYMENT → PENDING_SHIPMENT
+        """
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.status != "PENDING_PAYMENT":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot confirm payment for order with status '{order.status}'"
+            )
+        
+        order.status = "PENDING_SHIPMENT"
+        db.commit()
+        db.refresh(order)
+        return True
+    
+
+    @staticmethod
+    def confirm_shipment(
+        db: Session, 
+        order_id: str, 
+        current_user: User,
+        tracking_number: str,
+        carrier: str
+    ) -> bool:
+        """
+        Confirm shipment with tracking number and carrier
+        
+        Logic:
+            - If status is PENDING_SHIPMENT -> update shipping_out_* (outbound, owner confirms)
+            - If status is BORROWING or OVERDUE -> update shipping_return_* (return, borrower confirms)
+        """
+        order = db.query(Order).filter(Order.id == order_id).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Validate carrier
+        carrier_upper = carrier.upper()
+        if carrier_upper not in ["AUSPOST", "OTHER"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid carrier '{carrier}'. Must be 'AUSPOST' or 'OTHER'"
+            )
+        
+        # Check status and permissions
+        if order.status == "PENDING_SHIPMENT":
+            # Outbound: only owner can confirm
+            if order.owner_id != current_user.user_id and not current_user.is_admin:
+                raise HTTPException(status_code=403, detail="Only owner can confirm outbound shipment")
+            
+            # Update outbound tracking
+            order.shipping_out_carrier = carrier_upper
+            order.shipping_out_tracking_number = tracking_number
+            
+            # Calculate start_at and due_at
+            from datetime import timedelta
+            now = datetime.now(timezone.utc)
+            
+            order.start_at = now + timedelta(days=order.estimated_delivery_time or 3)
+            
+            max_lending_days = max(
+                (ob.book.max_lending_days for ob in order.books if ob.book and ob.book.max_lending_days),
+                default=20
+            )
+            order.due_at = order.start_at + timedelta(days=max_lending_days)
+            
+        elif order.status in ["BORROWING", "OVERDUE"]:
+            # Return: only borrower can confirm
+            if order.borrower_id != current_user.user_id and not current_user.is_admin:
+                raise HTTPException(status_code=403, detail="Only borrower can confirm return shipment")
+            
+            # Update return tracking
+            order.shipping_return_carrier = carrier_upper
+            order.shipping_return_tracking_number = tracking_number
+
+            # Update status to RETURNED
+            order.status = "RETURNED"
+            order.returned_at = datetime.now(timezone.utc)
+                
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot confirm shipment for status '{order.status}'. Valid: PENDING_SHIPMENT, BORROWING, OVERDUE"
+            )
+
+        db.commit()
+        db.refresh(order)
+        return True
+
+
+    @staticmethod
+    def update_borrowing_status(db: Session) -> int:
+        """
+        Background task: Update orders to BORROWING when start_at is reached
+        Should be run periodically (e.g., every hour)
+        
+        Returns: number of orders updated
+        """
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "PENDING_SHIPMENT",
+            Order.start_at <= now,
+            Order.start_at.isnot(None)
+        ).all()
+        
+        count = 0
+        for order in orders:
+            order.status = "BORROWING"
+            count += 1
+        
+        db.commit()
+        return count
+
+
+
+    @staticmethod
+    def update_overdue_status(db: Session) -> int:
+        """
+        Background task: Update orders to OVERDUE when due_at is passed
+        Should be run periodically (e.g., every hour)
+        
+        Returns: number of orders updated
+        """
+
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "BORROWING",
+            Order.due_at.isnot(None),
+            Order.due_at <= now
+        ).all()
+
+        if not orders:
+            return 0
+        
+
+        order_ids = [o.id for o in orders]
+
+        # Find existing overdue orders, avoiding repeated creating complaints
+        existing = (
+            db.query(Complaint.order_id)
+              .filter(
+                  Complaint.order_id.in_(order_ids),
+                  Complaint.status.in_(("pending", "investigating")),
+              )
+              .all()
+        )
+        existed_ids: Set[str] = {row[0] for row in existing}
+        
+        count = 0
+        try:
+            for order in orders:
+                if order.id not in existed_ids:
+                # create new complaint
+                    ComplaintService.create(
+                        db=db,
+                        complainant_id=order.owner_id, 
+                        respondent_id=order.borrower_id,  
+                        order_id=order.id,
+                        type="other",  
+                        subject=f"Order {order.id} is overdue",
+                        description=f"This order was due on {order.due_at} but has not been returned.",
+                        commit=False
+                    )
+                    
+                order.status = "OVERDUE"
+                count += 1
+                
+            db.commit()
+            return count
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def update_completed_status(db: Session) -> int:
+        """
+        Background task: Update orders to COMPLETED when returned package is delivered
+        Transition: RETURNED -> COMPLETED after estimated_delivery_time
+        
+        Returns: number of orders updated
+        """
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        
+        orders = db.query(Order).filter(
+            Order.status == "RETURNED",
+            Order.returned_at.isnot(None)
+        ).all()
+        
+        count = 0
+        for order in orders:
+            # Calculate expected delivery date: returned_at + estimated_delivery_time
+            delivery_time = order.estimated_delivery_time or 3
+            expected_delivery = order.returned_at + timedelta(days=delivery_time)
+            
+            if now >= expected_delivery:
+                order.status = "COMPLETED"
+                order.completed_at = now
+                count += 1
+        
+        db.commit()
+        return count
+    

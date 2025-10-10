@@ -54,6 +54,8 @@ coverage.xml
 *.log
 local_settings.py
 db.sqlite3
+*.sql
+
 
 # Flask stuff:
 instance/
@@ -133,3 +135,9 @@ dmypy.json
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Alembic cache/temp files
+alembic/__pycache__/
+
+node_modules/
+**/node_modules/

@@ -66,9 +66,24 @@ class OrderDetail(BaseModel):
     shippingReturnTrackingUrl: Optional[str]
     
     # fee
+    paymentId: Optional[str] = None
     lateFeeAmount: float
     damageFeeAmount: float
     totalRefundedAmount: float
     
     # books info
     books: List[BookDetail]
+
+
+class CreateOrderRequest(BaseModel):
+    checkout_id: str
+    payment_id: str
+
+class TrackingNumberItem(BaseModel):
+    order_id: str
+    shipping_out_tracking_number: Optional[str]
+    shipping_return_tracking_number: Optional[str]
+
+class ConfirmShipmentRequest(BaseModel):
+    tracking_number: str
+    carrier: str = "AUSPOST" # "AUSPOST" or "OTHER"

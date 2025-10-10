@@ -24,10 +24,20 @@ bun install
 
 ```bash
 # and install extra libraries used in this project:
-npm install zustand lucide-react tailwindcss postcss autoprefixer
+npm install zustand lucide-react tailwindcss postcss autoprefixer \
+  @stripe/stripe-js @stripe/react-stripe-js
 ```
 
-### 2. Run the development server
+### 2. Environment variables
+Create your frontend env file  **`.env.local`** (frontend root, same level as `package.json`):
+
+```env
+# Frontend (Next.js)
+NEXT_PUBLIC_STRIPE_PK=pk_test_xxx        # Stripe publishable key (do NOT use secret key)
+NEXT_PUBLIC_API_URL=http://localhost:8000  # backend API base URL
+```
+
+### 3. Run the development server
 ```bash
 npm run dev
 # or

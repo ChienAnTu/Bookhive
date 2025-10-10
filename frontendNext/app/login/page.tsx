@@ -90,12 +90,12 @@ export default function LoginPage() {
               />
               Remember me
             </label>
-            <Link
+            {/* <Link
               href="/forgot-password"
               className="text-sm text-blue-600 hover:text-blue-700"
             >
               Forgot password?
-            </Link>
+            </Link> */}
           </div>
 
           {/* login button */}
@@ -116,7 +116,7 @@ export default function LoginPage() {
           <div className="flex-1 border-t border-gray-300"></div>
         </div>
 
-        {/* social media login */}
+        {/* social media login
         <div className="space-y-3">
           <Button variant="outline" fullWidth className="border-gray-300">
             Continue with Google
@@ -124,7 +124,7 @@ export default function LoginPage() {
           <Button variant="outline" fullWidth className="border-gray-300">
             Continue with Apple
           </Button>
-        </div>
+        </div> */}
 
         {/* register link */}
         <div className="text-center mt-6 text-sm text-gray-600">

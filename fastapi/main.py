@@ -10,22 +10,33 @@ from routes.books import router as books_router
 from routes.messages import router as message_router
 from routes.cart import router as cart_router
 from routes.complaints import router as complaints_router  # routes/complaints
-from routes.mail import router as mail_router
 from routes.shipping import router as shipping_router  # Import shipping router
 from routes.service_fee import router as service_fee_router
 from routes.checkout import router as checkout_router  # Import checkout router
+from routes.mail import router as mail_router
+from routes.payment_gateway import router as payment_gateway_router
 from routes.order import router as orders_router
 from routes.bans import router as bans_router
 from routes.blacklists import router as blacklists_router
 from routes.review import router as review_router
 
+# update order statuses automatically
+from contextlib import asynccontextmanager
+from tasks import start_scheduler, stop_scheduler
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
 
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware for Next.js integration
@@ -73,6 +84,9 @@ app.include_router(complaints_router, prefix="/api/v1")
 
 # mail router
 app.include_router(mail_router) 
+
+# payment gateway router
+app.include_router(payment_gateway_router) 
 
 # order router
 app.include_router(orders_router, prefix="/api/v1/orders")

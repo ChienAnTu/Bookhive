@@ -6,7 +6,8 @@ import { MapPin, Calendar, Ban } from "lucide-react";
 import Link from "next/link";
 import Avatar from "@/app/components/ui/Avatar";
 import type { User } from "@/app/types/user";
-import { getUserById } from "@/utils/auth";
+import { getUserById, addToBlacklist, removeFromBlacklist, listBlacklist, } from "@/utils/auth";
+import { getCurrentUser, createBan, listBans, unban } from "@/utils/auth";
 import type { RatingStats, Comment } from "@/app/types/index";
 import StarRating from '@/app/components/ui/StarRating';
 import {
@@ -14,10 +15,13 @@ import {
   getReviewsByUser,
 } from "@/utils/review";
 
+
 const UserProfilePage: React.FC = () => {
   const router = useRouter();
   const params = useParams();
   const userId = params?.id as string;
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
 
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +54,48 @@ const UserProfilePage: React.FC = () => {
     };
     loadUser();
   }, [userId, router]);
+
+  useEffect(() => {
+    const loadUserAndCheckAdmin = async () => {
+      try {
+        const userData = await getCurrentUser();
+        if (!userData) return;
+
+        const adminFlag =
+          Boolean(userData.is_admin === true) ||
+          userData.is_admin === true ||
+          userData.email?.includes("admin");
+
+        setIsAdmin(adminFlag);
+
+        if (adminFlag && userId) {
+          const bans = await listBans();
+          const activeBan = bans.find(b => b.user_id === userId && b.is_active);
+          setIsBanned(!!activeBan);
+        }
+      } catch (err) {
+        console.error("Failed to check admin or load bans:", err);
+        setIsAdmin(false);
+      }
+    };
+
+    loadUserAndCheckAdmin();
+  }, [userId]);
+
+
+  useEffect(() => {
+    const checkIfBlocked = async () => {
+      try {
+        const blockedList = await listBlacklist();
+        setIsBlocked(blockedList.includes(userId));
+      } catch (err) {
+        console.error("Failed to load blacklist:", err);
+      }
+    };
+
+    if (userId) checkIfBlocked();
+  }, [userId]);
+
 
   // get reviews
   useEffect(() => {
@@ -89,29 +135,68 @@ const UserProfilePage: React.FC = () => {
     loadReviewsAndStats();
   }, [userId]);
 
+  // ADMIN ban users
+  const handleBanUser = async () => {
+    if (!user) {
+      alert("User not loaded yet.");
+      return;
+    }
 
+    if (!confirm("Are you sure you want to ban this user?")) return;
+    try {
+      await createBan(user.id, "Violation of platform rules");
+      alert("User has been banned.");
+      setIsBanned(true);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to ban user.");
+    }
+  };
+
+  const handleUnbanUser = async () => {
+    if (!confirm("Unban this user?")) return;
+    try {
+      const bans = await listBans();
+      const activeBan = bans.find(b => b.user_id === user?.id && b.is_active);
+      if (!activeBan) {
+        alert("No active ban found for this user.");
+        return;
+      }
+      await unban(activeBan.ban_id);
+      alert("User has been unbanned.");
+      setIsBanned(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Failed to unban user.");
+    }
+  };
+
+  // Users block others
   const handleBlockUser = async (userId: string) => {
     if (!confirm("Are you sure you want to block this user?")) return;
     try {
-      // TODO: 调用 block API
-      console.log(`Blocked user: ${userId}`);
+      await addToBlacklist(userId);
       setIsBlocked(true);
-    } catch (err) {
+      alert("User has been blocked successfully.");
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to block user.");
+      alert(err.response?.data?.detail || "Failed to block user.");
     }
   };
 
+
   const handleUnblockUser = async (userId: string) => {
+    if (!confirm("Unblock this user?")) return;
     try {
-      // TODO: 调用 unblock API
-      console.log(`Unblocked user: ${userId}`);
+      await removeFromBlacklist(userId);
       setIsBlocked(false);
-    } catch (err) {
+      alert("User has been unblocked.");
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to unblock user.");
+      alert(err.response?.data?.detail || "Failed to unblock user.");
     }
   };
+
 
   if (isLoading) {
     return <div className="p-8 text-gray-500">Loading user profile...</div>;
@@ -193,6 +278,20 @@ const UserProfilePage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {isAdmin && (
+            <div className="mt-6 p-6">
+              <button
+                onClick={isBanned ? handleUnbanUser : handleBanUser}
+                className={`w-full py-2 px-4 rounded-lg font-medium transition ${isBanned
+                  ? "bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-100"
+                  : "bg-red-50 border border-red-300 text-red-700 hover:bg-red-100"
+                  }`}
+              >
+                {isBanned ? "Admin Unban User" : "Admin Ban User"}
+              </button>
+            </div>
+          )}
 
           {/* User Reviews */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
