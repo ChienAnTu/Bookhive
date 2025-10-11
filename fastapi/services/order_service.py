@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime, timezone
 from collections import defaultdict
 from models.service_fee import ServiceFee
+from services.cart_service import remove_cart_items_by_book_ids
 from models.complaint import Complaint
 from sqlalchemy import or_
 from services.complaint_service import ComplaintService
@@ -198,7 +199,7 @@ class OrderService:
         orders_data_without_price = OrderService.split_checkout_to_orders(checkout, db, user_id=user_id)
         orders_data = OrderService.add_calculate_order_amounts(db, orders_data=orders_data_without_price)
         created_orders = []
-
+        all_book_ids = set() # for remove items later
         for order_info in orders_data:
             items = order_info["items"]
             first_item = items[0]
@@ -239,10 +240,18 @@ class OrderService:
                 book = db.query(Book).filter(Book.id == item.book_id).first()
                 if book:
                     book.status = "unlisted"
+                    all_book_ids.add(book.id)
             created_orders.append(order)
         # checkout.status
         checkout.status = "COMPLETED"
         db.commit()
+
+        # remove items from cart
+        current_user = db.query(User).filter(User.user_id == user_id).first()
+        try:
+            remove_cart_items_by_book_ids(db, book_ids=list(all_book_ids), current_user=current_user)
+        except Exception as e:
+            print(f"Failed to clear cart items after checkout: {e}")
         return created_orders
     
 

@@ -2,6 +2,7 @@ import uuid
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from models.cart import Cart, CartItem
+from typing import List
 
 def get_cart_with_items(db: Session, user_id: str) -> Cart:
     cart = db.query(Cart).filter(Cart.user_id == user_id).first()
