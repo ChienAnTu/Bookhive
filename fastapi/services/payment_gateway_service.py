@@ -193,7 +193,7 @@ def initiate_payment(data: dict, db: Session):
                 status=intent.status,
                 purchase=purchase,
                 deposit=deposit,
-                shipping_fee=owner.shipping_quote,
+                shipping_fee=shipping_fee,
                 service_fee=service_fee,
 
                 created_at=datetime.utcnow(),
@@ -627,7 +627,7 @@ async def stripe_webhook(event: dict, db: Session):
 
     event_type = event["type"]
     obj = event["data"]["object"]
-    print("[webhook] incoming event type:", event.get("type"))
+    print("[webhook] service started:")
 
 
     # -------------------------
@@ -635,6 +635,7 @@ async def stripe_webhook(event: dict, db: Session):
     # -------------------------
     payment = None
     if event_type == "payment_intent.succeeded":
+        print("[webhook] incoming event type:", event.get("type"))
         payment_id = obj["id"]
         metadata = obj.get("metadata", {})
         intent_type = metadata.get("type", "payment")
@@ -652,16 +653,21 @@ async def stripe_webhook(event: dict, db: Session):
                 db.commit()
             log_event(db, "donation_succeeded", reference_id=payment_id, actor="system")
         else:
-            payment = db.query(Payment).filter_by(payment_id=payment_id).first()
-            print("[webhook] payment_intent.succeeded pi:", payment_id, "hit:", bool(payment))
+            payment = db.query(Payment).filter_by(payment_id=payment_id).all()
+            userPayID = db.query(Payment).filter_by(payment_id=payment_id).first()
+            user = db.query(Payment).filter_by(user_id=payment.userPayID.user).all()
 
-            order = db.query(Order).filter_by(id=id).first()
+            print("payment : " + payment)
             if payment:
-                payment.status = "succeeded"
-                db.commit()
-                Order.confirm_payment(db, order.id)
-                Order.create_orders_data_with_validation(db, checkout.checkout_id, order.borrower_id, payment_id)
+                for pay in payment:
+                    pay.status = "succeeded"
+                    print("status : " + pay.status)
 
+                OrderService.create_orders_data_with_validation(db, checkout.checkout_id, user.user_id, payment_id)
+                order = db.query(Order).filter_by(id=id).first()
+                # OrderService.confirm_payment(db, order.id)
+                db.commit()
+                
             log_event(db, "payment_succeeded", reference_id=payment_id, actor="system")
 
     # -------------------------
