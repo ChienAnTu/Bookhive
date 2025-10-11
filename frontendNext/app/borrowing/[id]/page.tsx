@@ -457,7 +457,9 @@ export default function OrderDetailPage() {
         <h3 className="text-base font-semibold mb-3">Actions</h3>
         <div className="flex flex-wrap gap-2">
           {isBorrower &&
-            (order.status === "BORROWING" || order.status === "OVERDUE") && (
+            (order.status === "BORROWING" ||
+              order.status === "RETURNED" ||
+              order.status === "OVERDUE") && (
               <Button
                 className="bg-black text-white hover:bg-gray-800"
                 onClick={() => setShipModalOpen(true)}
