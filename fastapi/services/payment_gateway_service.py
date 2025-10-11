@@ -177,9 +177,11 @@ def initiate_payment(data: dict, db: Session):
         for owner in checkoutItem:
             
             if owner.action_type == "BORROW":
-                value = owner.deposit
+                deposit = owner.deposit*100
+                purchase = 0
             elif owner.action_type == "PURCHASE":
-                value = owner.price
+                purchase = owner.price*100
+                deposit = 0
 
             # 3. Save payment record in DB
             payment = Payment(
