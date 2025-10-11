@@ -628,7 +628,7 @@ async def stripe_webhook(event: dict, db: Session):
     event_type = event["type"]
     obj = event["data"]["object"]
     print("[webhook] service started:")
-
+    print("[webhook] incoming event type:", event.get("type"))
 
     # -------------------------
     # PaymentIntent succeeded
@@ -642,9 +642,6 @@ async def stripe_webhook(event: dict, db: Session):
         # order = db.query(Order).filter_by(payment_id=payment_id).first()
         # checkout = db.query(Checkout).filter_by(checkout_id=checkout_id).first()
         checkout = None
-        if payment and getattr(payment, "checkout_id", None):
-            checkout = db.query(Checkout).filter_by(checkout_id=payment.checkout_id).first()
-
 
         if intent_type == "donation":
             donation = db.query(Donation).filter_by(donation_id=payment_id).first()
@@ -654,21 +651,26 @@ async def stripe_webhook(event: dict, db: Session):
             log_event(db, "donation_succeeded", reference_id=payment_id, actor="system")
         else:
             payment = db.query(Payment).filter_by(payment_id=payment_id).all()
-            userPayID = db.query(Payment).filter_by(payment_id=payment_id).first()
-            user = db.query(Payment).filter_by(user_id=payment.userPayID.user).all()
+            if not payment:
+                print(f"No payments found for {payment_id}")
+                return
+            checkout = db.query(Checkout).filter_by(checkout_id=payment[0].checkout_id).first()
 
-            print("payment : " + payment)
+            print("payment : " + str(payment))
             if payment:
                 for pay in payment:
                     pay.status = "succeeded"
                     print("status : " + pay.status)
+                    db.commit()   
 
-                OrderService.create_orders_data_with_validation(db, checkout.checkout_id, user.user_id, payment_id)
-                order = db.query(Order).filter_by(id=id).first()
-                # OrderService.confirm_payment(db, order.id)
-                db.commit()
-                
+                orderID = OrderService.create_orders_data_with_validation(db, checkout.checkout_id, payment[0].user_id, payment_id)
+                order = db.query(Order).filter_by(id=orderID[-1].id).first()
+                OrderService.confirm_payment(db, order.id)
+
+            
+            db.commit()            
             log_event(db, "payment_succeeded", reference_id=payment_id, actor="system")
+            
 
     # -------------------------
     # PaymentIntent amount capturable updated
