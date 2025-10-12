@@ -135,20 +135,20 @@ export default function CartPage() {
 
   // totals
   const selectedPrice = useMemo(() => {
-    const selectedItems = cart.filter((item) => selectedIds.includes(item.cartItemId));
-    console.log("selectedIds:", selectedIds, "selectedItems:", selectedItems);
-    return cart
-      .filter((item) => selectedIds.includes(item.cartItemId)) // selected
+    const total = cart
+      .filter((item) => selectedIds.includes(item.cartItemId))
       .reduce((sum, item) => {
-        if (item.mode === "purchase") {
-          return sum + (item.salePrice || 0);
-        }
-        if (item.mode === "borrow") {
-          return sum + (item.deposit || 0);
-        }
+        const sale = Number(item.salePrice ?? 0);
+        const deposit = Number(item.deposit ?? 0);
+        if (item.mode === "purchase") return sum + sale;
+        if (item.mode === "borrow") return sum + deposit;
         return sum;
       }, 0);
+
+    return Number.isFinite(total) ? total : 0;
   }, [cart, selectedIds]);
+
+
 
 
   if (loading) {
@@ -386,8 +386,9 @@ export default function CartPage() {
                     <span>({selectedIds.length} items)</span>
                     <span className="font-medium">:</span>
                     <span className="text-xl font-bold" style={{ color: "#FF6801" }}>
-                      ${selectedPrice.toFixed(2)}
+                      ${Number(selectedPrice || 0).toFixed(2)}
                     </span>
+
                   </div>
 
                   {/* Buttons */}
