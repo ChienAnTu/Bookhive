@@ -521,13 +521,14 @@ class OrderService:
         Returns: number of orders updated
         """
         now = datetime.now(timezone.utc)
-        
+        now = now.replace(tzinfo=None)
+
         orders = db.query(Order).filter(
             Order.status == "PENDING_SHIPMENT",
             Order.start_at <= now,
             Order.start_at.isnot(None)
         ).all()
-        
+
         count = 0
         for order in orders:
             order.status = "BORROWING"
@@ -548,7 +549,7 @@ class OrderService:
         """
 
         now = datetime.now(timezone.utc)
-        
+        now = now.replace(tzinfo=None)
         orders = db.query(Order).filter(
             Order.status == "BORROWING",
             Order.due_at.isnot(None),
@@ -607,7 +608,7 @@ class OrderService:
         """
         from datetime import timedelta
         now = datetime.now(timezone.utc)
-        
+        now = now.replace(tzinfo=None)
         orders = db.query(Order).filter(
             Order.status == "RETURNED",
             Order.returned_at.isnot(None)

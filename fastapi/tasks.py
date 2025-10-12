@@ -34,6 +34,8 @@ def update_order_statuses():
 
 def start_scheduler():
     """Start the scheduled task scheduler"""
+    # update when app starts
+    update_order_statuses()
     scheduler.add_job(update_order_statuses, 'interval', hours=1, id="order_status_job")
     scheduler.start()
     print("Order status scheduler started")
