@@ -15,12 +15,13 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    payment_id = Column(String(255), unique=True, nullable=False)  # Stripe PaymentIntent ID
+    payment_id = Column(String(255), nullable=False)  # Stripe PaymentIntent ID
+    checkout_id = Column(String(255), unique=True, nullable=False)
     user_id = Column(String(255), nullable=False)
     amount = Column(Integer, nullable=False)                       # total in cents
     currency = Column(String(10), default="usd")
     status = Column(String(50), default="pending")
-
+    purchase = Column(Integer, default=0)   
     deposit = Column(Integer, default=0)
     shipping_fee = Column(Integer, default=0)
     service_fee = Column(Integer, default=0)

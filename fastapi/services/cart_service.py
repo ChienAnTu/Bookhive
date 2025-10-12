@@ -2,6 +2,7 @@ import uuid
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from models.cart import Cart, CartItem
+from typing import List
 
 def get_cart_with_items(db: Session, user_id: str) -> Cart:
     cart = db.query(Cart).filter(Cart.user_id == user_id).first()
@@ -97,3 +98,54 @@ def update_cart_item(
     db.commit()
     db.refresh(item)
     return item
+
+def remove_cart_items_by_book_ids(
+    db: Session,
+    book_ids: List[str],
+    current_user=None,
+) -> int:
+    """
+    Remove all cart items that match the given book IDs
+    for the currently authenticated user.
+
+    This function is typically called after an order is successfully created,
+    to clear purchased or borrowed books from the user's cart.
+
+    Args:
+        db (Session): SQLAlchemy database session.
+        book_ids (List[str]): A list of book IDs to remove from the cart.
+        current_user: The currently authenticated user (automatically resolved).
+
+    Returns:
+        int: The number of deleted cart items.
+    Raises:
+        HTTPException: If the user's cart is not found.
+    """
+    # Validate user context
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="User context missing")
+
+    # 1. Retrieve the user's cart
+    cart = db.query(Cart).filter(Cart.user_id == current_user.user_id).first()
+    if not cart:
+        raise HTTPException(status_code=404, detail="Cart not found")
+
+    # 2. Find matching cart items
+    items_to_delete = (
+        db.query(CartItem)
+        .filter(
+            CartItem.cart_id == cart.cart_id,
+            CartItem.book_id.in_(book_ids)
+        )
+        .all()
+    )
+
+    if not items_to_delete:
+        return 0  # No matching items found — nothing to delete
+
+    # 3. Delete matching items and commit transaction
+    for item in items_to_delete:
+        db.delete(item)
+
+    db.commit()
+    return len(items_to_delete)

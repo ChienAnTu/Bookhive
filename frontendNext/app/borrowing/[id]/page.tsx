@@ -456,24 +456,17 @@ export default function OrderDetailPage() {
       <Card className="p-4">
         <h3 className="text-base font-semibold mb-3">Actions</h3>
         <div className="flex flex-wrap gap-2">
-          {isBorrower && order.status === "PENDING_PAYMENT" && (
-            <Button
-              className="bg-black text-white hover:bg-gray-800"
-              onClick={() => alert("TODO: Pay flow")}
-            >
-              Pay Now
-            </Button>
-          )}
-
           {isBorrower &&
-            (order.status === "BORROWING" || order.status === "OVERDUE") && (
+            (order.status === "BORROWING" ||
+              order.status === "RETURNED" ||
+              order.status === "OVERDUE") && (
               <Button
                 className="bg-black text-white hover:bg-gray-800"
-                onClick={() =>
-                  router.push(`/borrow/${order.id}/confirm-return`)
-                }
+                onClick={() => setShipModalOpen(true)}
               >
-                Return
+                {order.shippingReturnTrackingNumber
+                  ? "Update Return"
+                  : "Return"}
               </Button>
             )}
 
@@ -492,7 +485,7 @@ export default function OrderDetailPage() {
               className="bg-black text-white hover:bg-gray-800"
               onClick={() => setShipModalOpen(true)}
             >
-              {order.shippingOutTrackingNumber ? "Update Shipment" : "Ship"} 
+              {order.shippingOutTrackingNumber ? "Update Shipment" : "Ship"}
             </Button>
           )}
 
@@ -603,7 +596,11 @@ export default function OrderDetailPage() {
       <Modal
         isOpen={shipModalOpen}
         onClose={() => setShipModalOpen(false)}
-        title="Confirm Shipment"
+        title={
+          isOwner && order?.status === "PENDING_SHIPMENT"
+            ? "Confirm Outbound Shipment"
+            : "Confirm Return Shipment"
+        }
       >
         <div className="space-y-4">
           <div>

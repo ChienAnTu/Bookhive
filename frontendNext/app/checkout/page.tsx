@@ -13,7 +13,7 @@ import { getBookById } from "@/utils/books";
 import { getMyCheckouts, rebuildCheckout } from "@/utils/checkout";
 import { listServiceFees } from "@/utils/serviceFee";
 import { getShippingQuotes } from "@/utils/shipping";
-import { createOrder } from "@/utils/borrowingOrders";
+//import { createOrder } from "@/utils/borrowingOrders";
 
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
@@ -44,7 +44,7 @@ interface CheckoutItem {
   bookId: string;
   ownerId: string;
   titleOr: string;
-  actionType: "borrow" | "purchase";
+  actionType: "BORROW" | "PURCHASE";
   price?: number;
   deposit?: number;
   deliveryMethod?: "post" | "pickup" | "both";
@@ -53,57 +53,92 @@ interface CheckoutItem {
 }
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PK!);
-// Payment Confirm
-function PaymentConfirmForm({
-  clientSecret,
-  onSuccess,
-}: {
+
+type PaymentConfirmFormProps = {
   clientSecret: string;
-  onSuccess: () => void;
-}) {
+  onSuccess?: () => void;
+};
+
+// Payment Confirm
+function PaymentConfirmForm({ clientSecret, onSuccess }: PaymentConfirmFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || !ready) {
+      console.log("[confirm] blocked:", { hasStripe: !!stripe, hasElements: !!elements, ready });
+      return;
+    }
 
     setSubmitting(true);
     setErr(null);
 
-    const { error } = await stripe.confirmPayment({
+    console.log("[confirm] calling elements.submit()");
+    const { error: submitError } = await elements.submit();
+    console.log("[confirm] elements.submit result:", submitError);
+    if (submitError) {
+      setSubmitting(false);
+      setErr(submitError.message || "Please check your details.");
+      return;
+    }
+
+    console.log("[confirm] calling stripe.confirmPayment()");
+    const result = await stripe.confirmPayment({
       elements,
-      clientSecret,
+      // return_url 
       confirmParams: {
-        return_url:
-          typeof window !== "undefined"
-            ? `${window.location.origin}/checkout/success`
-            : undefined,
+        return_url: typeof window !== "undefined"
+          ? `${window.location.origin}/checkout/success`
+          : undefined,
       },
       redirect: "if_required",
     });
 
     setSubmitting(false);
 
-    if (error) setErr(error.message || "Payment failed");
-    else onSuccess();
+    console.log("[confirm] result:", result);
+
+    if (result.error) {
+      console.error("[confirm] error:", result.error);
+      setErr(result.error.message || "Payment failed");
+      return;
+    }
+
+    const pi = result.paymentIntent;
+    if (pi?.client_secret) {
+      localStorage.setItem("last_pi_client_secret", pi.client_secret);
+    }
+    if (pi?.id) {
+      localStorage.setItem("last_pi_id", pi.id);
+    }
+    onSuccess?.();
+
+    console.log("[confirm] success, PI:", { id: pi?.id, status: pi?.status });
   };
+
 
   return (
     <form onSubmit={handleConfirm} className="space-y-3">
-      <PaymentElement />
+      <PaymentElement
+        onReady={() => { setReady(true); console.log("[PaymentElement] ready"); }}
+        onChange={(ev) => { setReady(true); console.log("[PaymentElement] change", ev.complete); }}
+      />
       <button
         className="px-4 py-2 rounded-md bg-black text-white w-full"
-        disabled={!stripe || !elements || submitting}
+        disabled={!stripe || !elements || !ready || submitting}
       >
         {submitting ? "Processing..." : "Confirm Payment"}
+
       </button>
       {err && <p className="text-red-600 text-sm">{err}</p>}
     </form>
   );
 }
+
 
 
 export default function CheckoutPage() {
@@ -205,7 +240,7 @@ export default function CheckoutPage() {
       );
       setFullItems(results);
 
-      // 初始化 itemShipping
+      // initiate itemShipping
       const next: Record<string, DeliveryChoice | ""> = {};
       for (const b of results) {
         if (b.deliveryMethod === "post") {
@@ -378,22 +413,6 @@ export default function CheckoutPage() {
     });
   };
 
-  function validateCheckoutBeforePay(co: any): string | null {
-    const { contactName, phone, street, city, state, postcode } = co;
-    if (!contactName || !phone || !street || !city || !state || !postcode) {
-      return "Please complete your delivery address before paying.";
-    }
-    const invalidItems = co.items.filter((it: CheckoutItem) => !it.shippingMethod);
-    if (invalidItems.length > 0) return "Please select delivery/pickup for all items and save them.";
-    for (const it of co.items) {
-      if (it.shippingMethod === "post" && !it.shippingQuote) {
-        return "Please select delivery shipping quote.";
-      }
-    }
-    if (!co.totalDue || co.totalDue <= 0) return "Order total is invalid.";
-    return null;
-  }
-
 
   // initiate PaymentIntent，to get client_secret
   const startPayment = async () => {
@@ -410,20 +429,23 @@ export default function CheckoutPage() {
 
     const toCents = (n: number | undefined | null) =>
       Math.max(0, Math.round((n || 0) * 100));
-
+    console.log("[startPayment] currentUser.stripe_account_id =", (currentUser as any)?.stripe_account_id);
+    console.log("[startPayment] checkout[0] =", co);
     try {
       setPaying(true);
       const res = await initiatePayment({
         user_id: currentUser.id,
         amount: toCents(co.totalDue),
         currency: "aud",
+        purchase: toCents(co.bookFee), //purchase price
         deposit: toCents(co.deposit),
-        purchase: toCents(co.bookFee),
         shipping_fee: toCents(co.shippingFee),
         service_fee: toCents(co.serviceFee),
         checkout_id: co.checkoutId,
         lender_account_id: lenderAccountId,
       });
+      console.log("[initiatePayment] toCall:", res)
+
       setClientSecret(res.client_secret);
     } catch (e: any) {
       console.error("initiatePayment failed:", e?.response?.data || e);
@@ -432,75 +454,6 @@ export default function CheckoutPage() {
       setPaying(false);
     }
   };
-
-
-  const onPaymentSuccess = async () => {
-    try {
-      const checkoutId = currentCheckout?.checkoutId;
-      await createOrder(checkoutId);
-      router.push("/borrowing");
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.response?.data?.detail || "Create order failed");
-    }
-  };
-
-  // ---------- Place Order ----------
-  const placeOrder = async () => {
-    const checkoutToUse = checkouts[0];
-    console.log("[placeOrder] checkouts[0]:", checkouts[0]);
-    console.log("Checkout list:", checkouts)
-
-    if (!checkoutToUse) {
-      alert("No checkout found, please refresh.");
-      return;
-    }
-    console.log("[placeOrder] checkoutToUse:", checkoutToUse);
-
-    // check address
-    const { contactName, phone, street, city, state, postcode } = checkoutToUse;
-    if (!contactName || !phone || !street || !city || !state || !postcode) {
-      alert("Please complete your delivery address before placing the order.");
-      return;
-    }
-
-    // check item's delivery method
-    const invalidItems = checkoutToUse.items.filter((it: CheckoutItem) => !it.shippingMethod);
-    if (invalidItems.length > 0) {
-      alert("Please select delivery/pickup for all items and save them.");
-      return;
-    }
-
-    // if choose delivery，must get shipping quotes
-    for (const it of checkoutToUse.items) {
-      if (it.shippingMethod === "post" && !it.shippingQuote) {
-        alert("Please select delivery shipping quote.");
-        return;
-      }
-    }
-
-    // check amount
-    if (!checkoutToUse.totalDue || checkoutToUse.totalDue <= 0) {
-      alert("Order total is invalid.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const checkoutId = currentCheckout?.checkoutId;
-      const result = await createOrder(checkoutId);
-      console.log("Order created:", result);
-
-      alert(`Order placed! Total due: $${checkoutToUse.totalDue}`);
-      router.push(`/borrowing`);
-    } catch (err: any) {
-      console.error("Failed to place order:", err);
-      alert(err.response?.data?.detail || "Failed to place order");
-    } finally {
-      setLoading(false);
-    }
-  };
-
 
 
   // ---------- When Empty ----------
@@ -576,7 +529,7 @@ export default function CheckoutPage() {
                             <div className="font-medium">
                               《{b.titleOr}》
                               <span className="text-sm text-blue-600">
-                                Trading Way: {b.actionType === "borrow" ? "Borrow" : "Purchase"}
+                                Trading Way: {b.actionType === "BORROW" ? "Borrow" : "Purchase"}
                               </span>
                             </div>
                           </div>
@@ -721,12 +674,26 @@ export default function CheckoutPage() {
           </Button>
         </div>
       ) : (
-        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { labels: "floating" }, loader: "auto" }}>
+        <Elements
+          key={clientSecret}
+          stripe={stripePromise}
+          options={{ clientSecret, appearance: { labels: "floating" }, loader: "auto" }}
+        >
           <div className="p-4 rounded-md border">
-            <PaymentConfirmForm clientSecret={clientSecret} onSuccess={onPaymentSuccess} />
+            <PaymentConfirmForm
+              clientSecret={clientSecret}
+              onSuccess={() => {
+                // 保底：也把最近一次 PI 放到本地，success 页可读取
+                const id = localStorage.getItem("last_pi_id") || "";
+                window.location.href = `/checkout/success${id ? `?payment_intent=${id}` : ""}`;
+                // 或者：router.push("/checkout/success")
+              }}
+            />
           </div>
         </Elements>
+
       )}
+
 
     </div>
   );
