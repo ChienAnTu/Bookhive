@@ -61,6 +61,7 @@ export default function OrderDetailPage() {
   const [shipModalOpen, setShipModalOpen] = useState(false); // control if Modal should display
   const [trackingNumber, setTrackingNumber] = useState(""); // input tracking number
   const [carrier, setCarrier] = useState("AUSPOST"); // default carrier="AUSPOST"
+  const [confirmReceiveModalOpen, setConfirmReceiveModalOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -184,6 +185,38 @@ export default function OrderDetailPage() {
       return;
     }
     router.push(path);
+  };
+
+  const handleConfirmReceive = async (orderId: string) => {
+    try {
+      const token = getToken();
+      if (!token) {
+        toast.error("Please login first");
+        router.push("/auth");
+        return;
+      }
+
+      const res = await fetch(
+        `${getApiUrl()}/api/v1/orders/${orderId}/owner-confirm-received`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to confirm receive");
+
+      toast.success("Book received successfully");
+
+      const updatedOrder = await fetchOrderDetails(orderId);
+      if (updatedOrder) setOrder(updatedOrder);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to confirm receive");
+    }
   };
 
   const handleConfirmShipment = async () => {
@@ -533,6 +566,14 @@ export default function OrderDetailPage() {
               Login to View Actions
             </Button>
           )}
+          {isOwner && order.status === "RETURNED" && (
+            <Button
+              className="bg-green-600 text-white hover:bg-green-700"
+              onClick={() => setConfirmReceiveModalOpen(true)}
+            >
+              Confirm Receive Book
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -635,6 +676,35 @@ export default function OrderDetailPage() {
             <Button
               onClick={handleConfirmShipment}
               disabled={!trackingNumber.trim()}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={confirmReceiveModalOpen}
+        onClose={() => setConfirmReceiveModalOpen(false)}
+        title="Confirm Receive Book"
+      >
+        <div className="space-y-4">
+          <p>
+            Are you sure you have received the returned books? This action will
+            mark the order as COMPLETED and trigger refund if applicable.
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmReceiveModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                handleConfirmReceive(order!.id);
+                setConfirmReceiveModalOpen(false);
+              }}
             >
               Confirm
             </Button>

@@ -487,6 +487,17 @@ class OrderService:
                 default=20
             )
             order.due_at = order.start_at + timedelta(days=max_lending_days)
+
+            # implement distribute shipping fee function
+            try:
+                payment_id = order.payment_id
+                if payment_id:
+                    data = {"lender_account_id": order.owner.stripe_account_id}
+                    from services.payment_gateway_service import distribute_shipping_fee
+                    distribute_shipping_fee(payment_id, data, db=db)
+            except Exception as e:
+                print(f"[WARN] distribute_shipping_fee failed: {e}")
+                
             
         elif order.status in ["BORROWING", "OVERDUE"]:
             # Return: only borrower can confirm
@@ -617,8 +628,8 @@ class OrderService:
         count = 0
         for order in orders:
             # Calculate expected delivery date: returned_at + estimated_delivery_time
-            delivery_time = order.estimated_delivery_time or 3
-            expected_delivery = order.returned_at + timedelta(days=delivery_time)
+            delivery_time = order.estimated_delivery_time or 7
+            expected_delivery = order.returned_at + timedelta(days=delivery_time + 10) # 10 more days
             
             if now >= expected_delivery:
                 order.status = "COMPLETED"
@@ -628,3 +639,33 @@ class OrderService:
         db.commit()
         return count
     
+    @staticmethod
+    def owner_confirm_received(db: Session, order_id: str, current_user: User) -> bool:
+        """
+        Owner manually confirms that returned books are received
+        """
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        if order.status != "RETURNED":
+            raise HTTPException(status_code=400, detail="Order is not in RETURNED status")
+        
+        if order.owner_id != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Only owner can confirm received books")
+        
+        # Upate order status
+        order.status = "COMPLETED"
+        order.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(order)
+
+        # Trigger refund
+        if order.payment_id:
+            try:
+                refund_data = {"reason": "Books returned and received"}
+                from services.payment_gateway_service import refund_payment
+                refund_payment(order.payment_id, refund_data, db=db)
+            except Exception as e:
+                print(f"[WARN] refund_payment failed: {e}")  
+        return True
