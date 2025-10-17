@@ -109,3 +109,13 @@ def confirm_shipment(
     )
     if success:
         return {"message": "Shipment confirmed successfully"}
+    
+@router.put("/{order_id}/owner-confirm-received", status_code=status.HTTP_200_OK)
+def owner_confirm_received(
+    order_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    success = OrderService.owner_confirm_received(db, order_id, current_user)
+    if success:
+        return {"message": "Order marked as COMPLETED and refund triggered if applicable"}
