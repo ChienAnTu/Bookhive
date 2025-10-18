@@ -10,7 +10,8 @@ import {
   CheckCircle,
   XCircle,
   Plus,
-  Calendar
+  Calendar,
+  Search
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -24,6 +25,7 @@ import {
 } from "@/utils/complaints";
 import { getOrderById } from "@/utils/borrowingOrders";
 import { createPaymentDispute } from "@/utils/payments";
+import { uploadFile } from "@/utils/books";
 
 
 const ComplainPage: React.FC = () => {
@@ -42,6 +44,8 @@ const ComplainPage: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userCache, setUserCache] = useState<Record<string, User>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [evidenceFiles, setEvidenceFiles] = useState<{ file: File; url: string }[]>([]);
 
 
   useEffect(() => {
@@ -123,6 +127,36 @@ const ComplainPage: React.FC = () => {
     return "Unknown";
   };
 
+  // Handle evidence file uploads
+  const handleEvidenceFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    try {
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          if (file.size > 2 * 1024 * 1024) {
+            alert("File size cannot exceed 2MB");
+            return null;
+          }
+          const url = await uploadFile(file, "complaint");
+          return { file, url };
+        })
+      );
+
+      const valid = uploaded.filter((f): f is { file: File; url: string } => f !== null);
+      setEvidenceFiles((prev) => [...prev, ...valid]);
+    } catch (err) {
+      console.error("Evidence file upload failed:", err);
+      alert("Failed to upload files. Please try again.");
+    }
+  };
+
+  // Remove evidence file
+  const handleRemoveEvidenceFile = (index: number) => {
+    setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const determineRespondentId = async (orderId: string, currentUserId: string) => {
   try {
     const order = await getOrderById(orderId);
@@ -201,6 +235,7 @@ const ComplainPage: React.FC = () => {
     }
     setIsCreateModalOpen(false);
     setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
+    setEvidenceFiles([]);
 
     console.log("Complaint flow completed successfully.");
   } catch (error) {
@@ -242,6 +277,36 @@ const ComplainPage: React.FC = () => {
     }
   };
 
+  // Filter complaints based on search query
+  const filteredComplaints = complaints.filter((complaint) => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const subject = complaint.subject?.toLowerCase() || "";
+    const description = complaint.description?.toLowerCase() || "";
+    const status = complaint.status?.toLowerCase() || "";
+    const orderId = complaint.orderId?.toLowerCase() || "";
+
+    // Get user names from cache
+    const complainantName = userCache[complaint.complainantId]
+      ? [userCache[complaint.complainantId].firstName, userCache[complaint.complainantId].lastName]
+          .filter(Boolean).join(" ").toLowerCase()
+      : "";
+    const respondentName = userCache[complaint.respondentId]
+      ? [userCache[complaint.respondentId].firstName, userCache[complaint.respondentId].lastName]
+          .filter(Boolean).join(" ").toLowerCase()
+      : "";
+
+    return (
+      subject.includes(query) ||
+      description.includes(query) ||
+      status.includes(query) ||
+      orderId.includes(query) ||
+      complainantName.includes(query) ||
+      respondentName.includes(query)
+    );
+  });
+
   if (isLoading) {
     return (
       <div className="flex-1 bg-gray-50 py-8 flex items-center justify-center">
@@ -267,6 +332,20 @@ const ComplainPage: React.FC = () => {
               <Plus className="w-4 h-4 mr-2" />
               New Complaint
             </Button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search complaints by subject, description, status, order ID, or user..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
         </div>
 
@@ -320,7 +399,7 @@ const ComplainPage: React.FC = () => {
 
         <Card className="shadow-sm">
           <h2 className="text-xl font-semibold mb-4">
-            Your Complaints
+            Complaints
           </h2>
 
           {complaints.length === 0 ? (
@@ -328,9 +407,14 @@ const ComplainPage: React.FC = () => {
               <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No complaints submitted yet</p>
             </div>
+          ) : filteredComplaints.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No complaints match your search</p>
+            </div>
           ) : (
             <div className="space-y-4">
-              {complaints.map((complaint) => (
+              {filteredComplaints.map((complaint) => (
                 <Card
                   key={complaint.id}
                   className="relative border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
@@ -448,6 +532,53 @@ const ComplainPage: React.FC = () => {
                     placeholder="Please provide detailed information about your complaint..."
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Evidence Images (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    id="evidence-upload"
+                    accept="image/*"
+                    multiple
+                    onChange={handleEvidenceFiles}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("evidence-upload")?.click()}
+                  >
+                    Upload Evidence
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Upload images to support your complaint (max 2MB per file)
+                  </p>
+
+                  {/* Preview evidence images */}
+                  {evidenceFiles.length > 0 && (
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      {evidenceFiles.map((f, i) => (
+                        <div key={i} className="relative">
+                          <img
+                            src={f.url || (f.file ? URL.createObjectURL(f.file) : "")}
+                            alt={`Evidence ${i + 1}`}
+                            className="h-20 w-20 object-cover rounded border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEvidenceFile(i)}
+                            className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-700"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">
@@ -456,6 +587,7 @@ const ComplainPage: React.FC = () => {
                   onClick={() => {
                     setIsCreateModalOpen(false);
                     setNewComplaint({ type: "other", subject: "", description: "", orderId: "", respondentId: "" });
+                    setEvidenceFiles([]);
                   }}
                   disabled={isSubmitting}
                 >

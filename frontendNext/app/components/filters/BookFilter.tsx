@@ -1,7 +1,8 @@
 // app/components/filters/BookFilter.tsx
-import React, { useState } from "react";
-import { X, BookOpen, Globe, Package, Tag, Filter } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, BookOpen, Globe, Package, Tag, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { Book } from "@/app/types/book";
+import { getFilterOptions } from "@/utils/books";
 
 export interface BookFilters {
   category: string;
@@ -25,49 +26,46 @@ const BookFilter: React.FC<BookFilterProps> = ({
   className = "",
 }) => {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [allLanguages, setAllLanguages] = useState<string[]>([]);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showAllLanguages, setShowAllLanguages] = useState(false);
 
-  // Extract unique categories and languages from books data
-  const allCategories = [...new Set(books.map((book) => book.category))];
-  const allLanguages = [...new Set(books.map((book) => book.originalLanguage))];
+  // Fetch all categories and languages from database
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      const options = await getFilterOptions();
+      setAllCategories(options.categories);
+      setAllLanguages(options.languages);
+    };
+    fetchFilterOptions();
+  }, []);
+
+  // Extract tags from books data for display
   const allTags = [...new Set(books.flatMap((book) => book.tags ?? []))];
-
-  // Count frequency of each category, language, and tags
-  const categoryCount = allCategories.map((category) => ({
-    name: category,
-    count: books.filter((book) => book.category === category).length,
-  }));
-
-  const languageCount = allLanguages.map((language) => ({
-    name: language,
-    count: books.filter((book) => book.originalLanguage === language).length,
-  }));
-
   const tagsCount = allTags.map((tags) => ({
     name: tags,
-    count: books.filter((book) => book.tags?.includes(tags)).length, // Prevent undefined
+    count: books.filter((book) => book.tags?.includes(tags)).length,
   }));
-
-  // Sort by frequency (most common first) and take top 5
-  const topCategories = categoryCount
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-    .map((item) => item.name);
-
-  const topLanguages = languageCount
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-    .map((item) => item.name);
-
   const topTags = tagsCount
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
     .map((item) => item.name);
 
+  // Show limited or all items
+  const INITIAL_DISPLAY_COUNT = 5;
+  const displayedCategories = showAllCategories
+    ? allCategories
+    : allCategories.slice(0, INITIAL_DISPLAY_COUNT);
+  const displayedLanguages = showAllLanguages
+    ? allLanguages
+    : allLanguages.slice(0, INITIAL_DISPLAY_COUNT);
+
   // Delivery method options with clear labels
   const deliveryOptions = [
     { value: "", label: "All Methods" },
     { value: "post", label: "Post" },
-    { value: "self-help", label: "Pickup" },
+    { value: "pickup", label: "Pickup" },
   ];
 
   // Calculate the number of active filters for UI feedback
@@ -109,7 +107,7 @@ const BookFilter: React.FC<BookFilterProps> = ({
           >
             All Categories
           </button>
-          {topCategories.map((category) => (
+          {displayedCategories.map((category) => (
             <button
               key={category}
               onClick={() => {
@@ -124,6 +122,19 @@ const BookFilter: React.FC<BookFilterProps> = ({
               {category}
             </button>
           ))}
+          {allCategories.length > INITIAL_DISPLAY_COUNT && (
+            <button
+              onClick={() => setShowAllCategories(!showAllCategories)}
+              className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50 flex items-center justify-between"
+            >
+              <span>{showAllCategories ? "Show Less" : `Show All (${allCategories.length})`}</span>
+              {showAllCategories ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -146,7 +157,7 @@ const BookFilter: React.FC<BookFilterProps> = ({
           >
             All Languages
           </button>
-          {topLanguages.map((lang) => (
+          {displayedLanguages.map((lang) => (
             <button
               key={lang}
               onClick={() => {
@@ -161,8 +172,19 @@ const BookFilter: React.FC<BookFilterProps> = ({
               {lang}
             </button>
           ))}
-
-
+          {allLanguages.length > INITIAL_DISPLAY_COUNT && (
+            <button
+              onClick={() => setShowAllLanguages(!showAllLanguages)}
+              className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50 flex items-center justify-between"
+            >
+              <span>{showAllLanguages ? "Show Less" : `Show All (${allLanguages.length})`}</span>
+              {showAllLanguages ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 

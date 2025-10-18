@@ -173,6 +173,9 @@ export default function CheckoutPage() {
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [showDonationModal, setShowDonationModal] = useState(false);
+  const [donationAmount, setDonationAmount] = useState<string>("");
+  const [deliveryMethodSaved, setDeliveryMethodSaved] = useState(false);
 
 
   // 1. load current user, fill address info
@@ -401,6 +404,7 @@ export default function CheckoutPage() {
     console.log("[saveDeliveryMethod] calling requestQuotes...");
 
     await requestQuotes();
+    setDeliveryMethodSaved(true);
     alert("Delivery methods saved!");
   };
 
@@ -411,11 +415,13 @@ export default function CheckoutPage() {
       const next = { ...prev, [bookId]: value };
       return next;
     });
+    // Mark delivery as unsaved when user changes selection
+    setDeliveryMethodSaved(false);
   };
 
 
   // initiate PaymentIntent，to get client_secret
-  const startPayment = async () => {
+  const startPayment = async (donation: number = 0) => {
     const co = checkouts[0];
     if (!co || !currentUser) return;
 
@@ -431,28 +437,87 @@ export default function CheckoutPage() {
       Math.max(0, Math.round((n || 0) * 100));
     console.log("[startPayment] currentUser.stripe_account_id =", (currentUser as any)?.stripe_account_id);
     console.log("[startPayment] checkout[0] =", co);
+    console.log("[startPayment] donation =", donation);
+
+    const totalAmount = co.totalDue + donation;
+
     try {
       setPaying(true);
       const res = await initiatePayment({
         user_id: currentUser.id,
-        amount: toCents(co.totalDue),
+        amount: toCents(totalAmount),
         currency: "aud",
-        purchase: toCents(co.bookFee), //purchase price
+        purchase: toCents(co.bookFee),
         deposit: toCents(co.deposit),
         shipping_fee: toCents(co.shippingFee),
         service_fee: toCents(co.serviceFee),
+        donation: toCents(donation),
         checkout_id: co.checkoutId,
         lender_account_id: lenderAccountId,
       });
       console.log("[initiatePayment] toCall:", res)
 
       setClientSecret(res.client_secret);
+      setShowDonationModal(false);
     } catch (e: any) {
       console.error("initiatePayment failed:", e?.response?.data || e);
       alert(e?.response?.data?.detail || "Failed to initiate payment");
     } finally {
       setPaying(false);
     }
+  };
+
+  const handleCheckout = () => {
+    // Validate address fields
+    const co = checkouts[0];
+    if (!co) return;
+
+    const requiredFields = [
+      { field: 'contactName', label: 'Full Name' },
+      { field: 'phone', label: 'Phone Number' },
+      { field: 'street', label: 'Street Address' },
+      { field: 'city', label: 'City' },
+      { field: 'state', label: 'State' },
+      { field: 'postcode', label: 'Postcode' }
+    ];
+
+    const missingFields = requiredFields.filter(({ field }) => !co[field]?.trim());
+
+    if (missingFields.length > 0) {
+      const fieldNames = missingFields.map(({ label }) => label).join(', ');
+      alert(`Please fill in the following required fields: ${fieldNames}`);
+      return;
+    }
+
+    // Check if address is being edited
+    if (isEditing) {
+      alert("Please save your delivery address before checkout.");
+      return;
+    }
+
+    // Validate delivery methods are selected
+    const unselected = items.filter((b) => !itemShipping[b.bookId]);
+    if (unselected.length > 0) {
+      alert("Please select delivery method for all items before checkout.");
+      return;
+    }
+
+    // Check if delivery methods have been saved
+    if (!deliveryMethodSaved) {
+      alert("Please save your delivery methods by clicking the 'Save Delivery Method' button.");
+      return;
+    }
+
+    setShowDonationModal(true);
+  };
+
+  const handleDonationSubmit = () => {
+    const donation = parseFloat(donationAmount) || 0;
+    if (donation < 0) {
+      alert("Donation amount cannot be negative");
+      return;
+    }
+    startPayment(donation);
   };
 
 
@@ -656,9 +721,17 @@ export default function CheckoutPage() {
             <span>Platform Service Fees (10%)</span>
             <span>${checkouts[0]?.serviceFee?.toFixed(2) || "0.00"}</span>
           </div>
+          {donationAmount && parseFloat(donationAmount) > 0 && (
+            <div className="flex justify-between text-sm text-green-600 font-medium">
+              <span>Donation (Thank you! ❤️)</span>
+              <span>${parseFloat(donationAmount).toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-lg font-bold border-t pt-2">
-            <span>Total Due</span>
-            <span>${checkouts[0]?.totalDue?.toFixed(2) || "0.00"}</span>
+            <span>Total {donationAmount && parseFloat(donationAmount) > 0 ? "to Pay" : "Due"}</span>
+            <span>
+              ${((checkouts[0]?.totalDue || 0) + (parseFloat(donationAmount) || 0)).toFixed(2)}
+            </span>
           </div>
           <p className="text-xs text-gray-500">
             Deposits may be refundable upon return. Shipping is charged per owner based on your selected quote.
@@ -669,8 +742,8 @@ export default function CheckoutPage() {
       {/* Summary 卡片后面 */}
       {!clientSecret ? (
         <div className="flex justify-end">
-          <Button className="bg-black text-white" onClick={startPayment} disabled={paying}>
-            {paying ? "Preparing..." : "Pay Now"}
+          <Button className="bg-black text-white" onClick={handleCheckout} disabled={paying}>
+            {paying ? "Preparing..." : "Checkout"}
           </Button>
         </div>
       ) : (
@@ -694,6 +767,95 @@ export default function CheckoutPage() {
 
       )}
 
+      {/* Donation Modal */}
+      {showDonationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold mb-4">Support BookBorrow</h2>
+            <p className="text-gray-600 mb-4">
+              Would you like to make a donation to support our platform? Your contribution helps us maintain and improve BookBorrow for the community.
+            </p>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Donation Amount (Optional)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={donationAmount}
+                  onChange={(e) => setDonationAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Enter any amount you'd like to donate (leave empty for no donation)
+              </p>
+            </div>
+
+            {/* Quick donation buttons */}
+            <div className="mb-6">
+              <p className="text-sm font-medium text-gray-700 mb-2">Quick select:</p>
+              <div className="flex gap-2">
+                {[5, 10, 20, 50].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setDonationAmount(amount.toString())}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+                  >
+                    ${amount}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-4 mb-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span>Order Total</span>
+                <span>${checkouts[0]?.totalDue?.toFixed(2) || "0.00"}</span>
+              </div>
+              {donationAmount && parseFloat(donationAmount) > 0 && (
+                <div className="flex justify-between text-sm text-green-600 mb-2">
+                  <span>Donation</span>
+                  <span>+${parseFloat(donationAmount).toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <span>Total to Pay</span>
+                <span>
+                  ${((checkouts[0]?.totalDue || 0) + (parseFloat(donationAmount) || 0)).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDonationModal(false);
+                  setDonationAmount("");
+                }}
+                disabled={paying}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDonationSubmit}
+                disabled={paying}
+                className="flex-1 bg-black text-white"
+              >
+                {paying ? "Processing..." : "Pay Now"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

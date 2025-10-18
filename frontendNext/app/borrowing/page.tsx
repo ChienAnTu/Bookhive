@@ -3,12 +3,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Package, Clock, AlertTriangle } from "lucide-react";
+import { Search, Filter, Package, Clock, AlertTriangle, ArrowDownCircle, ArrowUpCircle, User as UserIcon } from "lucide-react";
 import CoverImg from "../components/ui/CoverImg";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import type { OrderStatus } from "@/app/types/order";
 import { getBorrowingOrders, type Order } from "@/utils/borrowingOrders";
+import { getCurrentUser } from "@/utils/auth";
 
 const STATUS_META: Record<OrderStatus, { label: string; className: string }> = {
   PENDING_PAYMENT: { label: "Pending Payment", className: "text-amber-600" },
@@ -26,14 +27,40 @@ export default function OrderListPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [search, setSearch] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [usersCache, setUsersCache] = useState<Record<string, any>>({});
   const router = useRouter();
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const apiOrders = await getBorrowingOrders();
+        const [apiOrders, user] = await Promise.all([
+          getBorrowingOrders(),
+          getCurrentUser()
+        ]);
         setOrders(apiOrders);
+        setCurrentUserId(user?.id || null);
+
+        // Fetch user details for all unique user IDs
+        const userIds = new Set<string>();
+        apiOrders.forEach(order => {
+          if (order.borrower_id) userIds.add(order.borrower_id);
+          if (order.owner_id) userIds.add(order.owner_id);
+        });
+
+        // Fetch all users in parallel
+        const { getUserById } = await import("@/utils/auth");
+        const userPromises = Array.from(userIds).map(id => getUserById(id));
+        const users = await Promise.all(userPromises);
+
+        // Build users cache
+        const cache: Record<string, any> = {};
+        users.forEach(u => {
+          if (u) cache[u.id] = u;
+        });
+        setUsersCache(cache);
+
       } catch (error) {
         console.error("Failed to load orders:", error);
         setError("Failed to load orders. Please try again.");
@@ -217,24 +244,72 @@ export default function OrderListPage() {
                         <div>
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             {/* Title */}
-                            <div>
-                              <h3
-                                className="text-lg font-semibold text-black cursor-pointer hover:underline"
-                                onClick={() =>
-                                  router.push(`/borrowing/${order.order_id}`)
-                                }
-                                title={order.books
-                                  .map((b) => b.title)
-                                  .join(" · ")}
-                              >
-                                {firstBook?.title || "Untitled Book"}
-                                {extra > 0 && (
-                                  <span className="text-gray-500">
-                                    {" "}
-                                    + {extra} more
-                                  </span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3
+                                  className="text-lg font-semibold text-black cursor-pointer hover:underline"
+                                  onClick={() =>
+                                    router.push(`/borrowing/${order.order_id}`)
+                                  }
+                                  title={order.books
+                                    .map((b) => b.title)
+                                    .join(" · ")}
+                                >
+                                  {firstBook?.title || "Untitled Book"}
+                                  {extra > 0 && (
+                                    <span className="text-gray-500">
+                                      {" "}
+                                      + {extra} more
+                                    </span>
+                                  )}
+                                </h3>
+                                {/* Lent Out / Borrowed Tag */}
+                                {currentUserId && (
+                                  order.owner_id === currentUserId ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                      <ArrowUpCircle className="w-3 h-3" />
+                                      Lent Out
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                      <ArrowDownCircle className="w-3 h-3" />
+                                      Borrowed In
+                                    </span>
+                                  )
                                 )}
-                              </h3>
+                              </div>
+
+                              {/* User Info - Show borrower if lent out, owner if borrowed */}
+                              {currentUserId && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <UserIcon className="w-4 h-4" />
+                                  {order.owner_id === currentUserId ? (
+                                    // Lent out - show borrower
+                                    usersCache[order.borrower_id] && (
+                                      <span>
+                                        Borrower:{" "}
+                                        <span className="font-medium text-gray-800">
+                                          {usersCache[order.borrower_id].name ||
+                                           usersCache[order.borrower_id].username ||
+                                           "Unknown"}
+                                        </span>
+                                      </span>
+                                    )
+                                  ) : (
+                                    // Borrowed - show owner
+                                    usersCache[order.owner_id] && (
+                                      <span>
+                                        Owner:{" "}
+                                        <span className="font-medium text-gray-800">
+                                          {usersCache[order.owner_id].name ||
+                                           usersCache[order.owner_id].username ||
+                                           "Unknown"}
+                                        </span>
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              )}
                             </div>
 
                             {/* Status */}

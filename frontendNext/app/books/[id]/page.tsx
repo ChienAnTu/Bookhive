@@ -9,6 +9,7 @@ import { Star, MapPin, Clock, Share2, MessageCircle, Package, Shield, ShoppingBa
 import Card from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
+import CoverImg from "@/app/components/ui/CoverImg";
 import { calculateDistance } from "@/app/data/mockData";
 import { sendMessage } from "@/utils/messageApi";
 
@@ -129,13 +130,13 @@ const [ownerRating, setOwnerRating] = useState<RatingStats>({
   const getDeliveryLabel = (method: string) => {
     switch (method) {
       case "both":
-        return "Pickup and Post";
+        return "Pickup or Post";
       case "post":
         return "Post";
-      case "self-help":
+      case "pickup":
         return "Pickup";
       default:
-        return "Pickup and Post";
+        return "Pickup or Post";
     }
   };
 
@@ -182,15 +183,41 @@ const [ownerRating, setOwnerRating] = useState<RatingStats>({
     }
   };
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: book.titleOr,
-        text: `Check out "${book.titleOr}" by ${book.author} on BookBorrow`,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (!book) {
+      toast.error("Book information not available");
+      return;
+    }
+
+    const shareData = {
+      title: book.titleOr || "Book on BookBorrow",
+      text: `Check out "${book.titleOr}" by ${book.author} on BookBorrow${book.canRent ? ' - Available for borrowing' : ''}${book.canSell ? ' - Available for purchase' : ''}`,
+      url: window.location.href,
+    };
+
+    try {
+      // Try using the Web Share API (works on mobile and some desktop browsers)
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        toast.success("Shared successfully!");
+      } else {
+        // Fallback: Copy link to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Link copied to clipboard!");
+      }
+    } catch (error: any) {
+      // User cancelled share or other error
+      if (error.name !== 'AbortError') {
+        console.error('Error sharing:', error);
+        // Try fallback to clipboard as last resort
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          toast.success("Link copied to clipboard!");
+        } catch (clipboardError) {
+          console.error('Clipboard error:', clipboardError);
+          toast.error("Failed to share. Please copy the URL manually.");
+        }
+      }
     }
   };
 
@@ -212,22 +239,7 @@ const [ownerRating, setOwnerRating] = useState<RatingStats>({
               {/* cover img */}
               <Card padding={false} className="overflow-hidden">
                 <div className="aspect-[3/4] w-full">
-                  {book.coverImgUrl ? (
-                    <img
-                      src={book.coverImgUrl}
-                      alt={book.titleOr}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-6xl mb-4"></div>
-                        <div className="text-sm text-gray-500 font-medium px-4">
-                          {book.titleOr}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <CoverImg src={book.coverImgUrl} title={book.titleOr} />
                 </div>
 
                 {/* Request This Book */}
@@ -302,6 +314,11 @@ const [ownerRating, setOwnerRating] = useState<RatingStats>({
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
                       {book.titleOr}
                     </h1>
+                    {book.titleEn && book.titleEn !== book.titleOr && (
+                      <p className="text-lg text-gray-500 italic mb-2">
+                        {book.titleEn}
+                      </p>
+                    )}
                     <p className="text-xl text-gray-600 mb-4">by {book.author}</p>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getConditionColor(book.condition)}`}>

@@ -138,8 +138,8 @@ class BookService:
     # ---------- Search ----------
     @staticmethod
     def search_books(
-        db: Session, *, q: Optional[str], lang: Optional[str], status: str,
-        can_rent: Optional[bool], can_sell: Optional[bool],
+        db: Session, *, q: Optional[str], lang: Optional[str], category: Optional[str],
+        status: str, can_rent: Optional[bool], can_sell: Optional[bool],
         delivery: Optional[str], min_price: Optional[float], max_price: Optional[float],
         sort: Literal["relevance","newest","price_asc","price_desc"],
         page: int, page_size: int
@@ -176,6 +176,10 @@ class BookService:
         # Language
         if lang:
             stmt = stmt.where(Book.original_language == lang)
+
+        # Category
+        if category:
+            stmt = stmt.where(Book.category == category)
 
         # For lend / For sell
         if can_rent is not None:
@@ -240,3 +244,24 @@ class BookService:
                 "createdAt": b.date_added,
             }
         return [to_read(b) for b in rows], total
+
+    # ---------- Get Filter Options ----------
+    @staticmethod
+    def get_filter_options(db: Session) -> Dict[str, List[str]]:
+        """Get all unique categories and languages from books with 'listed' status."""
+        # Get unique categories from listed books only
+        categories_stmt = select(Book.category).distinct().where(
+            and_(Book.category.isnot(None), Book.status == "listed")
+        )
+        categories = db.execute(categories_stmt).scalars().all()
+
+        # Get unique languages from listed books only
+        languages_stmt = select(Book.original_language).distinct().where(
+            and_(Book.original_language.isnot(None), Book.status == "listed")
+        )
+        languages = db.execute(languages_stmt).scalars().all()
+
+        return {
+            "categories": sorted([c for c in categories if c]),
+            "languages": sorted([l for l in languages if l])
+        }

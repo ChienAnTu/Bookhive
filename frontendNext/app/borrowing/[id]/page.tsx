@@ -10,6 +10,7 @@ import Button from "@/app/components/ui/Button";
 import Modal from "@/app/components/ui/Modal";
 import { toast } from "sonner";
 import { getApiUrl, getToken, getCurrentUser } from "@/utils/auth";
+import { getReviewsByOrder } from "@/utils/review";
 
 import type { OrderStatus, ApiOrder } from "@/app/types/order";
 import type { User } from "@/app/types/user";
@@ -56,6 +57,7 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [hasReviewedOtherParty, setHasReviewedOtherParty] = useState(false);
 
   // useState for shipping
   const [shipModalOpen, setShipModalOpen] = useState(false); // control if Modal should display
@@ -78,6 +80,20 @@ export default function OrderDetailPage() {
 
         if (orderData) {
           setOrder(orderData);
+
+          // Check if current user has already reviewed the other party in this order
+          if (userData) {
+            try {
+              const reviews = await getReviewsByOrder(id);
+              // Check if current user has written a review for this order
+              const userReview = reviews.find(
+                (review: any) => review.reviewerId === userData.id
+              );
+              setHasReviewedOtherParty(!!userReview);
+            } catch (err) {
+              console.error("Failed to check reviews:", err);
+            }
+          }
         } else {
           setError("Failed to load order details");
         }
@@ -547,7 +563,7 @@ export default function OrderDetailPage() {
               </Button>
             )}
 
-          {order.status === "COMPLETED" && (
+          {order.status === "COMPLETED" && !hasReviewedOtherParty && (
             <Button
               className="bg-black text-white hover:bg-gray-800"
               onClick={() =>
