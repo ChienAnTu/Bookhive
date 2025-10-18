@@ -65,7 +65,7 @@ export const getMyCart = async () => {
   if (!token) throw new Error("No auth token");
   const API_URL = getApiUrl();
 
-  const res = await axios.get(`${API_URL}/api/v1/cart`, {
+  const res = await axios.get(`${API_URL}/api/v1/cart/`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.data;
