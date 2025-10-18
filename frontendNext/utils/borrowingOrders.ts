@@ -9,12 +9,16 @@ export type Order = {
   status: OrderStatus;
   total_paid_amount: number;
   books: Array<{
+    id: string;
     title: string;
     cover?: string;
     author?: string;
   }>;
   create_at: string;
   due_at: string | null;
+  completed_at: string | null;
+  owner_id: string;
+  borrower_id: string;
 };
 
 export async function createOrder(checkoutId: string) {
@@ -53,6 +57,27 @@ export async function getOrderById(orderId: string) {
   return res.data;
 }
 
+
+// Get orders by book ID
+export async function getOrdersByBookId(bookId: string): Promise<Order[]> {
+  const token = getToken();
+  const response = await axios.get(`${API_URL}/api/v1/orders/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  // Filter orders that contain this book
+  const allOrders: Order[] = response.data;
+  const filtered = allOrders.filter(order =>
+    order.books && order.books.some((book) => book.id === bookId)
+  );
+
+  console.log('Book ID:', bookId);
+  console.log('All orders:', allOrders.length);
+  console.log('Filtered orders:', filtered.length);
+  console.log('Sample order books:', allOrders[0]?.books);
+
+  return filtered;
+}
 
 // Alias functions for different contexts
 export const getOrders = listMyOrders;

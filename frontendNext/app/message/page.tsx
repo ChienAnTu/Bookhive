@@ -375,7 +375,7 @@ export default function MessagesPage() {
         <div className="overflow-y-auto h-[calc(100vh-5rem)]">
           {threads.map((thread) => (
             <Card
-              key={thread.user.email}
+              key={thread.id || `thread-${thread.user.email}`}
               className={`m-2 cursor-pointer transition-colors ${
                 selectedThread?.user.email === thread.user.email
                   ? "bg-gray-100 ring-2 ring-gray-300 ring-offset-1"

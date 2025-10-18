@@ -236,10 +236,17 @@ class OrderService:
                 )
                 db.add(order_book)
 
-                # Update book status to 'unlisted'
+                # Update book status based on action type
                 book = db.query(Book).filter(Book.id == item.book_id).first()
                 if book:
-                    book.status = "unlisted"
+                    # For borrow/rent: set to 'lent'
+                    # For purchase: set to 'sold'
+                    if order.action_type == "borrow":
+                        book.status = "lent"
+                    elif order.action_type == "purchase":
+                        book.status = "sold"
+                    else:
+                        book.status = "unlisted"
                     all_book_ids.add(book.id)
             created_orders.append(order)
         # checkout.status
@@ -288,6 +295,7 @@ class OrderService:
             for ob in order.books:
                 if ob.book:
                     books_info.append({
+                        "id": ob.book.id,
                         "title": ob.book.title_or,
                         "cover": ob.book.cover_img_url,
                     })
@@ -299,6 +307,9 @@ class OrderService:
                 "books": books_info,
                 "create_at": order.created_at,
                 "due_at": order.due_at,
+                "completed_at": order.completed_at,
+                "owner_id": order.owner_id,
+                "borrower_id": order.borrower_id,
             })
         return result
     
@@ -359,7 +370,8 @@ class OrderService:
         for order_book in order.books:
             if order_book.book:
                 book = db.query(Book).filter(Book.id == order_book.book_id).first()
-                if book.status == "unlisted":
+                # Restore to listed if it was unlisted, lent, or sold due to this order
+                if book.status in ["unlisted", "lent", "sold"]:
                     book.status = "listed"
         
         db.commit()
@@ -630,12 +642,23 @@ class OrderService:
             # Calculate expected delivery date: returned_at + estimated_delivery_time
             delivery_time = order.estimated_delivery_time or 7
             expected_delivery = order.returned_at + timedelta(days=delivery_time + 10) # 10 more days
-            
+
             if now >= expected_delivery:
                 order.status = "COMPLETED"
                 order.completed_at = now
+
+                # Restore book availability for borrowed books
+                # For borrow orders: set books back to 'listed'
+                # For purchase orders: books stay as 'sold'
+                if order.action_type == "borrow":
+                    for order_book in order.books:
+                        if order_book.book:
+                            book = db.query(Book).filter(Book.id == order_book.book_id).first()
+                            if book and book.status == "lent":
+                                book.status = "listed"
+
                 count += 1
-        
+
         db.commit()
         return count
     
@@ -657,6 +680,17 @@ class OrderService:
         # Upate order status
         order.status = "COMPLETED"
         order.completed_at = datetime.now(timezone.utc)
+
+        # Restore book availability for borrowed books
+        # For borrow orders: set books back to 'listed'
+        # For purchase orders: books stay as 'sold'
+        if order.action_type == "borrow":
+            for order_book in order.books:
+                if order_book.book:
+                    book = db.query(Book).filter(Book.id == order_book.book_id).first()
+                    if book and book.status == "lent":
+                        book.status = "listed"
+
         db.commit()
         db.refresh(order)
 

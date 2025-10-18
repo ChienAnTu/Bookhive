@@ -79,10 +79,19 @@ export default function AboutPage() {
           <h2 className="text-2xl font-semibold mb-6 text-center" style={{ color: "#FF6801" }}>
             Join Our Community
           </h2>
-          <p className="text-gray-600 text-center max-w-2xl mx-auto">
+          <p className="text-gray-600 text-center max-w-2xl mx-auto mb-6">
             Whether you're an avid reader or just getting started, BookExchange welcomes
             you to join our growing community of book lovers. Start sharing your
             books today and be part of the reading revolution!
+          </p>
+          <p className="text-gray-700 text-center">
+            Contact us at:{" "}
+            <a
+              href="mailto:support-reply@bookborrow.org"
+              className="text-[#FF6801] hover:underline font-medium"
+            >
+              support-reply@bookborrow.org
+            </a>
           </p>
         </div>
       </div>

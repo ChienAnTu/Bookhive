@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 class VerificationEmailRequest(BaseModel):
     emailAddress: EmailStr
-    otp: str
+    otp: str = ""
 
 
 class ReceiptEmailRequest(BaseModel):
