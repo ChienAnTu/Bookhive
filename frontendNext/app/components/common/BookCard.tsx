@@ -76,13 +76,13 @@ const BookCard: React.FC<BookCardProps> = ({ book, onViewDetails }) => {
   const getDeliveryLabel = (method: string) => {
     switch (method) {
       case "both":
-        return "Pickup and Post";
+        return "Pickup or Post";
       case "post":
         return "Post";
-      case "self-help":
+      case "pickup":
         return "Pickup";
       default:
-        return "Pickup and Post";
+        return "Pickup or Post";
     }
   };
 

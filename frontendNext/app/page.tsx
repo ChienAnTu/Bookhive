@@ -43,7 +43,7 @@ export default function HomePage() {
         {/* 半透明遮罩 */}
         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-6">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            {greeting}! Welcome back
+            Hi! Welcome back
           </h1>
           <p className="text-lg text-gray-200 mb-8">
             BookBorrow — where every book finds a new friend.

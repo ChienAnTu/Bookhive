@@ -115,6 +115,74 @@ export const registerUser = async (userData: RegisterData) => {
   }
 };
 
+// Send verification email (OTP)
+export const sendVerificationEmail = async (emailAddress: string) => {
+  const API_URL = getApiUrl();
+
+  try {
+    const response = await axios.post(
+      `${API_URL}/email/send_verification`,
+      { emailAddress },
+      {
+        headers: { "Content-Type": "application/json" },
+        withCredentials: false,
+      }
+    );
+
+    return {
+      success: true,
+      message: response.data.message || "Verification email sent successfully.",
+    };
+  } catch (err) {
+    let errorMessage = "Failed to send verification email";
+
+    if (axios.isAxiosError(err)) {
+      errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message;
+    } else if (err instanceof Error) {
+      errorMessage = err.message;
+    }
+
+    return {
+      success: false,
+      message: errorMessage,
+    };
+  }
+};
+
+// verify Otp
+export const verifyOtp = async (emailAddress: string, otp: string) => {
+  const API_URL = getApiUrl();
+
+  try {
+    const response = await axios.post(`${API_URL}/email/verify_otp`, {
+      emailAddress,
+      otp,
+    });
+
+    return {
+      success: true,
+      message: response.data.message || "OTP verified successfully.",
+    };
+  } catch (err) {
+    let errorMessage = "OTP verification failed";
+    if (axios.isAxiosError(err)) {
+      errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message;
+    } else if (err instanceof Error) {
+      errorMessage = err.message;
+    }
+
+    return { success: false, message: errorMessage };
+  }
+};
+
+
+
 // User logout function
 export const logoutUser = async () => {
   const API_URL = getApiUrl();

@@ -12,6 +12,7 @@ export async function initiatePayment(payload: {
   deposit?: number;      // in cents
   shipping_fee?: number; // in cents
   service_fee?: number;  // in cents
+  donation?: number;     // in cents
   checkout_id: string;
   lender_account_id: string;
 }) {

@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 
 class BookSummary(BaseModel):
+    id: str
     title: str
     cover: Optional[str]  
 
@@ -19,6 +20,9 @@ class OrderSummary(BaseModel):
     books: List[BookSummary]
     create_at: datetime = None
     due_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    owner_id: str
+    borrower_id: str
 
 class BookDetail(BaseModel):
     bookId: str

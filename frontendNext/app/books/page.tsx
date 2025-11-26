@@ -23,41 +23,24 @@ export default function BooksPage() {
   });
 
   const [books, setBooks] = useState<Book[]>([]);
+  const [allBooks, setAllBooks] = useState<Book[]>([]); // For filter options
   const [loading, setLoading] = useState(true);
-  const [ownersMap, setOwnersMap] = useState<Record<string, User>>({});
   const [totalBooks, setTotalBooks] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
-  // Search function
-  const performSearch = async (searchParams: SearchParams) => {
-    setLoading(true);
-    try {
-      const result = await searchBooks({
-        ...searchParams,
-        page: currentPage,
-        pageSize,
-        status: 'listed', // Only show listed books by default
-      });
-      setBooks(result.items);
-      setTotalBooks(result.total);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load all books once for filter options
   useEffect(() => {
-    async function loadOwners() {
-      const uniqueOwnerIds = Array.from(new Set(books.map(b => b.ownerId)));
-      const results = await Promise.all(uniqueOwnerIds.map(id => getUserById(id)));
-      const map: Record<string, User> = {};
-      results.forEach(u => { if (u) map[u.id] = u; });
-      setOwnersMap(map);
-    }
-    if (books.length) loadOwners();
-  }, [books]);
+    const loadAllBooks = async () => {
+      try {
+        const data = await getBooks({ status: 'listed' });
+        setAllBooks(data || []);
+      } catch (err) {
+        console.error("Failed to fetch all books:", err);
+      }
+    };
+    loadAllBooks();
+  }, []);
 
   // Handle search when filters change
   useEffect(() => {
@@ -67,6 +50,7 @@ export default function BooksPage() {
         const searchParams = {
           q: searchQuery || undefined,
           lang: filters.originalLanguage || undefined,
+          category: filters.category || undefined,
           delivery: filters.deliveryMethod as SearchParams['delivery'] || undefined,
           page: currentPage,
           pageSize: 20,
@@ -92,8 +76,9 @@ export default function BooksPage() {
       // If no search parameters, fetch default books
       (async () => {
         try {
-          const data = await getBooks();
+          const data = await getBooks({ status: 'listed' });
           setBooks(data || []);
+          setTotalBooks(data?.length || 0);
         } catch (err) {
           console.error("Failed to fetch books:", err);
         } finally {
@@ -117,49 +102,17 @@ export default function BooksPage() {
     setCurrentPage(1);
   };
 
-  // Only get listed books for filtering and display
-  const availableBooks = useMemo(() => {
-    return books.filter((book) => book.status === "listed");
-  }, [books]);
 
-  // Filter logic
-  const filteredBooks = useMemo(() => {
-    return availableBooks.filter((book) => {
-      // Category filter
-      if (filters.category && book.category !== filters.category) {
-        return false;
-      }
 
-      // Language filter
-      if (filters.originalLanguage && book.originalLanguage !== filters.originalLanguage) {
-        return false;
-      }
-
-      // Delivery Method filter
-      if (
-        filters.deliveryMethod &&
-        book.deliveryMethod !== filters.deliveryMethod
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [availableBooks, filters]);
 
   const router = useRouter();
 
   // Sort logic: old->new
   const sortedBooks = useMemo(() => {
-    return [...filteredBooks].sort(
+    return [...books].sort(
       (a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime()
     );
-  }, [filteredBooks]);
-
-  // go to detail page
-  const handleViewDetails = (bookId: string) => {
-    router.push(`/books/${bookId}`);
-  };
+  }, [books]);
 
   // Handle pagination
   const handlePageChange = (page: number) => {
@@ -173,13 +126,13 @@ export default function BooksPage() {
       <div className="hidden lg:flex lg:w-1/5 lg:min-w-48 lg:max-w-64">
         <BookFilter
           filters={filters}
-          books={availableBooks}
+          books={allBooks}
           onFilterChange={handleFilterChange}
           onClearFilters={handleClearFilters}
         />
       </div>
 
-    {/* Main content area */}
+      {/* Main content area */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
           {/* Results count and loading state */}
@@ -192,7 +145,7 @@ export default function BooksPage() {
           {/* Books grid */}
           {loading ? (
             <div className="text-center py-20">Loading books...</div>
-          ) : filteredBooks.length > 0 ? (
+          ) : books.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {sortedBooks.map((book) => (
@@ -211,11 +164,10 @@ export default function BooksPage() {
                     <button
                       key={i}
                       onClick={() => handlePageChange(i + 1)}
-                      className={`mx-1 px-4 py-2 rounded ${
-                        currentPage === i + 1
-                          ? 'bg-black text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
+                      className={`mx-1 px-4 py-2 rounded ${currentPage === i + 1
+                        ? 'bg-black text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
                     >
                       {i + 1}
                     </button>

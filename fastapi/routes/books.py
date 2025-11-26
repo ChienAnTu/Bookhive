@@ -130,11 +130,19 @@ def list_books(
     return {"items": [_to_read(b) for b in items], "total": total, "page": page, "page_size": page_size}
 
 
+# -------- Get Filter Options --------
+@router.get("/filter-options")
+def get_filter_options(db: Session = Depends(get_db)):
+    """Get all unique categories and languages for filter dropdowns."""
+    return BookService.get_filter_options(db)
+
+
 # -------- Search --------
 @router.get("/search")
 def search_books(
     q: Optional[str] = Query(None, description="keyword in title/author/description/ISBN"),
     lang: Optional[str] = Query(None),
+    category: Optional[str] = None,
     status: Literal["listed","unlisted","all"] = "listed",
     canRent: Optional[bool] = None,
     canSell: Optional[bool] = None,
@@ -147,7 +155,7 @@ def search_books(
     db: Session = Depends(get_db),
 ):
     items, total = BookService.search_books(
-        db=db, q=q, lang=lang, status=status, can_rent=canRent, can_sell=canSell,
+        db=db, q=q, lang=lang, category=category, status=status, can_rent=canRent, can_sell=canSell,
         delivery=delivery, min_price=minPrice, max_price=maxPrice,
         sort=sort, page=page, page_size=page_size
     )
