@@ -6,41 +6,85 @@ Users can register, list books for lending, borrow books from others, and comple
 ---
 
 ## Features
-Product Requirement Document can be found here:
+Product Requirement Document (PRD) can be found here:
 https://skfusc.axshare.com/?g=4
+
 
 ### 👤 User Management
 
-* User registration and login
-* Profile management (bio, location, ratings, history)
-* Blacklist and reporting system for misuse
+- User registration & login
+- Profile management (bio, location, borrowing history, ratings)
+- User reviews & rating system
+- Blacklist system (users can block each other)
+- Platform-maintained global blacklist
+- Misuse reporting & moderation workflow
 
-### 📖 Book Lending & Borrowing
+------
 
-* Add, edit, delete, and search books by title, author, genre, location
-* Borrow request and approval workflow
-* Shipping options: self-pickup or delivery
-* Security deposit mechanism (hold, refund, compensation)
+### 📖 Book Listing & Borrowing Workflow
 
-### 💳 Payment Gateway
+- List books for lending (title, author, photos, description, condition)
+- Edit / delete book listings
+- Borrow request workflow (request → pay → shipping → return)
+- Real-time borrowing status updates
+- Automatic overdue handling
+- Dual options: self-pickup or platform shipping
+- Platform-managed deposit mechanism
+  - Platform receives deposit
+  - Platform refunds deposit
+  - Deposit deduction for losses/damages
+- Order status automation (scheduled backend tasks)
 
-* Secure deposit handling via Stripe (or equivalent)
-* Service fee deduction for purchases and deposit loss
-* Refunds and transparent payment status updates
-* Donation support
+------
 
-### 💬 Messaging & Notifications
+### 🛒 Purchase & Delivery
 
-* In-app messaging linked to transactions
-* Email notifications for updates, reminders, disputes
-* Moderation and reporting tools
+- Users may purchase books directly from the owner
+- Platform handles payment & fee deduction
+- Platform-managed shipping workflow
+- Shipping status tracking
+- Platform-issued refunds
 
-### 📊 Platform Management
+------
 
-* Configurable service fee rate
-* Audit trail for payments and transactions
-* Admin tools for blacklist, dispute handling, and fee management
+### 🧾 Payment & Settlement System
 
+- Deposit management (hold, refund, compensation)
+- Platform fee management (borrowing / purchase fee)
+- Dispute settlement & fee distribution
+- Transparent transaction logs
+- Refund tracking
+- Optional donation support
+
+------
+
+### 💬 Messaging, Notifications & Real-time Features
+
+- Real-time chat between users (linked to each order)
+- System notifications (email + in-app)
+- Status change alerts: request updates, shipping, returns, disputes
+- Dispute communication & mediation logs
+
+------
+
+### ⚖️ Dispute Management 
+
+- Dispute ticket creation
+- Customer support involvement (Admin)
+- Evidence upload (photos, chat logs, transaction records)
+- Partial or full deposit deduction (Admin)
+- Automated settlement & platform ledger updates
+
+------
+
+### 🔧 Platform Management (Admin)
+
+- Configure service fee rate
+- Manage global blacklist
+- Handle user disputes
+- Modify platform-level rules
+- Transaction & payment audit trail
+- Automated tasks (overdue updates, settlement updates)
 ---
 
 ## Tech Stack
